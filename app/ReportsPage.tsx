@@ -96,7 +96,6 @@ export const DailyReportsPage: React.FC = () => {
     ? metricsConfig.filter(m => selectedMetrics.includes(m.key))
     : metricsConfig;
 
-  // Helper to determine column color based on metric group
   const getMetricColor = (key: string) => {
     if (key === 'attendance' || key === 'appearance') return 'bg-[#E2EFDA]';
     if (key === 'preparation') return 'bg-white';
@@ -193,7 +192,6 @@ export const DailyReportsPage: React.FC = () => {
 
   const totalMaxScore = metricsConfig.reduce((acc, m) => acc + m.max, 0);
 
-  // Auto focus logic
   const handleKeyDown = (e: React.KeyboardEvent, teacherIdx: number, metricKey: string) => {
     if (e.key === 'Enter') {
         e.preventDefault();
@@ -270,15 +268,10 @@ export const DailyReportsPage: React.FC = () => {
                 {displayedMetrics.map(m => (
                   <th key={m.key} className={`p-1 border-e border-slate-300 min-w-[70px] align-bottom ${getMetricColor(m.key)}`}>
                     <div className="flex flex-col items-center justify-end gap-1 pb-1 h-full w-full">
-                        {/* Vertical Text Name */}
                         <div className="vertical-text font-bold text-slate-800 h-20 mb-auto text-[11px]">{m.label}</div>
-                        
-                        {/* Max Grade Box */}
                         <div className="w-full px-1">
                             <div className="bg-white border border-slate-300 rounded text-center text-[10px] font-bold py-0.5 shadow-sm">{m.max}</div>
                         </div>
-
-                        {/* Fill All Button */}
                         <div className="w-full px-1">
                             <button 
                                 onClick={() => {
@@ -291,8 +284,6 @@ export const DailyReportsPage: React.FC = () => {
                                 <Zap size={8} className="fill-current" /> الكل
                             </button>
                         </div>
-
-                        {/* Custom Input Row */}
                         <div className="flex items-center gap-1 w-full px-1">
                             <button 
                                 onClick={() => fillMetricColumn(m.key, m.max)}
@@ -509,7 +500,6 @@ export const DailyReportsPage: React.FC = () => {
                     className="w-full p-3 border rounded-xl bg-slate-50 text-right text-sm font-bold min-h-[80px]" 
                     placeholder="ملاحظات إضافية..."
                     onChange={(e) => {
-                        // Handle custom text logic if needed, currently storing predefined types mostly
                     }}
                 ></textarea>
                 <button onClick={() => setViolationModal(null)} className="w-full mt-2 p-3 bg-slate-800 text-white rounded-xl font-bold">حفظ وإغلاق</button>
@@ -520,7 +510,7 @@ export const DailyReportsPage: React.FC = () => {
   );
 };
 
-// --- START OF CHANGE - Requirement 1-6: Violations Page Refactoring ---
+// --- START OF CHANGE - Requirement: Intelligent Autocomplete with Auto-fill ---
 export const ViolationsPage: React.FC = () => {
   const { lang, data, updateData } = useGlobal();
   const [activeMode, setActiveMode] = useState<'students' | 'teachers'>('students');
@@ -534,11 +524,22 @@ export const ViolationsPage: React.FC = () => {
   const [showFilter, setShowFilter] = useState(false);
 
   const studentList = data.studentReports || [];
-  const teacherList = useMemo(() => {
-    const names = new Set<string>();
-    data.dailyReports.forEach(r => r.teachersData.forEach(t => names.add(t.teacherName)));
-    return Array.from(names);
+  
+  // Map teacher names to their profiles for quick lookup and auto-fill
+  const teacherProfiles = useMemo(() => {
+    const profiles: Record<string, { subject: string, class: string }> = {};
+    // Reverse iterate to get the most recent data if duplicates exist
+    [...data.dailyReports].reverse().forEach(r => {
+      r.teachersData.forEach(t => {
+        if (t.teacherName && !profiles[t.teacherName]) {
+          profiles[t.teacherName] = { subject: t.subjectCode, class: t.className };
+        }
+      });
+    });
+    return profiles;
   }, [data.dailyReports]);
+
+  const teacherList = useMemo(() => Object.keys(teacherProfiles), [teacherProfiles]);
 
   const violationOptions = [
     "تأخر عن الدوام", "تأخر عن الحصة", "عقاب بدني عنيف", "استخدام العصا بطريقة غير تربوية", 
@@ -575,6 +576,32 @@ export const ViolationsPage: React.FC = () => {
     updateData({ violations: updated });
   };
 
+  const handleSelectSuggestion = (rowId: string, suggestionName: string) => {
+    if (activeMode === 'students') {
+      const student = studentList.find(s => s.name === suggestionName);
+      if (student) {
+        const updated = data.violations.map(v => v.id === rowId ? {
+          ...v,
+          studentName: student.name,
+          grade: student.grade,
+          section: student.section
+        } : v);
+        updateData({ violations: updated });
+      }
+    } else {
+      const profile = teacherProfiles[suggestionName];
+      if (profile) {
+        const updated = data.violations.map(v => v.id === rowId ? {
+          ...v,
+          teacherName: suggestionName,
+          subject: profile.subject,
+          class: profile.class
+        } : v);
+        updateData({ violations: updated });
+      }
+    }
+  };
+
   const deleteViolation = (id: string) => {
     if (confirm('هل أنت متأكد من الحذف؟')) {
       updateData({ violations: data.violations.filter(v => v.id !== id) });
@@ -604,7 +631,6 @@ export const ViolationsPage: React.FC = () => {
     return source.filter(n => n.includes(nameInput) && !tempNames.includes(n)).slice(0, 5);
   }, [nameInput, activeMode, studentList, teacherList, tempNames]);
 
-  // Export Logic (Requirement 3, 4, 5)
   const generateRichReport = () => {
     let msg = `*📋 سجل التعهدات والمخالفات (${activeMode === 'students' ? 'طلاب' : 'معلمون'})*\n`;
     msg += `*التاريخ:* ${new Date().toLocaleDateString('ar-EG')}\n`;
@@ -813,7 +839,6 @@ export const ViolationsPage: React.FC = () => {
                          onChange={(e) => updateViolation(v.id, activeMode === 'students' ? 'studentName' : 'teacherName', e.target.value)}
                          placeholder="اكتب الاسم..."
                        />
-                       {/* Contextual Suggestion inside table for speed */}
                        {((activeMode === 'students' ? v.studentName : v.teacherName).length > 2) && (
                          <div className="absolute top-full left-0 right-0 z-[100] bg-white border shadow-xl rounded-lg max-h-32 overflow-y-auto hidden group-focus-within:block">
                             {(activeMode === 'students' ? studentList.map(s => s.name) : teacherList)
@@ -821,7 +846,7 @@ export const ViolationsPage: React.FC = () => {
                               .map(suggestion => (
                                 <button 
                                   key={suggestion}
-                                  onMouseDown={() => updateViolation(v.id, activeMode === 'students' ? 'studentName' : 'teacherName', suggestion)}
+                                  onMouseDown={() => handleSelectSuggestion(v.id, suggestion)}
                                   className="w-full text-right p-2 text-[10px] hover:bg-blue-50 border-b last:border-none"
                                 >
                                   {suggestion}
@@ -1092,15 +1117,11 @@ export const StudentsReportsPage: React.FC = () => {
 
   const filteredData = useMemo(() => {
     let result = [...studentData];
-    // Filter logic for student name selections
     if (filterMode === 'blacklist' || filterMode === 'excellence') {
       if (selectedStudentNames.length === 0) return [];
-      // STRICT MATCH: Only show students whose names are exactly in the selected list
       result = result.filter(s => selectedStudentNames.includes(s.name));
     } else if (filterMode === 'student') {
       if (selectedStudentNames.length === 0) return [];
-      // Partial match is kept only for the general 'By Student' filter input if desired, 
-      // but based on request, we align to strict selection for clarity.
       result = result.filter(s => selectedStudentNames.some(name => s.name.toLowerCase().includes(name.toLowerCase())));
     } else if (filterMode === 'grade' && filterValue) {
       result = result.filter(s => s.grade === filterValue);
@@ -1118,7 +1139,6 @@ export const StudentsReportsPage: React.FC = () => {
     return result;
   }, [studentData, filterMode, filterValue, selectedSpecifics, selectedStudentNames]);
 
-  // Suggestions for student input
   const suggestions = useMemo(() => {
     if (!studentInput.trim()) return [];
     return studentData
@@ -1147,7 +1167,6 @@ export const StudentsReportsPage: React.FC = () => {
 
   const handleListApply = () => {
     if (tempListSelected.length > 0) {
-      // Apply strict selected names to the filter
       setSelectedStudentNames(tempListSelected);
       setFilterMode(showListModal === 'blacklist' ? 'blacklist' : 'excellence');
     }
@@ -1162,8 +1181,6 @@ export const StudentsReportsPage: React.FC = () => {
       updateStudent(id, type, !student[type]);
     }
   };
-
-  // --- Export & WhatsApp Functions (Shared Logic) ---
 
   const formatLevel = (val: string) => {
     if (val === 'ضعيف' || val === 'ضعيف جداً' || val === 'مريض') return `❌ ${val}`;
@@ -1238,7 +1255,7 @@ export const StudentsReportsPage: React.FC = () => {
   };
 
   const exportToTxt = () => {
-    const text = generateReportText().replace(/\*/g, ''); // Remove markdown bold for TXT
+    const text = generateReportText().replace(/\*/g, '');
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -1266,8 +1283,6 @@ export const StudentsReportsPage: React.FC = () => {
           <button onClick={bulkAutoFill} className="flex items-center gap-2 bg-purple-50 text-purple-700 px-4 py-2.5 rounded-xl font-bold text-sm border border-purple-200 hover:bg-purple-100 transition-all">
             <Sparkles className="w-4 h-4" /> {lang === 'ar' ? 'التعبئة التلقائية' : 'Auto Fill'}
           </button>
-          
-          {/* Export Buttons */}
           <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200">
             <button onClick={exportToTxt} className="p-2.5 hover:bg-white text-slate-600 rounded-lg transition-all" title="TXT">
               <FileText className="w-4 h-4" />
@@ -1468,7 +1483,7 @@ export const StudentsReportsPage: React.FC = () => {
                           </select>
                         </td>
                         <td className="p-1 border-e border-slate-100 bg-[#FFF2CC]/5">
-                          <select className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicWriting.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicWriting} onChange={(e) => updateStudent(s.id, 'academicWriting', e.target.value)}>
+                          <select className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicReading.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicWriting} onChange={(e) => updateStudent(s.id, 'academicWriting', e.target.value)}>
                             {optionsAr.level.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.level[optionsAr.level.indexOf(o)]}</option>)}
                           </select>
                         </td>
@@ -1522,7 +1537,6 @@ export const StudentsReportsPage: React.FC = () => {
                       const currentVal = (s as any)[mKey];
                       const optKey = mKey === 'healthStatus' ? 'health' : (mKey === 'academicReading' || mKey === 'academicWriting') ? 'level' : mKey;
                       const possibleOpts = (optionsAr as any)[optKey] || [];
-                      
                       return (
                         <td key={mKey} className="p-1 border-e border-slate-100 bg-blue-50/5">
                           {possibleOpts.length > 0 ? (
@@ -1543,7 +1557,6 @@ export const StudentsReportsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* List Modal (Blacklist / Excellence) */}
       {showListModal && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
@@ -1587,7 +1600,6 @@ export const StudentsReportsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Metric Filter Modal */}
       {metricFilterMode && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
@@ -1607,7 +1619,6 @@ export const StudentsReportsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Specific Filter Modal */}
       {showSpecificFilterModal && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-2xl max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
@@ -1655,7 +1666,6 @@ export const StudentsReportsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Notes Modal */}
       {showNotesModal && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
