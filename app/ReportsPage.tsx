@@ -1,0 +1,1310 @@
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useGlobal } from '../context/GlobalState';
+import { Plus, Search, Trash2, Filter, ChevronDown, Check, Calendar, Percent, User, Target, Settings2, AlertCircle, X, ChevronRight, Zap, CheckCircle, FilePlus, FolderOpen, Save, ListOrdered, ArrowUpDown, ArrowUp, ArrowDown, SortAsc, Book, School, Type, Sparkles, FilterIcon, BarChart3, LayoutList, Upload, Download, Phone, UserCircle, Activity, Star, FileText, FileSpreadsheet, Share2, Edit, ChevronLeft } from 'lucide-react';
+import { TeacherFollowUp, DailyReportContainer, StudentReport } from '../types';
+import DynamicTable from '../components/DynamicTable';
+import * as XLSX from 'xlsx';
+
+// Adding local types for TeacherFollowUpPage sorting and filtering
+type FilterMode = 'all' | 'student' | 'percent' | 'metric' | 'grade' | 'section' | 'specific' | 'blacklist' | 'excellence' | 'date';
+type SortCriteria = 'manual' | 'name' | 'subject' | 'class';
+type SortDirection = 'asc' | 'desc';
+
+// --- Teachers Follow-up Page (DailyReportsPage) ---
+export const DailyReportsPage: React.FC = () => {
+  const { lang, data, updateData } = useGlobal();
+  const [activeReportId, setActiveReportId] = useState<string | null>(null);
+  const [showArchive, setShowArchive] = useState(false);
+  const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
+  const [showMetricPicker, setShowMetricPicker] = useState(false);
+  const [showSortModal, setShowSortModal] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ criteria: SortCriteria, direction: SortDirection }>({ criteria: 'manual', direction: 'asc' });
+  const [violationModal, setViolationModal] = useState<{ id: string, notes: string[] } | null>(null);
+  const [activeTeacherFilter, setActiveTeacherFilter] = useState<string>('');
+
+  const reports = data.dailyReports || [];
+  
+  // Set active report on load if not set
+  useEffect(() => {
+    if (!activeReportId && reports.length > 0) {
+      setActiveReportId(reports[reports.length - 1].id);
+    }
+  }, [reports, activeReportId]);
+
+  const currentReport = reports.find(r => r.id === activeReportId);
+  
+  // Subjects Ordering
+  const subjectOrder = ["القرآن الكريم", "التربية الإسلامية", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "العلوم", "الكيمياء", "الفيزياء", "الأحياء", "الاجتماعيات", "الحاسوب", "المكتبة", "الفنية", "المختص الاجتماعي", "الأنشطة", "غيرها"];
+  
+  const teachers = useMemo(() => {
+    let list = currentReport ? [...currentReport.teachersData] : [];
+    
+    // Filtering
+    if (filterMode === 'student' && activeTeacherFilter) {
+      list = list.filter(t => t.teacherName.includes(activeTeacherFilter));
+    }
+
+    // Sorting
+    list.sort((a, b) => {
+      let res = 0;
+      if (sortConfig.criteria === 'name') {
+        res = a.teacherName.localeCompare(b.teacherName);
+      } else if (sortConfig.criteria === 'subject') {
+        const idxA = subjectOrder.indexOf(a.subjectCode);
+        const idxB = subjectOrder.indexOf(b.subjectCode);
+        if (idxA !== -1 && idxB !== -1) res = idxA - idxB;
+        else if (idxA !== -1) res = -1;
+        else if (idxB !== -1) res = 1;
+        else res = a.subjectCode.localeCompare(b.subjectCode);
+      } else if (sortConfig.criteria === 'class') {
+        res = a.className.localeCompare(b.className);
+      } else if (sortConfig.criteria === 'manual') {
+        res = (a.order || 0) - (b.order || 0);
+      }
+      return sortConfig.direction === 'asc' ? res : -res;
+    });
+
+    return list;
+  }, [currentReport, sortConfig, filterMode, activeTeacherFilter]);
+
+  const metricsConfig = [
+    { key: 'attendance', label: 'الحضور', max: data.maxGrades.attendance || 5 },
+    { key: 'appearance', label: 'المظهر', max: data.maxGrades.appearance || 5 },
+    { key: 'preparation', label: 'التحضير', max: data.maxGrades.preparation || 10 },
+    { key: 'supervision_queue', label: 'طابور', max: data.maxGrades.supervision_queue || 5 },
+    { key: 'supervision_rest', label: 'راحة', max: data.maxGrades.supervision_rest || 5 },
+    { key: 'supervision_end', label: 'نهاية', max: data.maxGrades.supervision_end || 5 },
+    { key: 'correction_books', label: 'كتب', max: data.maxGrades.correction_books || 10 },
+    { key: 'correction_notebooks', label: 'دفاتر', max: data.maxGrades.correction_notebooks || 10 },
+    { key: 'correction_followup', label: 'متابعة تصحيح', max: data.maxGrades.correction_followup || 10 },
+    { key: 'teaching_aids', label: 'وسائل تعليمية', max: data.maxGrades.teaching_aids || 10 },
+    { key: 'extra_activities', label: 'أنشطة لا صفية', max: data.maxGrades.extra_activities || 10 },
+    { key: 'radio', label: 'إذاعة', max: data.maxGrades.radio || 5 },
+    { key: 'creativity', label: 'إبداع', max: data.maxGrades.creativity || 5 },
+    { key: 'zero_period', label: 'حصة صفرية', max: data.maxGrades.zero_period || 5 },
+  ];
+
+  const subjects = ["القرآن الكريم", "التربية الإسلامية", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "العلوم", "الكيمياء", "الفيزياء", "الأحياء", "الاجتماعيات", "الحاسوب", "المكتبة", "الفنية", "المختص الاجتماعي", "الأنشطة", "غيرها"];
+  const grades = ["التمهيدي", "الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "الأول الثانوي", "الثاني الثانوي", "الثالث الثانوي"];
+  const violationTypes = ["تأخر عن طابور", "تأخر عن حصة", "خروج من الحصة", "الإفراط في العقاب", "رفض القرارات الإدارية", "عدم تسليم ما كلف به"];
+
+  const displayedMetrics = filterMode === 'metric' && selectedMetrics.length > 0 
+    ? metricsConfig.filter(m => selectedMetrics.includes(m.key))
+    : metricsConfig;
+
+  // Helper to determine column color based on metric group
+  const getMetricColor = (key: string) => {
+    if (key === 'attendance' || key === 'appearance') return 'bg-[#E2EFDA]';
+    if (key === 'preparation') return 'bg-white';
+    if (key.startsWith('supervision')) return 'bg-[#FCE4D6]';
+    return 'bg-[#DDEBF7]';
+  };
+
+  const handleCreateReport = () => {
+    const lastReport = reports[reports.length - 1];
+    const newTeachers = lastReport ? lastReport.teachersData.map(t => ({ 
+      ...t, 
+      attendance: 0, appearance: 0, preparation: 0, supervision_queue: 0, supervision_rest: 0, supervision_end: 0, 
+      correction_books: 0, correction_notebooks: 0, correction_followup: 0, teaching_aids: 0, extra_activities: 0, 
+      radio: 0, creativity: 0, zero_period: 0, violations_score: 0, violations_notes: [] 
+    })) : [];
+    
+    const newReport: DailyReportContainer = {
+      id: Date.now().toString(),
+      dayName: new Intl.DateTimeFormat('ar-EG', { weekday: 'long' }).format(new Date()),
+      dateStr: new Date().toISOString().split('T')[0],
+      teachersData: newTeachers as any
+    };
+    updateData({ dailyReports: [...reports, newReport] });
+    setActiveReportId(newReport.id);
+  };
+
+  const addNewTeacher = () => {
+    if (!activeReportId) return;
+    const newTeacher: TeacherFollowUp = {
+        id: Date.now().toString(), teacherName: '', subjectCode: '', className: '',
+        attendance: 0, appearance: 0, preparation: 0, supervision_queue: 0, supervision_rest: 0, supervision_end: 0,
+        correction_books: 0, correction_notebooks: 0, correction_followup: 0, teaching_aids: 0, extra_activities: 0,
+        radio: 0, creativity: 0, zero_period: 0, violations_score: 0, violations_notes: [], order: teachers.length + 1
+    };
+    
+    const updatedReports = reports.map(r => r.id === activeReportId ? { ...r, teachersData: [...r.teachersData, newTeacher] } : r);
+    updateData({ dailyReports: updatedReports });
+  };
+
+  const updateTeacher = (teacherId: string, field: string, value: any) => {
+    if (!activeReportId) return;
+    const updatedReports = reports.map(r => {
+      if (r.id === activeReportId) {
+        return {
+          ...r,
+          teachersData: r.teachersData.map(t => t.id === teacherId ? { ...t, [field]: value } : t)
+        };
+      }
+      return r;
+    });
+    updateData({ dailyReports: updatedReports });
+  };
+
+  const fillAllMax = () => {
+    if (!activeReportId) return;
+    if (!confirm(lang === 'ar' ? 'هل أنت متأكد من تعبئة جميع الدرجات بالحد الأقصى؟' : 'Fill all max?')) return;
+    const updatedReports = reports.map(r => {
+      if (r.id === activeReportId) {
+        return {
+          ...r,
+          teachersData: r.teachersData.map(t => {
+            const filled: any = { ...t };
+            metricsConfig.forEach(m => filled[m.key] = m.max);
+            return filled;
+          })
+        };
+      }
+      return r;
+    });
+    updateData({ dailyReports: updatedReports });
+  };
+
+  const fillMetricColumn = (metricKey: string, val?: number) => {
+    if (!activeReportId) return;
+    const max = metricsConfig.find(m => m.key === metricKey)?.max || 0;
+    const valueToFill = val !== undefined ? val : max;
+    
+    const updatedReports = reports.map(r => {
+        if (r.id === activeReportId) {
+            return {
+                ...r,
+                teachersData: r.teachersData.map(t => ({ ...t, [metricKey]: valueToFill }))
+            };
+        }
+        return r;
+    });
+    updateData({ dailyReports: updatedReports });
+  };
+
+  const calculateTotal = (t: TeacherFollowUp) => {
+    let sum = metricsConfig.reduce((acc, m) => acc + (Number((t as any)[m.key]) || 0), 0);
+    return Math.max(0, sum - (t.violations_score || 0));
+  };
+
+  const totalMaxScore = metricsConfig.reduce((acc, m) => acc + m.max, 0);
+
+  // Auto focus logic
+  const handleKeyDown = (e: React.KeyboardEvent, teacherIdx: number, metricKey: string) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const nextTeacher = teachers[teacherIdx + 1];
+        if (nextTeacher) {
+            const nextInput = document.getElementById(`input-${nextTeacher.id}-${metricKey}`);
+            if (nextInput) nextInput.focus();
+        }
+    }
+  };
+
+  const getColSum = (key: string) => teachers.reduce((acc, t) => acc + (Number((t as any)[key]) || 0), 0);
+  const getColPercent = (key: string, max: number) => {
+    const sum = getColSum(key);
+    return teachers.length ? ((sum / (teachers.length * max)) * 100).toFixed(1) : '0';
+  };
+
+  return (
+    <div className="space-y-4 font-arabic">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm border">
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={handleCreateReport} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-blue-700 transition-all text-xs sm:text-sm"><FilePlus size={16}/> إضافة جدول جديد</button>
+          <button onClick={() => setShowArchive(true)} className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-xl font-bold hover:bg-slate-200 transition-all text-xs sm:text-sm"><FolderOpen size={16}/> فتح تقرير</button>
+          <button onClick={addNewTeacher} className="flex items-center gap-2 bg-purple-50 text-purple-700 px-4 py-2 rounded-xl font-bold border border-purple-200 hover:bg-purple-100 transition-all text-xs sm:text-sm"><UserCircle size={16}/> إضافة معلم</button>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <button onClick={() => setFilterMode(prev => prev === 'all' ? 'metric' : 'all')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold border transition-all text-xs sm:text-sm ${filterMode === 'metric' ? 'bg-orange-100 text-orange-600 border-orange-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                <Filter size={16}/> {filterMode === 'metric' ? 'عرض مخصص' : 'عرض الجميع'}
+            </button>
+            {filterMode === 'metric' && (
+                <button onClick={() => setShowMetricPicker(true)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 w-5 h-5 flex items-center justify-center text-[10px]"><Settings2 size={10}/></button>
+            )}
+          </div>
+          
+          <button onClick={() => setShowSortModal(true)} className="p-2.5 bg-slate-50 text-slate-600 rounded-xl border border-slate-200 hover:bg-white"><ListOrdered size={18}/></button>
+          {currentReport && (
+             <div className="flex items-center gap-2 bg-blue-50 text-blue-600 px-3 py-2 rounded-xl border border-blue-100">
+                <Calendar size={16}/>
+                <span className="text-xs font-black">{currentReport.dayName} {currentReport.dateStr}</span>
+                <button className="hover:bg-blue-200 rounded p-0.5"><Edit size={12}/></button>
+             </div>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border shadow-sm overflow-hidden relative">
+        <div className="overflow-x-auto">
+          <table className={`w-full text-center border-collapse ${filterMode === 'metric' ? '' : 'min-w-[1400px]'}`}>
+            <thead>
+              <tr className="border-b border-slate-300">
+                <th rowSpan={2} className="p-2 border-e border-slate-300 w-10 sticky right-0 bg-[#FFD966] z-20">م</th>
+                <th rowSpan={2} className={`p-2 border-e border-slate-300 sticky right-10 bg-[#FFD966] z-20 ${filterMode === 'metric' ? 'w-40' : 'w-48'}`}>اسم المعلم</th>
+                {!filterMode.includes('metric') && (
+                    <>
+                        <th rowSpan={2} className="p-2 border-e border-slate-300 w-28 bg-[#FFD966]">المادة</th>
+                        <th rowSpan={2} className="p-2 border-e border-slate-300 w-24 bg-[#FFD966]">الصف</th>
+                    </>
+                )}
+                <th colSpan={displayedMetrics.length} className="p-2 border-b border-slate-300 font-black text-sm bg-[#FFD966]">
+                    <div className="flex items-center gap-2">
+                        <span>مجالات تقييم المعلمين</span>
+                        <button onClick={fillAllMax} title="تعبئة الجميع بالحد الأقصى" className="bg-blue-600 hover:bg-blue-700 text-white rounded px-2 py-1 text-[10px] flex items-center gap-1">
+                           <Sparkles size={10} /> مطابقة التعبئة للجميع
+                        </button>
+                    </div>
+                </th>
+                <th rowSpan={2} className="p-2 border-e border-slate-300 w-24 bg-[#C6E0B4]">المخالفات</th>
+                <th rowSpan={2} className="p-2 border-e border-slate-300 w-20 bg-[#C6E0B4]">المجموع</th>
+                <th rowSpan={2} className="p-2 w-20 bg-[#FFD966]">النسبة</th>
+              </tr>
+              <tr className="text-[10px]">
+                {displayedMetrics.map(m => (
+                  <th key={m.key} className={`p-1 border-e border-slate-300 min-w-[70px] align-bottom ${getMetricColor(m.key)}`}>
+                    <div className="flex flex-col items-center justify-end gap-1 pb-1 h-full w-full">
+                        {/* Vertical Text Name */}
+                        <div className="vertical-text font-bold text-slate-800 h-20 mb-auto text-[11px]">{m.label}</div>
+                        
+                        {/* Max Grade Box */}
+                        <div className="w-full px-1">
+                            <div className="bg-white border border-slate-300 rounded text-center text-[10px] font-bold py-0.5 shadow-sm">{m.max}</div>
+                        </div>
+
+                        {/* Fill All Button */}
+                        <div className="w-full px-1">
+                            <button 
+                                onClick={() => {
+                                    const input = document.getElementById(`header-input-${m.key}`) as HTMLInputElement;
+                                    const val = input?.value ? parseInt(input.value) : m.max;
+                                    fillMetricColumn(m.key, val);
+                                }}
+                                className="w-full bg-blue-50 text-blue-600 border border-blue-200 rounded flex items-center justify-center gap-1 text-[9px] font-bold py-0.5 hover:bg-blue-100 transition-colors"
+                            >
+                                <Zap size={8} className="fill-current" /> الكل
+                            </button>
+                        </div>
+
+                        {/* Custom Input Row */}
+                        <div className="flex items-center gap-1 w-full px-1">
+                            <button 
+                                onClick={() => fillMetricColumn(m.key, m.max)}
+                                className="bg-green-50 text-green-600 border border-green-200 rounded p-0.5 hover:bg-green-100 flex-shrink-0"
+                                title="تعبئة الدرجة الكاملة"
+                            >
+                                <CheckCircle size={10} />
+                            </button>
+                            <input 
+                                id={`header-input-${m.key}`}
+                                className="w-full text-[9px] text-center border border-slate-300 rounded py-0.5 outline-none bg-white focus:ring-1 focus:ring-blue-200" 
+                                placeholder="درجة"
+                                type="number"
+                                max={m.max}
+                            />
+                        </div>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {teachers.length === 0 ? (
+                  <tr><td colSpan={20} className="p-8 text-slate-400">لا توجد بيانات.. أضف معلمين أو أنشئ جدولاً جديداً</td></tr>
+              ) : teachers.map((t, idx) => {
+                const total = calculateTotal(t);
+                const percent = totalMaxScore > 0 ? ((total / totalMaxScore) * 100).toFixed(1) : '0';
+                return (
+                  <tr key={t.id} className="border-b hover:bg-slate-50 transition-colors h-10">
+                    <td className="p-1 border-e sticky right-0 bg-white group-hover:bg-slate-50 font-bold text-xs">{idx + 1}</td>
+                    <td className="p-1 border-e sticky right-10 bg-white group-hover:bg-slate-50">
+                        <input className="w-full text-right font-bold outline-none bg-transparent text-xs" value={t.teacherName} onChange={e => updateTeacher(t.id, 'teacherName', e.target.value)} placeholder="اسم المعلم.." />
+                    </td>
+                    {!filterMode.includes('metric') && (
+                        <>
+                            <td className="p-1 border-e">
+                            <select className="w-full bg-transparent outline-none text-[10px] text-center" value={t.subjectCode} onChange={e => updateTeacher(t.id, 'subjectCode', e.target.value)}>
+                                <option value="">اختر..</option>
+                                {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                            </td>
+                            <td className="p-1 border-e">
+                            <select className="w-full bg-transparent outline-none text-[10px] text-center" value={t.className} onChange={e => updateTeacher(t.id, 'className', e.target.value)}>
+                                <option value="">اختر..</option>
+                                {grades.map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                            </td>
+                        </>
+                    )}
+                    {displayedMetrics.map(m => (
+                      <td key={m.key} className="p-1 border-e">
+                        <input 
+                            id={`input-${t.id}-${m.key}`}
+                            type="number" 
+                            className="w-full text-center outline-none bg-transparent font-bold text-xs focus:bg-blue-50 focus:ring-1 focus:ring-blue-200 rounded" 
+                            value={(t as any)[m.key]} 
+                            onChange={e => {
+                                const val = Math.min(m.max, Math.max(0, parseInt(e.target.value) || 0));
+                                updateTeacher(t.id, m.key, val);
+                            }} 
+                            onKeyDown={(e) => handleKeyDown(e, idx, m.key)}
+                        />
+                      </td>
+                    ))}
+                    <td 
+                        className="p-1 border-e cursor-pointer hover:bg-red-50 transition-colors relative group"
+                        onClick={() => setViolationModal({ id: t.id, notes: t.violations_notes })}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                          <input 
+                             type="number" 
+                             className="w-full text-center text-red-600 font-bold outline-none bg-transparent text-xs" 
+                             value={t.violations_score} 
+                             onChange={e => updateTeacher(t.id, 'violations_score', parseInt(e.target.value) || 0)} 
+                             onClick={(e) => e.stopPropagation()}
+                          />
+                          {t.violations_notes.length > 0 && <div className="w-2 h-2 rounded-full bg-red-600 absolute top-1 right-1"></div>}
+                      </div>
+                    </td>
+                    <td className="p-1 border-e font-black text-blue-600 text-xs">{total}</td>
+                    <td className="p-1 font-black text-slate-800 text-xs">{percent}%</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            {teachers.length > 0 && (
+                <tfoot className="bg-slate-50 text-slate-800 font-bold text-xs sticky bottom-0 z-20 shadow-lg border-t-2 border-slate-200">
+                    <tr>
+                        <td colSpan={filterMode === 'metric' ? 2 : 4} className="p-2 text-left px-4 border-e">المجموع الكلي</td>
+                        {displayedMetrics.map(m => (
+                            <td key={m.key} className="p-2 border-e text-blue-600">
+                                <div className="flex flex-col">
+                                    <span>{getColSum(m.key)}</span>
+                                </div>
+                            </td>
+                        ))}
+                        <td className="p-2 border-e"></td>
+                        <td className="p-2 border-e text-blue-700">{teachers.reduce((acc, t) => acc + calculateTotal(t), 0)}</td>
+                        <td className="p-2 border-e">
+                            {((teachers.reduce((acc, t) => acc + calculateTotal(t), 0) / (teachers.length * totalMaxScore)) * 100).toFixed(1)}%
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan={filterMode === 'metric' ? 2 : 4} className="p-2 text-left px-4 border-e">النسبة العامة</td>
+                        {displayedMetrics.map(m => (
+                            <td key={m.key} className="p-2 border-e text-slate-500">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px]">{getColPercent(m.key, m.max)}%</span>
+                                </div>
+                            </td>
+                        ))}
+                        <td className="p-2 border-e"></td>
+                        <td className="p-2 border-e"></td>
+                        <td className="p-2 border-e"></td>
+                    </tr>
+                </tfoot>
+            )}
+          </table>
+        </div>
+      </div>
+
+      {/* Archive Modal */}
+      {showArchive && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
+            <h3 className="text-xl font-black mb-4 text-right">أرشيف التقارير</h3>
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {reports.map(r => (
+                <button key={r.id} onClick={() => { setActiveReportId(r.id); setShowArchive(false); }} className={`w-full flex justify-between p-4 rounded-xl font-bold border transition-all ${activeReportId === r.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 hover:bg-slate-100 border-slate-100'}`}>
+                  <span>{r.dateStr}</span>
+                  <span>{r.dayName}</span>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setShowArchive(false)} className="w-full mt-4 p-3 bg-slate-100 rounded-xl font-bold hover:bg-slate-200">إغلاق</button>
+          </div>
+        </div>
+      )}
+
+      {/* Sort Modal */}
+      {showSortModal && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in duration-200 space-y-4">
+                <h3 className="text-xl font-black text-center">ترتيب المعلمين</h3>
+                <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => setSortConfig({...sortConfig, criteria: 'name'})} className={`p-3 rounded-xl border font-bold ${sortConfig.criteria === 'name' ? 'bg-blue-100 border-blue-500 text-blue-700' : 'bg-slate-50'}`}>أبجدياً</button>
+                    <button onClick={() => setSortConfig({...sortConfig, criteria: 'subject'})} className={`p-3 rounded-xl border font-bold ${sortConfig.criteria === 'subject' ? 'bg-blue-100 border-blue-500 text-blue-700' : 'bg-slate-50'}`}>حسب المادة</button>
+                    <button onClick={() => setSortConfig({...sortConfig, criteria: 'class'})} className={`p-3 rounded-xl border font-bold ${sortConfig.criteria === 'class' ? 'bg-blue-100 border-blue-500 text-blue-700' : 'bg-slate-50'}`}>حسب الصف</button>
+                    <button onClick={() => setSortConfig({...sortConfig, criteria: 'manual'})} className={`p-3 rounded-xl border font-bold ${sortConfig.criteria === 'manual' ? 'bg-blue-100 border-blue-500 text-blue-700' : 'bg-slate-50'}`}>يدوي</button>
+                </div>
+                {sortConfig.criteria === 'manual' && (
+                    <div className="max-h-40 overflow-y-auto border p-2 rounded-xl bg-slate-50">
+                        {teachers.map(t => (
+                            <div key={t.id} className="flex items-center gap-2 mb-1">
+                                <input type="number" className="w-12 p-1 text-center rounded border" value={t.order || 0} onChange={(e) => updateTeacher(t.id, 'order', parseInt(e.target.value))} />
+                                <span className="text-xs font-bold">{t.teacherName}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                <div className="flex gap-2 justify-center pt-2">
+                    <button onClick={() => setSortConfig({...sortConfig, direction: 'asc'})} className={`p-2 rounded-lg border ${sortConfig.direction === 'asc' ? 'bg-blue-600 text-white' : 'bg-slate-100'}`}><ArrowUp/></button>
+                    <button onClick={() => setSortConfig({...sortConfig, direction: 'desc'})} className={`p-2 rounded-lg border ${sortConfig.direction === 'desc' ? 'bg-blue-600 text-white' : 'bg-slate-100'}`}><ArrowDown/></button>
+                </div>
+                <button onClick={() => setShowSortModal(false)} className="w-full p-3 bg-slate-800 text-white rounded-xl font-black">تم</button>
+            </div>
+        </div>
+      )}
+
+      {/* Metric Picker Modal */}
+      {showMetricPicker && (
+          <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+              <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in duration-200">
+                  <h3 className="font-bold text-center mb-4">اختر المعايير للعرض</h3>
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                      {metricsConfig.map(m => (
+                          <button 
+                            key={m.key} 
+                            onClick={() => setSelectedMetrics(prev => prev.includes(m.key) ? prev.filter(k => k !== m.key) : [...prev, m.key])}
+                            className={`p-2 rounded-lg text-xs font-bold border ${selectedMetrics.includes(m.key) ? 'bg-blue-500 text-white border-blue-600' : 'bg-slate-50 border-slate-200'}`}
+                          >
+                              {m.label}
+                          </button>
+                      ))}
+                  </div>
+                  <button onClick={() => setShowMetricPicker(false)} className="w-full p-2 bg-slate-800 text-white rounded-xl font-bold">موافق</button>
+              </div>
+          </div>
+      )}
+
+      {/* Violations Modal */}
+      {violationModal && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
+                <h3 className="text-lg font-black text-red-600 mb-4 text-center">تفاصيل المخالفات</h3>
+                <div className="space-y-2 mb-4">
+                    {violationTypes.map(v => (
+                        <button 
+                            key={v}
+                            onClick={() => {
+                                const exists = violationModal.notes.includes(v);
+                                const newNotes = exists ? violationModal.notes.filter(n => n !== v) : [...violationModal.notes, v];
+                                setViolationModal({ ...violationModal, notes: newNotes });
+                                updateTeacher(violationModal.id, 'violations_notes', newNotes);
+                            }}
+                            className={`w-full p-3 rounded-xl text-right font-bold border transition-all flex justify-between ${violationModal.notes.includes(v) ? 'bg-red-50 border-red-500 text-red-700' : 'bg-slate-50 border-slate-100'}`}
+                        >
+                            {v}
+                            {violationModal.notes.includes(v) && <Check size={16}/>}
+                        </button>
+                    ))}
+                </div>
+                <textarea 
+                    className="w-full p-3 border rounded-xl bg-slate-50 text-right text-sm font-bold min-h-[80px]" 
+                    placeholder="ملاحظات إضافية..."
+                    onChange={(e) => {
+                        // Handle custom text logic if needed, currently storing predefined types mostly
+                    }}
+                ></textarea>
+                <button onClick={() => setViolationModal(null)} className="w-full mt-2 p-3 bg-slate-800 text-white rounded-xl font-bold">حفظ وإغلاق</button>
+            </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Violations Page ---
+export const ViolationsPage: React.FC = () => {
+  const { lang, data, updateData } = useGlobal();
+
+  const columns = [
+    { key: 'studentName', label: lang === 'ar' ? 'اسم الطالب' : 'Student Name' },
+    { key: 'class', label: lang === 'ar' ? 'الصف' : 'Class' },
+    { key: 'date', label: lang === 'ar' ? 'التاريخ' : 'Date' },
+    { key: 'violation', label: lang === 'ar' ? 'المخالفة' : 'Violation' },
+    { key: 'procedure', label: lang === 'ar' ? 'الإجراء' : 'Procedure' },
+  ];
+
+  const handleAdd = () => {
+    const name = prompt(lang === 'ar' ? 'أدخل اسم الطالب:' : 'Enter student name:');
+    if (!name) return;
+    
+    const newViolation = {
+      id: Date.now().toString(),
+      studentName: name,
+      class: '',
+      date: new Date().toISOString().split('T')[0],
+      violation: '',
+      procedure: ''
+    };
+    updateData({ violations: [...data.violations, newViolation] });
+  };
+
+  const handleEdit = (item: any) => {
+    const name = prompt(lang === 'ar' ? 'تعديل اسم الطالب:' : 'Edit student name:', item.studentName);
+    const violation = prompt(lang === 'ar' ? 'تعديل المخالفة:' : 'Edit violation:', item.violation);
+    if (name) {
+       const updated = data.violations.map(v => v.id === item.id ? { ...v, studentName: name, violation: violation || v.violation } : v);
+       updateData({ violations: updated });
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm(lang === 'ar' ? 'هل أنت متأكد من الحذف؟' : 'Are you sure?')) {
+      updateData({ violations: data.violations.filter(v => v.id !== id) });
+    }
+  };
+
+  return (
+    <DynamicTable 
+      title={lang === 'ar' ? 'سجل المخالفات والتعهدات' : 'Violations Log'}
+      columns={columns}
+      data={data.violations}
+      onAdd={handleAdd}
+      onEdit={handleEdit}
+      onDelete={handleDelete}
+    />
+  );
+};
+
+export const StudentsReportsPage: React.FC = () => {
+  const { data, updateData, lang } = useGlobal();
+  const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [filterValue, setFilterValue] = useState('');
+  const [selectedStudentNames, setSelectedStudentNames] = useState<string[]>([]);
+  const [studentInput, setStudentInput] = useState('');
+  const [activeMetricFilter, setActiveMetricFilter] = useState<string[]>([]);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showNotesModal, setShowNotesModal] = useState<{id: string, text: string} | null>(null);
+  const [metricFilterMode, setMetricFilterMode] = useState(false);
+  const [showSpecificFilterModal, setShowSpecificFilterModal] = useState(false);
+  const [selectedSpecifics, setSelectedSpecifics] = useState<string[]>([]);
+  
+  // New States for Blacklist and Excellence lists
+  const [showListModal, setShowListModal] = useState<'blacklist' | 'excellence' | null>(null);
+  const [listSearch, setListSearch] = useState('');
+  const [tempListSelected, setTempListSelected] = useState<string[]>([]);
+
+  const studentData = data.studentReports || [];
+
+  const optionsAr = {
+    gender: ["ذكر", "أنثى"],
+    workOutside: ["لا يعمل", "يعمل"],
+    health: ["ممتاز", "مريض"],
+    level: ["ممتاز", "متوسط", "جيد", "ضعيف", "ضعيف جداً"],
+    behavior: ["ممتاز", "متوسط", "جيد", "جيد جدا", "مقبول", "ضعيف", "ضعيف جدا"],
+    mainNotes: ["ممتاز", "كثير الكلام", "كثير الشغب", "عدواني", "تطاول على معلم", "اعتداء على طالب جسدياً", "اعتداء على طالب لفظيا", "أخذ أدوات الغير دون أذنهم", "إتلاف ممتلكات طالب", "إتلاف ممتلكات المدرسة"],
+    eduStatus: ["متعلم", "ضعيف", "أمي"],
+    followUp: ["ممتازة", "متوسطة", "ضعيفة"],
+    cooperation: ["ممتازة", "متوسطة", "ضعيفة", "متذمر", "كثير النقد", "عدواني"],
+    grades: ["التمهيدي", "الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "الأول الثانوي", "الثاني الثانوي", "الثالث الثانوي"],
+    sections: ["أ", "ب", "ج", "د", "هـ", "و", "ز", "ح", "ط", "ي"]
+  };
+
+  const optionsEn = {
+    gender: ["Male", "Female"],
+    workOutside: ["Doesn't Work", "Works"],
+    health: ["Excellent", "Ill"],
+    level: ["Excellent", "Average", "Good", "Weak", "Very Weak"],
+    behavior: ["Excellent", "Average", "Good", "Very Good", "Acceptable", "Weak", "Very Weak"],
+    mainNotes: ["Excellent", "Talkative", "Riotous", "Aggressive", "Teacher Assault", "Physical Assault", "Verbal Assault", "Stealing", "Property Damage", "School Damage"],
+    eduStatus: ["Educated", "Weak", "Illiterate"],
+    followUp: ["Excellent", "Average", "Weak"],
+    cooperation: ["Excellent", "Average", "Weak", "Complaining", "Critical", "Aggressive"],
+    grades: ["Pre-K", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th", "11th", "12th"],
+    sections: ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+  };
+
+  const options = lang === 'ar' ? optionsAr : optionsEn;
+
+  const metricLabels: Record<string, string> = lang === 'ar' ? {
+    gender: "النوع",
+    grade: "الصف",
+    section: "الشعبة",
+    workOutside: "العمل خارج المدرسة",
+    healthStatus: "الحالة الصحية",
+    academicReading: "القراءة",
+    academicWriting: "الكتابة",
+    behaviorLevel: "المستوى السلوكي",
+    guardianEducation: "تعليم ولي الأمر",
+    guardianFollowUp: "متابعة ولي الأمر",
+    guardianCooperation: "تعاون ولي الأمر"
+  } : {
+    gender: "Gender",
+    grade: "Grade",
+    section: "Section",
+    workOutside: "Work Outside",
+    healthStatus: "Health Status",
+    academicReading: "Reading",
+    academicWriting: "Writing",
+    behaviorLevel: "Behavior Level",
+    guardianEducation: "Guardian Education",
+    guardianFollowUp: "Guardian Follow-up",
+    guardianCooperation: "Guardian Cooperation"
+  };
+
+  const updateStudent = (id: string, field: string, value: any) => {
+    const updated = studentData.map(s => s.id === id ? { ...s, [field]: value } : s);
+    updateData({ studentReports: updated });
+  };
+
+  const addStudent = () => {
+    const newStudent: StudentReport = {
+      id: Date.now().toString(),
+      name: '',
+      gender: options.gender[0],
+      grade: options.grades[0],
+      section: options.sections[0],
+      address: '',
+      workOutside: options.workOutside[0],
+      healthStatus: options.health[0],
+      healthDetails: '',
+      guardianName: '',
+      guardianPhones: [''],
+      academicReading: options.level[0],
+      academicWriting: options.level[0],
+      academicParticipation: options.level[0],
+      behaviorLevel: options.behavior[0],
+      mainNotes: [],
+      otherNotesText: '',
+      guardianEducation: options.eduStatus[0],
+      guardianFollowUp: options.followUp[0],
+      guardianCooperation: options.cooperation[0],
+      notes: '',
+      createdAt: new Date().toISOString()
+    };
+    updateData({ studentReports: [...studentData, newStudent] });
+  };
+
+  const bulkAutoFill = () => {
+    if (!confirm(lang === 'ar' ? 'سيتم تعبئة الخيار الأول لجميع الحقول في كافة الطلاب. استمرار؟' : 'Auto-fill first option for all students?')) return;
+    const updated = studentData.map(s => ({
+      ...s,
+      healthStatus: optionsAr.health[0],
+      guardianFollowUp: optionsAr.followUp[0],
+      guardianEducation: optionsAr.eduStatus[0],
+      guardianCooperation: optionsAr.cooperation[0],
+      academicReading: optionsAr.level[0],
+      academicWriting: optionsAr.level[0],
+      academicParticipation: optionsAr.level[0],
+      behaviorLevel: optionsAr.behavior[0],
+      workOutside: optionsAr.workOutside[0],
+    }));
+    updateData({ studentReports: updated });
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const dataXLSX = XLSX.utils.sheet_to_json(ws);
+      const imported = dataXLSX.map((row: any) => ({
+        id: Date.now().toString() + Math.random(),
+        name: row['اسم الطالب'] || '',
+        gender: row['النوع'] || optionsAr.gender[0],
+        grade: row['الصف'] || optionsAr.grades[0],
+        section: row['الشعبة'] || optionsAr.sections[0],
+        address: row['عنوان السكن'] || '',
+        workOutside: row['العمل'] || optionsAr.workOutside[0],
+        healthStatus: row['الحالة الصحية'] || optionsAr.health[0],
+        guardianName: row['ولي الأمر'] || '',
+        guardianPhones: [row['الهاتف'] || ''],
+        academicReading: optionsAr.level[0], academicWriting: optionsAr.level[0], academicParticipation: optionsAr.level[0],
+        behaviorLevel: optionsAr.behavior[0], mainNotes: [], otherNotesText: '', guardianEducation: optionsAr.eduStatus[0],
+        guardianFollowUp: optionsAr.followUp[0], guardianCooperation: optionsAr.cooperation[0], notes: '', createdAt: new Date().toISOString()
+      }));
+      updateData({ studentReports: [...studentData, ...imported as any] });
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const filteredData = useMemo(() => {
+    let result = [...studentData];
+    // Filter logic for student name selections
+    if (filterMode === 'blacklist' || filterMode === 'excellence') {
+      if (selectedStudentNames.length === 0) return [];
+      // STRICT MATCH: Only show students whose names are exactly in the selected list
+      result = result.filter(s => selectedStudentNames.includes(s.name));
+    } else if (filterMode === 'student') {
+      if (selectedStudentNames.length === 0) return [];
+      // Partial match is kept only for the general 'By Student' filter input if desired, 
+      // but based on request, we align to strict selection for clarity.
+      result = result.filter(s => selectedStudentNames.some(name => s.name.toLowerCase().includes(name.toLowerCase())));
+    } else if (filterMode === 'grade' && filterValue) {
+      result = result.filter(s => s.grade === filterValue);
+    } else if (filterMode === 'section' && filterValue) {
+      result = result.filter(s => s.section === filterValue);
+    } else if (filterMode === 'specific' && selectedSpecifics.length > 0) {
+      result = result.filter(s => 
+        selectedSpecifics.includes(s.healthStatus) || 
+        selectedSpecifics.includes(s.behaviorLevel) || 
+        selectedSpecifics.includes(s.grade) ||
+        selectedSpecifics.includes(s.section) ||
+        s.mainNotes.some(n => selectedSpecifics.includes(n))
+      );
+    }
+    return result;
+  }, [studentData, filterMode, filterValue, selectedSpecifics, selectedStudentNames]);
+
+  // Suggestions for student input
+  const suggestions = useMemo(() => {
+    if (!studentInput.trim()) return [];
+    return studentData
+      .filter(s => s.name.toLowerCase().includes(studentInput.toLowerCase()))
+      .map(s => s.name)
+      .filter((name, idx, self) => self.indexOf(name) === idx && !selectedStudentNames.includes(name));
+  }, [studentInput, studentData, selectedStudentNames]);
+
+  const listItemsToDisplay = useMemo(() => {
+    if (!showListModal) return [];
+    const isBlacklist = showListModal === 'blacklist';
+    return studentData
+      .filter(s => isBlacklist ? s.isBlacklisted : s.isExcellent)
+      .filter(s => s.name.toLowerCase().includes(listSearch.toLowerCase()));
+  }, [showListModal, studentData, listSearch]);
+
+  const isOnlyMetricView = filterMode === 'metric' && activeMetricFilter.length > 0;
+
+  const addStudentToFilter = (name?: string) => {
+    const targetName = name || studentInput.trim();
+    if (targetName && !selectedStudentNames.includes(targetName)) {
+      setSelectedStudentNames(prev => [...prev, targetName]);
+      setStudentInput('');
+    }
+  };
+
+  const handleListApply = () => {
+    if (tempListSelected.length > 0) {
+      // Apply strict selected names to the filter
+      setSelectedStudentNames(tempListSelected);
+      setFilterMode(showListModal === 'blacklist' ? 'blacklist' : 'excellence');
+    }
+    setShowListModal(null);
+    setTempListSelected([]);
+    setListSearch('');
+  };
+
+  const toggleStar = (id: string, type: 'isBlacklisted' | 'isExcellent') => {
+    const student = studentData.find(s => s.id === id);
+    if (student) {
+      updateStudent(id, type, !student[type]);
+    }
+  };
+
+  // --- Export & WhatsApp Functions (Shared Logic) ---
+
+  const formatLevel = (val: string) => {
+    if (val === 'ضعيف' || val === 'ضعيف جداً' || val === 'مريض') return `❌ ${val}`;
+    if (val === 'ممتاز' || val === 'جيد جدا') return `✅ ${val}`;
+    return `🔹 ${val}`;
+  };
+
+  const generateReportText = () => {
+    let text = `*📋 تقرير شؤون الطلاب (المفلتر)*\n`;
+    text += `*المدرسة:* ${data.profile.schoolName || 'غير محدد'}\n`;
+    text += `*التاريخ:* ${new Date().toLocaleDateString('ar-EG')}\n`;
+    text += `----------------------------------\n\n`;
+
+    filteredData.forEach((s, i) => {
+      text += `*👤 الطالب (${i + 1}): ${s.name}*\n`;
+      text += `📍 *الصف/الشعبة:* ${s.grade} / ${s.section}\n`;
+      text += `🚻 *النوع:* ${s.gender}\n`;
+      text += `🏠 *السكن:* ${s.address || 'غير متوفر'}\n`;
+      text += `💼 *العمل:* ${s.workOutside}\n`;
+      text += `🏥 *الحالة الصحية:* ${formatLevel(s.healthStatus)}${s.healthDetails ? ` (${s.healthDetails})` : ''}\n`;
+      text += `👨‍👩‍👧 *ولي الأمر:* ${s.guardianName} | ${s.guardianPhones.join(' - ')}\n`;
+      text += `📚 *المستوى العلمي:*\n`;
+      text += `   📖 القراءة: ${formatLevel(s.academicReading)}\n`;
+      text += `   ✍️ الكتابة: ${formatLevel(s.academicWriting)}\n`;
+      text += `   🙋 المشاركة: ${formatLevel(s.academicParticipation)}\n`;
+      text += `🎭 *المستوى السلوكي:* ${formatLevel(s.behaviorLevel)}\n`;
+      
+      if (s.mainNotes.length > 0) {
+        text += `⚠️ *الملاحظات الأساسية:*\n`;
+        s.mainNotes.forEach(note => {
+          text += `   🔴 ${note}\n`;
+        });
+      }
+      
+      text += `🤝 *متابعة ولي الأمر:*\n`;
+      text += `   🎓 التعليم: ${s.guardianEducation}\n`;
+      text += `   📈 المتابعة: ${s.guardianFollowUp}\n`;
+      text += `   🤝 التعاون: ${s.guardianCooperation}\n`;
+      
+      if (s.notes) text += `📝 *ملاحظات أخرى:* ${s.notes}\n`;
+      text += `----------------------------------\n`;
+    });
+    
+    return text;
+  };
+
+  const exportToExcel = () => {
+    const worksheet = XLSX.utils.json_to_sheet(filteredData.map(s => ({
+      'اسم الطالب': s.name,
+      'الصف': s.grade,
+      'الشعبة': s.section,
+      'النوع': s.gender,
+      'العنوان': s.address,
+      'العمل': s.workOutside,
+      'الحالة الصحية': s.healthStatus,
+      'تفاصيل الصحة': s.healthDetails,
+      'ولي الأمر': s.guardianName,
+      'الهواتف': s.guardianPhones.join(', '),
+      'القراءة': s.academicReading,
+      'الكتابة': s.academicWriting,
+      'المشاركة': s.academicParticipation,
+      'السلوك': s.behaviorLevel,
+      'الملاحظات': s.mainNotes.join(', '),
+      'تعليم الولي': s.guardianEducation,
+      'متابعة الولي': s.guardianFollowUp,
+      'تعاون الولي': s.guardianCooperation,
+      'ملاحظات أخرى': s.notes
+    })));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
+    XLSX.writeFile(workbook, `Students_Report_${new Date().getTime()}.xlsx`);
+  };
+
+  const exportToTxt = () => {
+    const text = generateReportText().replace(/\*/g, ''); // Remove markdown bold for TXT
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Students_Report_${new Date().getTime()}.txt`;
+    link.click();
+  };
+
+  const sendWhatsApp = () => {
+    const text = generateReportText();
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
+
+  return (
+    <div className="space-y-4 font-arabic animate-in fade-in duration-500">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm border">
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={addStudent} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl font-black text-sm hover:bg-blue-700 shadow-md transform active:scale-95 transition-all">
+            <Plus className="w-4 h-4" /> {lang === 'ar' ? 'إضافة طالب' : 'Add Student'}
+          </button>
+          <label className="flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2.5 rounded-xl font-bold text-sm border border-green-200 cursor-pointer hover:bg-green-100 transition-all">
+            <Upload className="w-4 h-4" /> {lang === 'ar' ? 'استيراد ملف' : 'Import File'}
+            <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} />
+          </label>
+          <button onClick={bulkAutoFill} className="flex items-center gap-2 bg-purple-50 text-purple-700 px-4 py-2.5 rounded-xl font-bold text-sm border border-purple-200 hover:bg-purple-100 transition-all">
+            <Sparkles className="w-4 h-4" /> {lang === 'ar' ? 'التعبئة التلقائية' : 'Auto Fill'}
+          </button>
+          
+          {/* Export Buttons */}
+          <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200">
+            <button onClick={exportToTxt} className="p-2.5 hover:bg-white text-slate-600 rounded-lg transition-all" title="TXT">
+              <FileText className="w-4 h-4" />
+            </button>
+            <button onClick={exportToExcel} className="p-2.5 hover:bg-white text-green-600 rounded-lg transition-all" title="Excel">
+              <FileSpreadsheet className="w-4 h-4" />
+            </button>
+            <button onClick={sendWhatsApp} className="p-2.5 hover:bg-white text-green-500 rounded-lg transition-all" title="WhatsApp">
+              <Share2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => setShowListModal('excellence')} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl font-black text-sm hover:bg-green-700 transition-all shadow-sm">
+            <Star className="w-4 h-4 fill-white" /> {lang === 'ar' ? 'قائمة التميز' : 'Excellence List'}
+          </button>
+          <button onClick={() => setShowListModal('blacklist')} className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2.5 rounded-xl font-black text-sm hover:bg-slate-900 transition-all shadow-sm">
+            <AlertCircle className="w-4 h-4" /> {lang === 'ar' ? 'القائمة السوداء' : 'Blacklist'}
+          </button>
+          
+          <div className="relative">
+            <button onClick={() => setShowFilterModal(!showFilterModal)} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all shadow-sm ${showFilterModal ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+              <Filter className="w-4 h-4" /> {lang === 'ar' ? 'فلترة متقدمة' : 'Advanced Filter'}
+            </button>
+            {showFilterModal && (
+              <div className="absolute right-0 sm:left-0 sm:right-auto mt-2 w-[85vw] sm:w-72 bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 z-[100] animate-in fade-in zoom-in duration-200 space-y-4 text-right">
+                 <button onClick={() => { setFilterMode('all'); setSelectedStudentNames([]); }} className="w-full text-right p-3 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center justify-between">{lang === 'ar' ? 'الجميع' : 'All'} {filterMode === 'all' && <Check className="w-4 h-4"/>}</button>
+                 
+                 <div className="border rounded-xl p-2 bg-slate-50">
+                   <button onClick={() => setFilterMode('student')} className="w-full text-right p-2 rounded-lg font-bold text-sm hover:bg-white flex items-center justify-between">{lang === 'ar' ? 'حسب الطالب' : 'By Student'} {filterMode === 'student' && <Check className="w-4 h-4"/>}</button>
+                   {filterMode === 'student' && (
+                     <div className="mt-2 space-y-2 relative">
+                        <div className="flex gap-1">
+                          <input 
+                            type="text" 
+                            className="flex-1 text-[10px] p-2 rounded border outline-none" 
+                            placeholder={lang === 'ar' ? 'اسم الطالب...' : 'Name...'}
+                            value={studentInput}
+                            onChange={(e) => setStudentInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && addStudentToFilter()}
+                          />
+                          <button onClick={() => addStudentToFilter()} className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700"><Plus size={14}/></button>
+                        </div>
+                        {suggestions.length > 0 && (
+                          <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-40 overflow-y-auto">
+                            {suggestions.map((name, idx) => (
+                              <button 
+                                key={idx} 
+                                onClick={() => addStudentToFilter(name)}
+                                className="w-full text-right p-2 text-[10px] font-bold hover:bg-blue-50 border-b border-slate-50 last:border-none"
+                              >
+                                {name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-1">
+                          {selectedStudentNames.map(name => (
+                            <span key={name} className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-[9px] flex items-center gap-1">
+                              {name} <X size={10} className="cursor-pointer" onClick={() => setSelectedStudentNames(prev => prev.filter(n => n !== name))} />
+                            </span>
+                          ))}
+                        </div>
+                     </div>
+                   )}
+                 </div>
+
+                 <button onClick={() => setMetricFilterMode(true)} className="w-full text-right p-3 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center justify-between">{lang === 'ar' ? 'حسب المعيار' : 'By Metric'} {isOnlyMetricView && <Check className="w-4 h-4"/>}</button>
+                 <button onClick={() => setShowSpecificFilterModal(true)} className="w-full text-right p-3 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center justify-between">{lang === 'ar' ? 'حسب صفة معينة' : 'By Feature'} {filterMode === 'specific' && <Check className="w-4 h-4"/>}</button>
+
+                 <div className="pt-2 border-t">
+                    <button 
+                      onClick={() => setShowFilterModal(false)}
+                      className="w-full bg-blue-600 text-white p-2.5 rounded-xl font-black text-sm hover:bg-blue-700 transition-all shadow-md active:scale-95"
+                    >
+                      {lang === 'ar' ? 'تطبيق' : 'Apply'}
+                    </button>
+                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-[1.5rem] shadow-xl border border-slate-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className={`w-full text-center border-collapse table-auto ${isOnlyMetricView ? 'min-w-[700px]' : 'min-w-[1600px]'}`}>
+            <thead className="bg-[#FFD966] text-slate-800 sticky top-0 z-20">
+              <tr className="border-b border-slate-300 h-12">
+                <th rowSpan={2} className="px-3 border-e border-slate-300 w-[160px] text-xs font-black sticky right-0 bg-[#FFD966] z-30">{lang === 'ar' ? 'اسم الطالب' : 'Student Name'}</th>
+                <th rowSpan={2} className="px-1 border-e border-slate-300 w-20 text-xs font-black">{lang === 'ar' ? 'الصف' : 'Grade'}</th>
+                <th rowSpan={2} className="px-1 border-e border-slate-300 w-16 text-xs font-black">{lang === 'ar' ? 'الشعبة' : 'Section'}</th>
+                
+                {!isOnlyMetricView && (
+                  <>
+                    <th rowSpan={2} className="px-1 border-e border-slate-300 w-16 text-xs font-black">{lang === 'ar' ? 'النوع' : 'Gender'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black">{lang === 'ar' ? 'السكن / العمل' : 'Residence / Work'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black">{lang === 'ar' ? 'الحالة الصحية' : 'Health Status'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-32 text-xs font-black">{lang === 'ar' ? 'ولي الأمر (الاسم/الهواتف)' : 'Guardian (Name/Phones)'}</th>
+                    <th colSpan={3} className="px-1 border-e border-slate-300 bg-[#FFF2CC] text-xs font-black">{lang === 'ar' ? 'المستوى العلمي' : 'Academic Level'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black">{lang === 'ar' ? 'المستوى السلوكي' : 'Behavior Level'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-44 text-xs font-black">{lang === 'ar' ? 'الملاحظات الأساسية' : 'Main Notes'}</th>
+                    <th colSpan={3} className="px-1 border-e border-slate-300 bg-[#DDEBF7] text-xs font-black">{lang === 'ar' ? 'ولي الأمر المتابع' : 'Guardian Follow-up'}</th>
+                    <th rowSpan={2} className="px-2 w-10 text-xs font-black">{lang === 'ar' ? 'ملاحظات أخرى' : 'Other Notes'}</th>
+                  </>
+                )}
+                
+                {isOnlyMetricView && activeMetricFilter.map(mKey => (
+                  <th key={mKey} className="px-4 border-e border-slate-300 text-xs font-black">{metricLabels[mKey]}</th>
+                ))}
+              </tr>
+              
+              {!isOnlyMetricView && (
+                <tr className="bg-[#F2F2F2] text-[9px] h-8">
+                  <th className="border-e border-slate-300 bg-[#FFF2CC]/50">{lang === 'ar' ? 'قراءة' : 'Read'}</th>
+                  <th className="border-e border-slate-300 bg-[#FFF2CC]/50">{lang === 'ar' ? 'كتابة' : 'Write'}</th>
+                  <th className="border-e border-slate-300 bg-[#FFF2CC]/50">{lang === 'ar' ? 'مشاركة' : 'Part'}</th>
+                  <th className="border-e border-slate-300 bg-[#DDEBF7]/50">{lang === 'ar' ? 'تعليم' : 'Edu'}</th>
+                  <th className="border-e border-slate-300 bg-[#DDEBF7]/50">{lang === 'ar' ? 'متابعة' : 'Follow'}</th>
+                  <th className="border-e border-slate-300 bg-[#DDEBF7]/50">{lang === 'ar' ? 'تعاون' : 'Coop'}</th>
+                </tr>
+              )}
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredData.length === 0 ? (
+                <tr>
+                  <td colSpan={isOnlyMetricView ? 3 + activeMetricFilter.length : 15} className="py-10 text-slate-400 italic text-sm">
+                    {(filterMode === 'student' || filterMode === 'blacklist' || filterMode === 'excellence') && selectedStudentNames.length === 0 
+                      ? (lang === 'ar' ? 'يرجى اختيار أسماء الطلاب من القائمة للعرض' : 'Please select student names to display')
+                      : (lang === 'ar' ? 'لا توجد بيانات تطابق هذا البحث' : 'No data matching this search')}
+                  </td>
+                </tr>
+              ) : (
+                filteredData.map((s, idx) => (
+                  <tr key={s.id} className="hover:bg-blue-50/20 transition-colors h-10 group">
+                    <td className="p-1 border-e border-slate-100 sticky right-0 bg-white z-10 group-hover:bg-blue-50 transition-colors shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
+                      <div className="flex items-center gap-1 h-full">
+                        <button onClick={() => toggleStar(s.id, 'isExcellent')} title={lang === 'ar' ? 'إضافة للتميز' : 'Add to Excellence'}>
+                          <Star className={`w-3.5 h-3.5 ${s.isExcellent ? 'fill-green-500 text-green-500' : 'text-slate-300'}`} />
+                        </button>
+                        <button onClick={() => toggleStar(s.id, 'isBlacklisted')} title={lang === 'ar' ? 'إضافة للقائمة السوداء' : 'Add to Blacklist'}>
+                          <Star className={`w-3.5 h-3.5 ${s.isBlacklisted ? 'fill-slate-900 text-slate-900' : 'text-slate-300'}`} />
+                        </button>
+                        <input className="flex-1 bg-transparent border-none outline-none font-bold text-[10px] text-right" value={s.name} onChange={(e) => updateStudent(s.id, 'name', e.target.value)} />
+                      </div>
+                    </td>
+                    <td className="p-1 border-e border-slate-100">
+                      <select className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.grade} onChange={(e) => updateStudent(s.id, 'grade', e.target.value)}>
+                        {optionsAr.grades.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.grades[optionsAr.grades.indexOf(o)]}</option>)}
+                      </select>
+                    </td>
+                    <td className="p-1 border-e border-slate-100">
+                      <select className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.section} onChange={(e) => updateStudent(s.id, 'section', e.target.value)}>
+                        {optionsAr.sections.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.sections[optionsAr.sections.indexOf(o)]}</option>)}
+                      </select>
+                    </td>
+
+                    {!isOnlyMetricView && (
+                      <>
+                        <td className="p-1 border-e border-slate-100">
+                          <select className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.gender} onChange={(e) => updateStudent(s.id, 'gender', e.target.value)}>
+                            {optionsAr.gender.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.gender[optionsAr.gender.indexOf(o)]}</option>)}
+                          </select>
+                        </td>
+                        <td className="p-1 border-e border-slate-100">
+                          <div className="flex flex-col gap-0.5">
+                            <input className="w-full text-[9px] text-right bg-transparent outline-none" value={s.address} onChange={(e) => updateStudent(s.id, 'address', e.target.value)} placeholder="..." />
+                            <select className="text-[8px] bg-slate-50/50 appearance-none text-center" value={s.workOutside} onChange={(e) => updateStudent(s.id, 'workOutside', e.target.value)}>
+                              {optionsAr.workOutside.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.workOutside[optionsAr.workOutside.indexOf(o)]}</option>)}
+                            </select>
+                          </div>
+                        </td>
+                        <td className="p-1 border-e border-slate-100">
+                          <div className="flex flex-col gap-0.5">
+                            <select className={`text-[9px] font-bold appearance-none text-center outline-none bg-transparent ${s.healthStatus === 'مريض' ? 'text-red-600' : ''}`} value={s.healthStatus} onChange={(e) => updateStudent(s.id, 'healthStatus', e.target.value)}>
+                              {optionsAr.health.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.health[optionsAr.health.indexOf(o)]}</option>)}
+                            </select>
+                            {s.healthStatus === 'مريض' && <input className="text-[8px] text-center border-b outline-none text-red-500" value={s.healthDetails} onChange={(e) => updateStudent(s.id, 'healthDetails', e.target.value)} />}
+                          </div>
+                        </td>
+                        <td className="p-1 border-e border-slate-100">
+                          <div className="flex flex-col gap-0.5">
+                            <input className="text-[9px] font-bold text-right outline-none bg-transparent" value={s.guardianName} onChange={(e) => updateStudent(s.id, 'guardianName', e.target.value)} />
+                            {s.guardianPhones.map((p, i) => (
+                              <div key={i} className="flex gap-0.5 items-center">
+                                <input className="text-[8px] w-full text-center bg-slate-50/50 outline-none" value={p} onChange={(e) => {
+                                  const newP = [...s.guardianPhones]; newP[i] = e.target.value; updateStudent(s.id, 'guardianPhones', newP);
+                                }} />
+                                {i === s.guardianPhones.length - 1 && <button onClick={() => updateStudent(s.id, 'guardianPhones', [...s.guardianPhones, ''])} className="text-blue-500 hover:scale-110"><Plus size={10}/></button>}
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-1 border-e border-slate-100 bg-[#FFF2CC]/5">
+                          <select className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicReading.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicReading} onChange={(e) => updateStudent(s.id, 'academicReading', e.target.value)}>
+                            {optionsAr.level.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.level[optionsAr.level.indexOf(o)]}</option>)}
+                          </select>
+                        </td>
+                        <td className="p-1 border-e border-slate-100 bg-[#FFF2CC]/5">
+                          <select className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicWriting.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicWriting} onChange={(e) => updateStudent(s.id, 'academicWriting', e.target.value)}>
+                            {optionsAr.level.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.level[optionsAr.level.indexOf(o)]}</option>)}
+                          </select>
+                        </td>
+                        <td className="p-1 border-e border-slate-100 bg-[#FFF2CC]/5">
+                          <select className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicParticipation.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicParticipation} onChange={(e) => updateStudent(s.id, 'academicParticipation', e.target.value)}>
+                            {optionsAr.level.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.level[optionsAr.level.indexOf(o)]}</option>)}
+                          </select>
+                        </td>
+                        <td className="p-1 border-e border-slate-100">
+                          <select className={`text-[9px] font-bold w-full appearance-none text-center outline-none bg-transparent ${s.behaviorLevel.includes('ضعيف') ? 'text-red-600' : ''}`} value={s.behaviorLevel} onChange={(e) => updateStudent(s.id, 'behaviorLevel', e.target.value)}>
+                            {optionsAr.behavior.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.behavior[optionsAr.behavior.indexOf(o)]}</option>)}
+                          </select>
+                        </td>
+                        <td className="p-1 border-e border-slate-100">
+                          <div className="flex flex-wrap gap-0.5 justify-center max-w-[180px]">
+                            {optionsAr.mainNotes.map((n, nIdx) => (
+                              <button key={n} onClick={() => {
+                                const newN = s.mainNotes.includes(n) ? s.mainNotes.filter(x => x !== n) : [...s.mainNotes, n];
+                                updateStudent(s.id, 'mainNotes', newN);
+                              }} className={`text-[7px] px-1 py-0.5 rounded border leading-none ${s.mainNotes.includes(n) ? 'bg-red-500 text-white' : 'bg-slate-50 text-slate-400'}`}>
+                                {lang === 'ar' ? n : optionsEn.mainNotes[nIdx]}
+                              </button>
+                            ))}
+                            <input className="text-[8px] border-b w-full mt-0.5 text-center outline-none" value={s.otherNotesText} onChange={(e) => updateStudent(s.id, 'otherNotesText', e.target.value)} />
+                          </div>
+                        </td>
+                        <td className="p-1 border-e border-slate-100 bg-[#DDEBF7]/5">
+                          <select className="text-[8px] w-full appearance-none text-center outline-none bg-transparent" value={s.guardianEducation} onChange={(e) => updateStudent(s.id, 'guardianEducation', e.target.value)}>
+                            {optionsAr.eduStatus.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.eduStatus[optionsAr.eduStatus.indexOf(o)]}</option>)}
+                          </select>
+                        </td>
+                        <td className="p-1 border-e border-slate-100 bg-[#DDEBF7]/5">
+                          <select className={`text-[8px] w-full appearance-none text-center outline-none bg-transparent ${s.guardianFollowUp === 'ضعيفة' ? 'text-red-600 font-bold' : ''}`} value={s.guardianFollowUp} onChange={(e) => updateStudent(s.id, 'guardianFollowUp', e.target.value)}>
+                            {optionsAr.followUp.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.followUp[optionsAr.followUp.indexOf(o)]}</option>)}
+                          </select>
+                        </td>
+                        <td className="p-1 border-e border-slate-100 bg-[#DDEBF7]/5">
+                          <select className={`text-[8px] w-full appearance-none text-center outline-none bg-transparent ${s.guardianCooperation === 'عدواني' || s.guardianCooperation === 'ضعيفة' ? 'text-red-600 font-bold' : ''}`} value={s.guardianCooperation} onChange={(e) => updateStudent(s.id, 'guardianCooperation', e.target.value)}>
+                            {optionsAr.cooperation.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.cooperation[optionsAr.cooperation.indexOf(o)]}</option>)}
+                          </select>
+                        </td>
+                        <td className="p-1">
+                          <button onClick={() => setShowNotesModal({id: s.id, text: s.notes})} className="p-1.5 bg-slate-100 hover:bg-blue-100 rounded-lg transition-all">
+                            {s.notes ? <CheckCircle size={14} className="text-green-500" /> : <Settings2 size={14} className="text-slate-400" />}
+                          </button>
+                        </td>
+                      </>
+                    )}
+
+                    {isOnlyMetricView && activeMetricFilter.map(mKey => {
+                      const currentVal = (s as any)[mKey];
+                      const optKey = mKey === 'healthStatus' ? 'health' : (mKey === 'academicReading' || mKey === 'academicWriting') ? 'level' : mKey;
+                      const possibleOpts = (optionsAr as any)[optKey] || [];
+                      
+                      return (
+                        <td key={mKey} className="p-1 border-e border-slate-100 bg-blue-50/5">
+                          {possibleOpts.length > 0 ? (
+                            <select className="text-[10px] w-full bg-transparent font-bold outline-none appearance-none text-center" value={currentVal} onChange={(e) => updateStudent(s.id, mKey, e.target.value)}>
+                              {possibleOpts.map((o: string) => <option key={o} value={o}>{lang === 'ar' ? o : (optionsEn as any)[optKey]?.[(optionsAr as any)[optKey].indexOf(o)] || o}</option>)}
+                            </select>
+                          ) : (
+                            <input className="text-[10px] w-full bg-transparent font-bold text-center outline-none" value={currentVal} onChange={(e) => updateStudent(s.id, mKey, e.target.value)} />
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* List Modal (Blacklist / Excellence) */}
+      {showListModal && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
+            <h3 className={`font-black text-right ${showListModal === 'blacklist' ? 'text-slate-800' : 'text-green-600'}`}>
+              {showListModal === 'blacklist' ? (lang === 'ar' ? 'القائمة السوداء' : 'Blacklist') : (lang === 'ar' ? 'قائمة التميز' : 'Excellence List')}
+            </h3>
+            <div className="relative">
+              <input 
+                className="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl text-right text-sm font-bold outline-none pr-10" 
+                placeholder={lang === 'ar' ? 'بحث عن اسم...' : 'Search for name...'} 
+                value={listSearch}
+                onChange={(e) => setListSearch(e.target.value)}
+              />
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-2 border rounded-xl p-2">
+              {listItemsToDisplay.length === 0 ? (
+                <div className="p-4 text-center text-slate-400 italic text-xs">{lang === 'ar' ? 'لا توجد أسماء مضافة' : 'No names added'}</div>
+              ) : (
+                listItemsToDisplay.map(s => (
+                  <label key={s.id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 text-blue-600" 
+                      checked={tempListSelected.includes(s.name)}
+                      onChange={(e) => {
+                        if (e.target.checked) setTempListSelected([...tempListSelected, s.name]);
+                        else setTempListSelected(tempListSelected.filter(n => n !== s.name));
+                      }}
+                    />
+                    <span className="text-sm font-bold">{s.name}</span>
+                  </label>
+                ))
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={handleListApply} className="flex-1 bg-blue-600 text-white p-3 rounded-2xl font-black">{lang === 'ar' ? 'موافق' : 'OK'}</button>
+              <button onClick={() => { setShowListModal(null); setTempListSelected([]); }} className="p-3 bg-slate-100 rounded-2xl font-black">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Metric Filter Modal */}
+      {metricFilterMode && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
+            <h3 className="font-black text-slate-800 text-right">{lang === 'ar' ? 'اختر المعايير المراد عرضها' : 'Choose Metrics to Show'}</h3>
+            <div className="grid grid-cols-2 gap-2 overflow-y-auto max-h-[60vh] p-1">
+              {Object.keys(metricLabels).map(m => (
+                <button key={m} onClick={() => setActiveMetricFilter(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m])} className={`p-2 rounded-xl text-xs font-bold border-2 transition-all ${activeMetricFilter.includes(m) ? 'border-blue-500 bg-blue-50' : 'border-slate-100 hover:border-blue-200'}`}>
+                  {metricLabels[m]}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setFilterMode('metric'); setMetricFilterMode(false); }} className="flex-1 bg-blue-600 text-white p-3 rounded-2xl font-black">{lang === 'ar' ? 'تطبيق' : 'Apply'}</button>
+              <button onClick={() => setMetricFilterMode(false)} className="bg-slate-100 text-slate-500 p-3 rounded-2xl font-black">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Specific Filter Modal */}
+      {showSpecificFilterModal && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-2xl max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between border-b pb-2 mb-4">
+              <h3 className="font-black">{lang === 'ar' ? 'فلترة حسب صفة معينة' : 'Filter by Specific Feature'}</h3>
+              <button onClick={() => setShowSpecificFilterModal(false)} className="hover:bg-slate-100 p-1 rounded-full transition-colors"><X/></button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-right">
+              {Object.entries(optionsAr).map(([key, vals]) => {
+                const label = key === 'gender' ? (lang === 'ar' ? 'النوع' : 'Gender') : 
+                              key === 'workOutside' ? (lang === 'ar' ? 'العمل' : 'Work') : 
+                              key === 'health' ? (lang === 'ar' ? 'الصحة' : 'Health') :
+                              key === 'level' ? (lang === 'ar' ? 'المستوى' : 'Level') :
+                              key === 'behavior' ? (lang === 'ar' ? 'السلوك' : 'Behavior') :
+                              key === 'mainNotes' ? (lang === 'ar' ? 'الملاحظات' : 'Notes') :
+                              key === 'eduStatus' ? (lang === 'ar' ? 'التعليم' : 'Education') :
+                              key === 'followUp' ? (lang === 'ar' ? 'المتابعة' : 'Follow-up') :
+                              key === 'cooperation' ? (lang === 'ar' ? 'التعاون' : 'Cooperation') :
+                              key === 'grades' ? (lang === 'ar' ? 'الصفوف' : 'Grades') :
+                              key === 'sections' ? (lang === 'ar' ? 'الشعب' : 'Sections') : key;
+
+                return (
+                  <div key={key} className="space-y-1">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase">{label}</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {vals.map((v, vIdx) => (
+                        <button key={v} onClick={() => {
+                          setFilterMode('specific');
+                          setSelectedSpecifics(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]);
+                        }} className={`text-right px-2 py-1.5 rounded-lg text-[9px] font-bold border transition-all ${selectedSpecifics.includes(v) ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-slate-50 border-slate-100 hover:border-blue-200'}`}>
+                          {lang === 'ar' ? v : (optionsEn as any)[key]?.[vIdx] || v}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap gap-2 mt-6 sticky bottom-0 bg-white pt-2 border-t">
+              <button onClick={() => setShowSpecificFilterModal(false)} className="flex-1 bg-slate-900 text-white p-4 rounded-2xl font-black shadow-xl">{lang === 'ar' ? 'تطبيق الفلتر' : 'Apply Filter'}</button>
+              <button onClick={() => setSelectedSpecifics([])} className="bg-slate-100 text-slate-500 p-4 rounded-2xl font-black">{lang === 'ar' ? 'إعادة ضبط' : 'Reset'}</button>
+              <button onClick={() => setShowSpecificFilterModal(false)} className="bg-red-50 text-red-500 p-4 rounded-2xl font-black">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notes Modal */}
+      {showNotesModal && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
+            <h3 className="font-black text-slate-800 text-right">{lang === 'ar' ? 'ملاحظات إضافية' : 'Extra Notes'}</h3>
+            <textarea className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold outline-none h-48 text-right" value={showNotesModal.text} onChange={(e) => setShowNotesModal({...showNotesModal, text: e.target.value})} placeholder="..." />
+            <div className="flex gap-2">
+              <button onClick={() => { updateStudent(showNotesModal.id, 'notes', showNotesModal.text); setShowNotesModal(null); }} className="flex-1 bg-blue-600 text-white p-3 rounded-2xl font-black">{lang === 'ar' ? 'موافق' : 'OK'}</button>
+              <button onClick={() => setShowNotesModal(null)} className="p-3 bg-slate-100 rounded-2xl font-black">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

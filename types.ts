@@ -1,0 +1,165 @@
+
+export type Language = 'ar' | 'en';
+
+export interface SchoolProfile {
+  schoolName: string;
+  supervisorName: string;
+  classes: string;
+  qualityOfficer: string;
+  managerName: string;
+  year: string;
+}
+
+export interface SubstitutionEntry {
+  id: string;
+  absentTeacher: string;
+  replacementTeacher: string;
+  period: string;
+  class: string;
+  date: string;
+  paymentStatus: 'pending' | 'paid';
+}
+
+export interface TeacherFollowUp {
+  id: string;
+  teacherName: string;
+  subjectCode: string;
+  className: string;
+  attendance: number;
+  appearance: number;
+  preparation: number;
+  supervision_queue: number;
+  supervision_rest: number;
+  supervision_end: number;
+  correction_books: number;
+  correction_notebooks: number;
+  correction_followup: number;
+  teaching_aids: number;
+  extra_activities: number;
+  radio: number;
+  creativity: number;
+  zero_period: number;
+  violations_score: number;
+  violations_notes: string[];
+  order?: number;
+}
+
+export interface DailyReportContainer {
+  id: string;
+  dayName: string;
+  dateStr: string;
+  teachersData: TeacherFollowUp[];
+}
+
+export interface StudentReport {
+  id: string;
+  name: string;
+  gender: string;
+  grade: string;
+  section: string;
+  address: string;
+  workOutside: string;
+  healthStatus: string;
+  healthDetails: string;
+  guardianName: string;
+  guardianPhones: string[];
+  academicReading: string;
+  academicWriting: string;
+  academicParticipation: string;
+  behaviorLevel: string;
+  mainNotes: string[];
+  otherNotesText: string;
+  guardianEducation: string;
+  guardianFollowUp: string;
+  guardianCooperation: string;
+  notes: string;
+  createdAt: string;
+  isBlacklisted?: boolean;
+  isExcellent?: boolean;
+  totalAbsences?: number;
+}
+
+export interface AbsenceLog {
+  id: string;
+  studentId: string;
+  studentName: string;
+  grade: string;
+  section: string;
+  semester: 'الأول' | 'الثاني';
+  date: string;
+  day: string;
+  status: 'expected' | 'recurring' | 'week1' | 'week2' | 'most' | 'disconnected';
+  reason: string;
+  commStatus: 'تم التواصل' | 'لم يتم التواصل';
+  commType: 'هاتف' | 'رسالة sms' | 'رسالة واتس' | 'أخرى';
+  commOtherDetail?: string;
+  replier: 'الأب' | 'الأم' | 'الجد' | 'الجدة' | 'الأخ' | 'الأخت' | 'العم' | 'الخال' | 'غيرهم';
+  replierOther?: string;
+  result: 'تم الرد' | 'لم يتم الرد' | string;
+  notes: string;
+  prevAbsenceCount: number;
+}
+
+export interface LatenessLog {
+  id: string;
+  studentId: string;
+  studentName: string;
+  grade: string;
+  section: string;
+  semester: 'الأول' | 'الثاني';
+  date: string;
+  day: string;
+  status: 'recurring' | 'frequent' | 'permanent';
+  reason: string;
+  action: string;
+  pledge: string;
+  notes: string;
+  prevLatenessCount: number;
+}
+
+export interface StudentViolationLog {
+  id: string;
+  studentId: string;
+  studentName: string;
+  grade: string;
+  section: string;
+  semester: 'الأول' | 'الثاني';
+  date: string;
+  totalViolations: number;
+  behaviorViolations: string[];
+  dutiesViolations: string[];
+  achievementViolations: string[];
+  status: 'blacklist' | 'high' | 'medium' | 'rare';
+  action: string;
+  pledge: string;
+  notes: string;
+}
+
+export interface GenericSpecialReport {
+  id: string;
+  category: string;
+  subCategory: string;
+  title: string;
+  content: string;
+  date: string;
+}
+
+export interface AppData {
+  profile: SchoolProfile;
+  substitutions: SubstitutionEntry[];
+  dailyReports: DailyReportContainer[];
+  violations: any[];
+  parentVisits: any[];
+  teacherFollowUps: TeacherFollowUp[];
+  maxGrades: Record<string, number>;
+  studentReports?: StudentReport[];
+  absenceLogs?: AbsenceLog[];
+  latenessLogs?: LatenessLog[];
+  studentViolationLogs?: StudentViolationLog[];
+  genericSpecialReports?: GenericSpecialReport[];
+  customViolationElements?: {
+    behavior: string[];
+    duties: string[];
+    achievement: string[];
+  };
+}
