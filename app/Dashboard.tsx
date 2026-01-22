@@ -32,6 +32,48 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
   const [cycleDuration, setCycleDuration] = useState(5000);
   const [cardOffsets, setCardOffsets] = useState<Record<number, number>>({});
 
+  // START OF CHANGE - Performance Optimization: Memoize all category lists at once
+  const memoizedCategoryData = useMemo(() => {
+    const cats: DataCategory[] = ['students', 'teachers', 'violations', 'substitutions', 'absences', 'lateness', 'student_violations'];
+    const results: Record<string, any[]> = {};
+    
+    cats.forEach(cat => {
+      let list: any[] = [];
+      if (cat === 'students') list = (data.studentReports || []).map(s => ({ ...s, displayName: s.name, type: 'student' }));
+      if (cat === 'teachers') list = (data.dailyReports.flatMap(r => r.teachersData)).map(t => ({ ...t, displayName: t.teacherName, type: 'teacher' }));
+      if (cat === 'violations') list = (data.violations || []).map(v => ({ ...v, displayName: v.studentName, type: 'violation' }));
+      if (cat === 'substitutions') list = (data.substitutions || []).map(s => ({ ...s, displayName: s.absentTeacher || 'معلم غير محدد', type: 'substitution' }));
+      if (cat === 'absences') list = (data.studentReports || []).filter(s => s.mainNotes?.includes('غياب')).map(s => ({ ...s, displayName: s.name, type: 'student' }));
+      if (cat === 'lateness') list = (data.studentReports || []).filter(s => s.mainNotes?.includes('تأخر')).map(s => ({ ...s, displayName: s.name, type: 'student' }));
+      if (cat === 'student_violations') list = (data.studentReports || []).filter(s => s.mainNotes?.length > 0 && !s.mainNotes.includes('ممتاز')).map(s => ({ ...s, displayName: s.name, type: 'student' }));
+
+      // Global Time Filtering Logic (Optimized)
+      if (globalTimeRange !== 'all') {
+        const now = new Date();
+        list = list.filter(item => {
+          const itemDate = new Date(item.date || item.createdAt || Date.now());
+          if (globalTimeRange === 'daily') return itemDate.toDateString() === now.toDateString();
+          if (globalTimeRange === 'weekly') {
+            const diff = now.getTime() - itemDate.getTime();
+            return diff <= 7 * 24 * 60 * 60 * 1000;
+          }
+          if (globalTimeRange === 'monthly') {
+            return itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
+          }
+          if (globalTimeRange === 'custom') {
+            const start = new Date(dateRange.start);
+            const end = new Date(dateRange.end);
+            return itemDate >= start && itemDate <= end;
+          }
+          return true;
+        });
+      }
+      results[cat] = list;
+    });
+    return results;
+  }, [data, globalTimeRange, dateRange]);
+  // END OF CHANGE
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCycleIndex(prev => prev + 1);
@@ -39,11 +81,12 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
     return () => clearInterval(timer);
   }, [cycleDuration]);
 
+  // START OF CHANGE - Optimized Offset Shifter
   useEffect(() => {
     setCardOffsets(prev => {
       const nextOffsets = { ...prev };
       cards.forEach(card => {
-        const list = getDataList(card);
+        const list = memoizedCategoryData[card.category] || [];
         if (list.length > 3) {
           const current = nextOffsets[card.id] || 0;
           let next = current + 3;
@@ -53,7 +96,8 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
       });
       return nextOffsets;
     });
-  }, [cycleIndex]);
+  }, [cycleIndex, memoizedCategoryData]);
+  // END OF CHANGE
 
   const [cards, setCards] = useState<CardConfig[]>(() => {
     const initial: CardConfig[] = [];
@@ -111,39 +155,6 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
     { gradient: 'linear-gradient(135deg, #f0fdfa 50%, #ccfbf1 50%)', text: 'text-teal-700', border: 'border-teal-200', accent: 'bg-teal-600' },
     { gradient: 'linear-gradient(135deg, #fefce8 50%, #fef9c3 50%)', text: 'text-yellow-700', border: 'border-yellow-200', accent: 'bg-yellow-600' },
   ];
-
-  const getDataList = (config: CardConfig) => {
-    let list: any[] = [];
-    if (config.category === 'students') list = (data.studentReports || []).map(s => ({ ...s, displayName: s.name, type: 'student' }));
-    if (config.category === 'teachers') list = (data.dailyReports.flatMap(r => r.teachersData)).map(t => ({ ...t, displayName: t.teacherName, type: 'teacher' }));
-    if (config.category === 'violations') list = (data.violations || []).map(v => ({ ...v, displayName: v.studentName, type: 'violation' }));
-    if (config.category === 'substitutions') list = (data.substitutions || []).map(s => ({ ...s, displayName: s.absentTeacher || 'معلم غير محدد', type: 'substitution' }));
-    if (config.category === 'absences') list = (data.studentReports || []).filter(s => s.mainNotes?.includes('غياب')).map(s => ({ ...s, displayName: s.name, type: 'student' }));
-    if (config.category === 'lateness') list = (data.studentReports || []).filter(s => s.mainNotes?.includes('تأخر')).map(s => ({ ...s, displayName: s.name, type: 'student' }));
-    if (config.category === 'student_violations') list = (data.studentReports || []).filter(s => s.mainNotes?.length > 0 && !s.mainNotes.includes('ممتاز')).map(s => ({ ...s, displayName: s.name, type: 'student' }));
-
-    if (globalTimeRange !== 'all') {
-      const now = new Date();
-      list = list.filter(item => {
-        const itemDate = new Date(item.date || item.createdAt || Date.now());
-        if (globalTimeRange === 'daily') return itemDate.toDateString() === now.toDateString();
-        if (globalTimeRange === 'weekly') {
-          const diff = now.getTime() - itemDate.getTime();
-          return diff <= 7 * 24 * 60 * 60 * 1000;
-        }
-        if (globalTimeRange === 'monthly') {
-          return itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
-        }
-        if (globalTimeRange === 'custom') {
-          const start = new Date(dateRange.start);
-          const end = new Date(dateRange.end);
-          return itemDate >= start && itemDate <= end;
-        }
-        return true;
-      });
-    }
-    return list;
-  };
 
   const updateCard = (id: number, updates: Partial<CardConfig>) => {
     setCards(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
@@ -226,10 +237,11 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
         </div>
       </header>
 
-      {/* START OF CHANGE - Requirement 1, 2, 3: Repositioned internals, fixed visibility for 3 items, updated triangles */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {cards.map((card, idx) => {
-          const filteredList = getDataList(card);
+          // START OF CHANGE - Use memoized list for maximum performance
+          const filteredList = memoizedCategoryData[card.category] || [];
+          // END OF CHANGE
           const count = filteredList.length;
           const currentCat = categories.find(c => c.id === card.category);
           const currentSub = getSubTypes(card.category).find(s => s.id === card.subType);
@@ -328,7 +340,6 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
 
               {count > 3 && (
                 <div className="flex justify-center items-center gap-6 relative z-20 pt-1 border-t border-white/40">
-                   {/* Requirement 2: Arrows point towards each other (facing center) */}
                    <button 
                      onClick={() => shiftCardData(card.id, 'prev', count)}
                      className={`p-1.5 rounded-full bg-white/80 hover:bg-white ${design.text} transition-all shadow-md active:scale-90`}
@@ -352,7 +363,6 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
           );
         })}
       </div>
-      {/* END OF CHANGE */}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 bg-white p-8 rounded-[2.5rem] border-2 border-slate-50 shadow-sm relative overflow-hidden group">
