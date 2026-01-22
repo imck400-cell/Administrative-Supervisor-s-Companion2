@@ -28,9 +28,8 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
   const [globalTimeRange, setGlobalTimeRange] = useState<TimeRange>('all');
   const [dateRange, setDateRange] = useState({ start: today, end: today });
   
-  // START OF CHANGE - Requirement 2: Automatic cycling states and effect
   const [cycleIndex, setCycleIndex] = useState(0);
-  const [cycleDuration, setCycleDuration] = useState(5000); // Default 5s
+  const [cycleDuration, setCycleDuration] = useState(5000);
   const [cardOffsets, setCardOffsets] = useState<Record<number, number>>({});
 
   useEffect(() => {
@@ -40,7 +39,6 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
     return () => clearInterval(timer);
   }, [cycleDuration]);
 
-  // Effect to automatically shift data for all cards when the cycleIndex updates
   useEffect(() => {
     setCardOffsets(prev => {
       const nextOffsets = { ...prev };
@@ -48,7 +46,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
         const list = getDataList(card);
         if (list.length > 3) {
           const current = nextOffsets[card.id] || 0;
-          let next = current + 3; // Shift by 3 since we show 3 items
+          let next = current + 3;
           if (next >= list.length) next = 0;
           nextOffsets[card.id] = next;
         }
@@ -56,7 +54,6 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
       return nextOffsets;
     });
   }, [cycleIndex]);
-  // END OF CHANGE
 
   const [cards, setCards] = useState<CardConfig[]>(() => {
     const initial: CardConfig[] = [];
@@ -145,7 +142,6 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
         return true;
       });
     }
-
     return list;
   };
 
@@ -163,19 +159,46 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
     });
   };
 
+  const handleExportExcel = (title: string, list: any[]) => {
+    const worksheet = XLSX.utils.json_to_sheet(list.map(item => ({
+      'الاسم': item.displayName,
+      'التفاصيل': item.grade ? `${item.grade} - ${item.section}` : item.subjectCode || '---',
+      'الحالة': item.mainNotes?.join(', ') || item.behaviorLevel || '---'
+    })));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
+    XLSX.writeFile(workbook, `${title}_Report.xlsx`);
+  };
+
+  const handleExportWhatsApp = (title: string, list: any[]) => {
+    let msg = `*📋 تقرير: ${title}*\n`;
+    msg += `*التاريخ:* ${new Date().toLocaleDateString('ar-EG')}\n`;
+    msg += `----------------------------------\n\n`;
+    list.slice(0, 15).forEach((item, idx) => {
+      let emoji = '🔹';
+      if (item.isBlacklisted || item.violations_score > 0) emoji = '🔴';
+      if (item.isExcellent || item.attendance === 5) emoji = '🟢';
+      msg += `*${emoji} (${idx + 1}) الاسم:* ${item.displayName}\n`;
+      if (item.grade) msg += `📍 *الصف:* ${item.grade} / ${item.section}\n`;
+      if (item.subjectCode) msg += `📚 *المادة:* ${item.subjectCode}\n`;
+      msg += `\n`;
+    });
+    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 font-arabic pb-20">
       <header className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white p-6 rounded-[2.5rem] border shadow-sm">
         <div className="flex-1">
           <h2 className="text-3xl font-black text-slate-800 flex items-center gap-3">
             <Sparkles className="text-blue-600 animate-pulse" />
-            لوحة التحكم الذكية
+            لوحه التحكم الذكيه
           </h2>
-          <p className="text-slate-500 font-bold mt-1 text-sm">أتمتة ذكية ومتابعة مرئية لكافة المعايير</p>
+          <p className="text-slate-500 font-bold mt-1 text-xs">أتمتة ذكية ومتابعة مرئية لكافة المعايير</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-4 bg-slate-50 p-4 rounded-3xl border border-slate-100">
-           {/* Requirement 2: User chooses the duration (3s, 5s, 10s) */}
            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-2xl border shadow-sm">
               <History className="w-4 h-4 text-blue-500" />
               <select 
@@ -200,23 +223,10 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
                 </button>
              ))}
            </div>
-           
-           {globalTimeRange === 'custom' && (
-             <div className="flex items-center gap-2 animate-in slide-in-from-left-2 duration-300">
-               <div className="flex flex-col">
-                 <span className="text-[9px] font-black text-slate-400">من</span>
-                 <input type="date" className="text-[10px] font-bold p-1 bg-white border rounded-lg" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} />
-               </div>
-               <div className="flex flex-col">
-                 <span className="text-[9px] font-black text-slate-400">إلى</span>
-                 <input type="date" className="text-[10px] font-bold p-1 bg-white border rounded-lg" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} />
-               </div>
-             </div>
-           )}
         </div>
       </header>
 
-      {/* Grid of boxes updated with Requirement 1: 3 items display and smaller item bars */}
+      {/* START OF CHANGE - Requirement 1, 2, 3: Repositioned internals, fixed visibility for 3 items, updated triangles */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {cards.map((card, idx) => {
           const filteredList = getDataList(card);
@@ -225,14 +235,12 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
           const currentSub = getSubTypes(card.category).find(s => s.id === card.subType);
           const design = cardColors[idx % cardColors.length];
           const offset = cardOffsets[card.id] || 0;
-
-          // Requirement 1: Display 3 items per view instead of 4
           const visibleItems = filteredList.slice(offset, offset + 3);
 
           return (
             <div 
                 key={card.id} 
-                className={`rounded-[2.5rem] border-2 ${design.border} p-4 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group flex flex-col gap-2 relative overflow-visible h-[240px] mt-6`}
+                className={`rounded-[2.5rem] border-2 ${design.border} p-4 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group flex flex-col gap-1.5 relative overflow-visible h-[240px] mt-6`}
                 style={{ background: design.gradient }}
             >
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-30">
@@ -241,7 +249,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
                  </div>
               </div>
 
-              <div className="flex flex-col gap-2 relative z-10 pt-4">
+              <div className="flex flex-col gap-1 relative z-10 pt-4 px-1">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                         <div className={`p-1.5 rounded-xl bg-white shadow-md transform group-hover:rotate-12 transition-transform`}>
@@ -256,11 +264,17 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
                         </select>
                     </div>
                     
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                      <button className="p-1 bg-white text-emerald-500 rounded-lg shadow-sm hover:bg-emerald-50 transition-colors">
+                    <div className="flex gap-1 opacity-100 transition-all duration-300">
+                      <button 
+                        onClick={() => handleExportWhatsApp(currentSub?.label || 'Data', filteredList)}
+                        className="p-1.5 bg-white text-green-500 rounded-lg shadow-sm hover:bg-green-50 transition-colors"
+                      >
                         <Share2 size={12} />
                       </button>
-                      <button className="p-1 bg-white text-blue-600 rounded-lg shadow-sm hover:bg-blue-50 transition-colors">
+                      <button 
+                        onClick={() => handleExportExcel(currentSub?.label || 'Data', filteredList)}
+                        className="p-1.5 bg-white text-blue-600 rounded-lg shadow-sm hover:bg-blue-50 transition-colors"
+                      >
                         <FileSpreadsheet size={12} />
                       </button>
                     </div>
@@ -280,8 +294,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
                 </div>
               </div>
 
-              {/* Requirement 1: Item rectangles made slightly smaller to fit perfectly as a set of 3 */}
-              <div className="flex-1 flex flex-col gap-1 py-1.5 relative z-10 overflow-hidden">
+              <div className="flex-1 flex flex-col gap-1 py-1 relative z-10 overflow-hidden">
                  {count === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-1">
                       <History size={20} className="opacity-20" />
@@ -293,16 +306,15 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
                        if (item.isBlacklisted) statusEmoji = '🚫';
                        else if (item.isExcellent) statusEmoji = '⭐';
                        else if (item.violations_score > 0) statusEmoji = '⚠️';
-                       
                        return (
                         <div 
                           key={`${card.id}-${offset}-${i}`}
                           onClick={() => setView?.(currentCat?.view || 'dashboard')}
-                          className="bg-white/90 backdrop-blur-sm p-1.5 rounded-xl border border-white shadow-sm flex items-center gap-2 hover:bg-white hover:shadow-lg hover:-translate-x-1 cursor-pointer transition-all animate-in slide-in-from-right-2 fade-in duration-300 h-[46px]"
+                          className="bg-white/90 backdrop-blur-sm p-1 rounded-xl border border-white shadow-sm flex items-center gap-2 hover:bg-white hover:shadow-lg hover:-translate-x-1 cursor-pointer transition-all animate-in slide-in-from-right-2 fade-in duration-300 h-[38px]"
                         >
-                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm bg-white border shadow-sm`}>{statusEmoji}</div>
+                           <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-sm bg-white border shadow-sm`}>{statusEmoji}</div>
                            <div className="flex-1 overflow-hidden">
-                              <div className="font-black text-[9px] text-slate-800 truncate">{item.displayName}</div>
+                              <div className="font-black text-[9px] text-slate-800 truncate leading-none">{item.displayName}</div>
                               <div className="text-[7px] text-slate-500 font-bold truncate">
                                 {item.grade ? `${item.grade} - ${item.section}` : item.subjectCode || '---'}
                               </div>
@@ -315,12 +327,13 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
               </div>
 
               {count > 3 && (
-                <div className="flex justify-center items-center gap-4 relative z-20 pt-1 border-t border-white/40">
+                <div className="flex justify-center items-center gap-6 relative z-20 pt-1 border-t border-white/40">
+                   {/* Requirement 2: Arrows point towards each other (facing center) */}
                    <button 
                      onClick={() => shiftCardData(card.id, 'prev', count)}
-                     className={`p-1 rounded-lg bg-white/80 hover:bg-white ${design.text} transition-all shadow-md active:scale-90`}
+                     className={`p-1.5 rounded-full bg-white/80 hover:bg-white ${design.text} transition-all shadow-md active:scale-90`}
                    >
-                     <Triangle size={10} className="rotate-270 fill-current" />
+                     <Triangle size={12} className="rotate-90 fill-current" />
                    </button>
                    <div className="flex gap-1">
                       {Array.from({ length: Math.min(Math.ceil(count / 3), 4) }).map((_, dotIdx) => (
@@ -329,9 +342,9 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
                    </div>
                    <button 
                      onClick={() => shiftCardData(card.id, 'next', count)}
-                     className={`p-1 rounded-lg bg-white/80 hover:bg-white ${design.text} transition-all shadow-md active:scale-90`}
+                     className={`p-1.5 rounded-full bg-white/80 hover:bg-white ${design.text} transition-all shadow-md active:scale-90`}
                    >
-                     <Triangle size={10} className="rotate-90 fill-current" />
+                     <Triangle size={12} className="rotate-270 fill-current" />
                    </button>
                 </div>
               )}
@@ -339,6 +352,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
           );
         })}
       </div>
+      {/* END OF CHANGE */}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 bg-white p-8 rounded-[2.5rem] border-2 border-slate-50 shadow-sm relative overflow-hidden group">
