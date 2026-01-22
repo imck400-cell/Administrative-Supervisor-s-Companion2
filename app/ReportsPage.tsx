@@ -1,6 +1,9 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useGlobal } from '../context/GlobalState';
-import { Plus, Search, Trash2, Filter, ChevronDown, Check, Calendar, Percent, User, Target, Settings2, AlertCircle, X, ChevronRight, Zap, CheckCircle, FilePlus, FolderOpen, Save, ListOrdered, ArrowUpDown, ArrowUp, ArrowDown, SortAsc, Book, School, Type, Sparkles, FilterIcon, BarChart3, LayoutList, Upload, Download, Phone, UserCircle, Activity, Star, FileText, FileSpreadsheet, Share2, Edit, ChevronLeft } from 'lucide-react';
+import { 
+  Plus, Search, Trash2, Filter, ChevronDown, Check, Calendar, Percent, User, Target, Settings2, AlertCircle, X, ChevronRight, Zap, CheckCircle, FilePlus, FolderOpen, Save, ListOrdered, ArrowUpDown, ArrowUp, ArrowDown, SortAsc, Book, School, Type, Sparkles, FilterIcon, BarChart3, LayoutList, Upload, Download, Phone, UserCircle, Activity, Star, FileText, FileSpreadsheet, Share2, Edit, ChevronLeft, UserCheck, GraduationCap, MessageCircle
+} from 'lucide-react';
 import { TeacherFollowUp, DailyReportContainer, StudentReport } from '../types';
 import DynamicTable from '../components/DynamicTable';
 import * as XLSX from 'xlsx';
@@ -517,59 +520,419 @@ export const DailyReportsPage: React.FC = () => {
   );
 };
 
-// --- Violations Page ---
+// --- START OF CHANGE - Requirement 1-6: Violations Page Refactoring ---
 export const ViolationsPage: React.FC = () => {
   const { lang, data, updateData } = useGlobal();
+  const [activeMode, setActiveMode] = useState<'students' | 'teachers'>('students');
+  
+  // Filtering states
+  const today = new Date().toISOString().split('T')[0];
+  const [filterValues, setFilterValues] = useState({ start: today, end: today });
+  const [appliedNames, setAppliedNames] = useState<string[]>([]);
+  const [tempNames, setTempNames] = useState<string[]>([]);
+  const [nameInput, setNameInput] = useState('');
+  const [showFilter, setShowFilter] = useState(false);
 
-  const columns = [
-    { key: 'studentName', label: lang === 'ar' ? 'اسم الطالب' : 'Student Name' },
-    { key: 'class', label: lang === 'ar' ? 'الصف' : 'Class' },
-    { key: 'date', label: lang === 'ar' ? 'التاريخ' : 'Date' },
-    { key: 'violation', label: lang === 'ar' ? 'المخالفة' : 'Violation' },
-    { key: 'procedure', label: lang === 'ar' ? 'الإجراء' : 'Procedure' },
+  const studentList = data.studentReports || [];
+  const teacherList = useMemo(() => {
+    const names = new Set<string>();
+    data.dailyReports.forEach(r => r.teachersData.forEach(t => names.add(t.teacherName)));
+    return Array.from(names);
+  }, [data.dailyReports]);
+
+  const violationOptions = [
+    "تأخر عن الدوام", "تأخر عن الحصة", "عقاب بدني عنيف", "استخدام العصا بطريقة غير تربوية", 
+    "تأخير تسليم ما كلف به", "عدم تصحيح", "رفض التغطية", "رفض الاجتماع", "رفض الإشراف", 
+    "رفض الإذاعة", "رفض التكليف", "غيرها"
   ];
 
-  const handleAdd = () => {
-    const name = prompt(lang === 'ar' ? 'أدخل اسم الطالب:' : 'Enter student name:');
-    if (!name) return;
-    
+  const subjects = ["القرآن الكريم", "التربية الإسلامية", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "العلوم", "الكيمياء", "الفيزياء", "الأحياء", "الاجتماعيات", "الحاسوب", "المكتبة", "الفنية", "المختص الاجتماعي", "الأنشطة", "غيرها"];
+  const grades = ["التمهيدي", "الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "الأول الثانوي", "الثاني الثانوي", "الثالث الثانوي"];
+  const sections = ["أ", "ب", "ج", "د", "هـ", "و", "ز", "ح", "ط", "ي"];
+
+  const handleAddRow = () => {
     const newViolation = {
       id: Date.now().toString(),
-      studentName: name,
+      type: activeMode,
+      studentName: '',
+      teacherName: '',
       class: '',
+      grade: '',
+      section: '',
+      subject: '',
       date: new Date().toISOString().split('T')[0],
+      day: new Intl.DateTimeFormat('ar-EG', { weekday: 'long' }).format(new Date()),
       violation: '',
-      procedure: ''
+      prevViolations: 0,
+      procedure: '',
+      signature: ''
     };
     updateData({ violations: [...data.violations, newViolation] });
   };
 
-  const handleEdit = (item: any) => {
-    const name = prompt(lang === 'ar' ? 'تعديل اسم الطالب:' : 'Edit student name:', item.studentName);
-    const violation = prompt(lang === 'ar' ? 'تعديل المخالفة:' : 'Edit violation:', item.violation);
-    if (name) {
-       const updated = data.violations.map(v => v.id === item.id ? { ...v, studentName: name, violation: violation || v.violation } : v);
-       updateData({ violations: updated });
-    }
+  const updateViolation = (id: string, field: string, value: any) => {
+    const updated = data.violations.map(v => v.id === id ? { ...v, [field]: value } : v);
+    updateData({ violations: updated });
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm(lang === 'ar' ? 'هل أنت متأكد من الحذف؟' : 'Are you sure?')) {
+  const deleteViolation = (id: string) => {
+    if (confirm('هل أنت متأكد من الحذف؟')) {
       updateData({ violations: data.violations.filter(v => v.id !== id) });
     }
   };
 
+  const handleSignature = (id: string) => {
+    const text = "تم الاطلاع على المخالفة والإجراء، وألتزم بعدم تكرار المخالفة المذكورة، وفي حال تم التكرار فللمدرسة الحق في اتخاذ كافة الإجراءات اللازمة";
+    updateViolation(id, 'signature', text);
+  };
+
+  const filteredData = useMemo(() => {
+    return data.violations.filter(v => {
+      if (v.type !== activeMode) return false;
+      if (appliedNames.length > 0) {
+        const name = activeMode === 'students' ? v.studentName : v.teacherName;
+        if (!appliedNames.includes(name)) return false;
+      }
+      if (v.date < filterValues.start || v.date > filterValues.end) return false;
+      return true;
+    });
+  }, [data.violations, activeMode, appliedNames, filterValues]);
+
+  const nameSuggestions = useMemo(() => {
+    if (!nameInput.trim()) return [];
+    const source = activeMode === 'students' ? studentList.map(s => s.name) : teacherList;
+    return source.filter(n => n.includes(nameInput) && !tempNames.includes(n)).slice(0, 5);
+  }, [nameInput, activeMode, studentList, teacherList, tempNames]);
+
+  // Export Logic (Requirement 3, 4, 5)
+  const generateRichReport = () => {
+    let msg = `*📋 سجل التعهدات والمخالفات (${activeMode === 'students' ? 'طلاب' : 'معلمون'})*\n`;
+    msg += `*التاريخ:* ${new Date().toLocaleDateString('ar-EG')}\n`;
+    msg += `----------------------------------\n\n`;
+
+    filteredData.forEach((row, i) => {
+      msg += `*🔹 البند (${i + 1}):*\n`;
+      msg += `👤 *الاسم:* ${activeMode === 'students' ? row.studentName : row.teacherName}\n`;
+      msg += `📍 *الصف:* ${row.grade || row.class || '---'} ${activeMode === 'students' ? `/ ${row.section || '---'}` : ''}\n`;
+      if (activeMode === 'teachers') msg += `📚 *المادة:* ${row.subject || '---'}\n`;
+      msg += `🔢 *عدد المخالفات:* ${row.prevViolations || 0}\n`;
+      msg += `📅 *التاريخ:* ${row.date} (${row.day || '---'})\n`;
+      msg += `⚠️ *بيان المخالفة:* _${row.violation || '---'}_\n`;
+      msg += `🛡️ *الإجراء المتخذ:* _${row.procedure || '---'}_\n`;
+      msg += `✍️ *التوقيع:* _${row.signature || '---'}_\n`;
+      msg += `\n`;
+    });
+
+    msg += `----------------------------------\n`;
+    msg += `*رفيق المشرف الإداري - إبراهيم دخان*`;
+    return msg;
+  };
+
+  const exportExcel = () => {
+    const worksheet = XLSX.utils.json_to_sheet(filteredData.map(v => ({
+      'الاسم': activeMode === 'students' ? v.studentName : v.teacherName,
+      'الصف': v.grade || v.class,
+      'الشعبة': v.section || '',
+      'المادة': v.subject || '',
+      'التاريخ': v.date,
+      'المخالفة': v.violation,
+      'الإجراء': v.procedure,
+      'التوقيع': v.signature
+    })));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Violations");
+    XLSX.writeFile(workbook, `Violations_${activeMode}.xlsx`);
+  };
+
+  const exportTxt = () => {
+    const text = generateRichReport().replace(/\*/g, '').replace(/_/g, '');
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Violations_${activeMode}.txt`;
+    link.click();
+  };
+
+  const handleWhatsApp = () => {
+    const url = `https://wa.me/?text=${encodeURIComponent(generateRichReport())}`;
+    window.open(url, '_blank');
+  };
+
   return (
-    <DynamicTable 
-      title={lang === 'ar' ? 'سجل المخالفات والتعهدات' : 'Violations Log'}
-      columns={columns}
-      data={data.violations}
-      onAdd={handleAdd}
-      onEdit={handleEdit}
-      onDelete={handleDelete}
-    />
+    <div className="space-y-6 font-arabic text-right animate-in fade-in duration-500 pb-20">
+      <div className="bg-white p-6 rounded-[2.5rem] border shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="flex gap-4">
+          <button 
+            onClick={() => setActiveMode('students')} 
+            className={`flex items-center gap-3 px-8 py-3 rounded-2xl font-black text-sm transition-all shadow-md ${activeMode === 'students' ? 'bg-blue-600 text-white scale-105' : 'bg-slate-50 text-slate-500 hover:bg-blue-50'}`}
+          >
+            <GraduationCap size={20} /> تعهدات الطلاب
+          </button>
+          <button 
+            onClick={() => setActiveMode('teachers')} 
+            className={`flex items-center gap-3 px-8 py-3 rounded-2xl font-black text-sm transition-all shadow-md ${activeMode === 'teachers' ? 'bg-emerald-600 text-white scale-105' : 'bg-slate-50 text-slate-500 hover:bg-emerald-50'}`}
+          >
+            <UserCheck size={20} /> تعهدات المعلمين
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+           <div className="flex items-center gap-1 bg-slate-100 p-1.5 rounded-2xl border">
+              <button title="استيراد" className="p-2.5 bg-white text-blue-600 rounded-xl hover:bg-blue-50 transition-all"><Upload size={18}/></button>
+              <button onClick={exportTxt} title="تصدير TXT" className="p-2.5 bg-white text-slate-600 rounded-xl hover:bg-slate-50 transition-all"><FileText size={18}/></button>
+              <button onClick={exportExcel} title="تصدير Excel" className="p-2.5 bg-white text-green-700 rounded-xl hover:bg-green-50 transition-all"><FileSpreadsheet size={18}/></button>
+              <button onClick={handleWhatsApp} title="واتساب" className="p-2.5 bg-white text-green-500 rounded-xl hover:bg-green-50 transition-all"><MessageCircle size={18}/></button>
+           </div>
+           <button 
+             onClick={() => setShowFilter(!showFilter)}
+             className={`p-3 rounded-2xl border font-black transition-all ${showFilter ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+           >
+             <Filter size={20} />
+           </button>
+           <button onClick={handleAddRow} className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2 hover:bg-blue-700 shadow-lg active:scale-95 transition-all">
+             <Plus size={20}/> إضافة تعهد
+           </button>
+        </div>
+      </div>
+
+      {showFilter && (
+        <div className="bg-slate-50 p-6 rounded-[2rem] border space-y-4 animate-in slide-in-from-top-4 duration-300">
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="flex-1 min-w-[300px] space-y-2">
+              <label className="text-xs font-black text-slate-400">تصفية حسب الأسماء</label>
+              <div className="flex gap-2 relative">
+                <div className="flex-1 relative">
+                  <input 
+                    type="text" 
+                    className="w-full p-3 bg-white border rounded-xl outline-none focus:ring-2 ring-blue-100 font-bold text-xs" 
+                    placeholder="ابحث عن اسم..."
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                  />
+                  {nameSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-50 bg-white border rounded-xl shadow-xl mt-1 overflow-hidden">
+                      {nameSuggestions.map(name => (
+                        <button 
+                          key={name}
+                          onClick={() => { setTempNames([...tempNames, name]); setNameInput(''); }}
+                          className="w-full text-right p-3 text-xs font-bold hover:bg-blue-50 border-b last:border-none"
+                        >
+                          {name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button 
+                  onClick={() => setAppliedNames(tempNames)}
+                  className="bg-blue-600 text-white px-8 py-3 rounded-xl font-black text-xs hover:bg-blue-700"
+                >
+                  موافق
+                </button>
+                <button 
+                  onClick={() => { setTempNames([]); setAppliedNames([]); }}
+                  className="bg-white border text-slate-500 px-4 py-3 rounded-xl font-black text-xs hover:bg-slate-50"
+                >
+                  إعادة ضبط
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {tempNames.map(name => (
+                  <span key={name} className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded-lg text-[10px] font-black">
+                    {name} <X size={10} className="cursor-pointer" onClick={() => setTempNames(tempNames.filter(n => n !== name))} />
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-400">الفترة الزمنية</label>
+              <div className="flex items-center gap-2 bg-white px-4 py-3 rounded-xl border">
+                <Calendar size={14} className="text-slate-400"/>
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-black text-slate-400">من:</span>
+                  <input type="date" className="text-xs font-bold outline-none" value={filterValues.start} onChange={e => setFilterValues({...filterValues, start: e.target.value})} />
+                </div>
+                <span className="mx-2 text-slate-300">|</span>
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-black text-slate-400">إلى:</span>
+                  <input type="date" className="text-xs font-bold outline-none" value={filterValues.end} onChange={e => setFilterValues({...filterValues, end: e.target.value})} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-[2.5rem] shadow-xl border overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-center text-sm border-collapse min-w-[1200px]">
+            <thead className="bg-[#FFD966] text-slate-800 font-black">
+              {activeMode === 'teachers' ? (
+                <tr>
+                  <th className="p-4 border-e border-slate-300 w-12">م</th>
+                  <th className="p-4 border-e border-slate-300 w-64">اسم المعلم</th>
+                  <th className="p-4 border-e border-slate-300 w-32">مادة</th>
+                  <th className="p-4 border-e border-slate-300 w-32">الصف</th>
+                  <th className="p-4 border-e border-slate-300 w-24">عدد التعهدات</th>
+                  <th className="p-4 border-e border-slate-300">بيان المخالفة</th>
+                  <th className="p-4 border-e border-slate-300 w-32">اليوم</th>
+                  <th className="p-4 border-e border-slate-300 w-40">التاريخ</th>
+                  <th className="p-4 border-e border-slate-300">الإجراء</th>
+                  <th className="p-4 border-e border-slate-300 w-64">التوقيع</th>
+                  <th className="p-4"></th>
+                </tr>
+              ) : (
+                <tr>
+                  <th className="p-4 border-e border-slate-300 w-12">م</th>
+                  <th className="p-4 border-e border-slate-300 w-64">اسم الطالب</th>
+                  <th className="p-4 border-e border-slate-300 w-32">الصف</th>
+                  <th className="p-4 border-e border-slate-300 w-24">الشعبة</th>
+                  <th className="p-4 border-e border-slate-300 w-24">عدد المخالفات</th>
+                  <th className="p-4 border-e border-slate-300 w-40">التاريخ</th>
+                  <th className="p-4 border-e border-slate-300">بيان المخالفة</th>
+                  <th className="p-4 border-e border-slate-300">الإجراء المتخذ</th>
+                  <th className="p-4 border-e border-slate-300 w-64">التوقيع</th>
+                  <th className="p-4"></th>
+                </tr>
+              )}
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredData.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="p-16 text-slate-400 italic font-bold">لا توجد تعهدات مسجلة لهذه الفئة حالياً.</td>
+                </tr>
+              ) : (
+                filteredData.map((v, idx) => (
+                  <tr key={v.id} className="hover:bg-slate-50 transition-colors font-bold group">
+                    <td className="p-4 border-e border-slate-100 bg-slate-50/50">{idx + 1}</td>
+                    
+                    <td className="p-2 border-e border-slate-100 relative">
+                       <input 
+                         className="w-full text-right bg-transparent outline-none focus:ring-1 ring-blue-200 rounded p-1"
+                         value={activeMode === 'students' ? v.studentName : v.teacherName}
+                         onChange={(e) => updateViolation(v.id, activeMode === 'students' ? 'studentName' : 'teacherName', e.target.value)}
+                         placeholder="اكتب الاسم..."
+                       />
+                       {/* Contextual Suggestion inside table for speed */}
+                       {((activeMode === 'students' ? v.studentName : v.teacherName).length > 2) && (
+                         <div className="absolute top-full left-0 right-0 z-[100] bg-white border shadow-xl rounded-lg max-h-32 overflow-y-auto hidden group-focus-within:block">
+                            {(activeMode === 'students' ? studentList.map(s => s.name) : teacherList)
+                              .filter(n => n.includes(activeMode === 'students' ? v.studentName : v.teacherName))
+                              .map(suggestion => (
+                                <button 
+                                  key={suggestion}
+                                  onMouseDown={() => updateViolation(v.id, activeMode === 'students' ? 'studentName' : 'teacherName', suggestion)}
+                                  className="w-full text-right p-2 text-[10px] hover:bg-blue-50 border-b last:border-none"
+                                >
+                                  {suggestion}
+                                </button>
+                            ))}
+                         </div>
+                       )}
+                    </td>
+
+                    {activeMode === 'teachers' ? (
+                      <>
+                        <td className="p-2 border-e border-slate-100">
+                          <select className="w-full bg-transparent outline-none text-center" value={v.subject} onChange={(e) => updateViolation(v.id, 'subject', e.target.value)}>
+                            <option value="">اختر...</option>
+                            {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </td>
+                        <td className="p-2 border-e border-slate-100">
+                          <select className="w-full bg-transparent outline-none text-center" value={v.class} onChange={(e) => updateViolation(v.id, 'class', e.target.value)}>
+                            <option value="">اختر...</option>
+                            {grades.map(g => <option key={g} value={g}>{g}</option>)}
+                          </select>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="p-2 border-e border-slate-100">
+                          <select className="w-full bg-transparent outline-none text-center" value={v.grade} onChange={(e) => updateViolation(v.id, 'grade', e.target.value)}>
+                            <option value="">اختر...</option>
+                            {grades.map(g => <option key={g} value={g}>{g}</option>)}
+                          </select>
+                        </td>
+                        <td className="p-2 border-e border-slate-100">
+                          <select className="w-full bg-transparent outline-none text-center" value={v.section} onChange={(e) => updateViolation(v.id, 'section', e.target.value)}>
+                            <option value="">اختر...</option>
+                            {sections.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </td>
+                      </>
+                    )}
+
+                    <td className="p-2 border-e border-slate-100">
+                       <input type="number" className="w-16 text-center bg-transparent outline-none text-red-600 font-black" value={v.prevViolations} onChange={(e) => updateViolation(v.id, 'prevViolations', parseInt(e.target.value) || 0)} />
+                    </td>
+
+                    {activeMode === 'teachers' ? (
+                      <>
+                        <td className="p-2 border-e border-slate-100">
+                          <div className="flex flex-col gap-1">
+                            <select className="w-full bg-transparent outline-none text-[10px]" value={v.violation} onChange={(e) => updateViolation(v.id, 'violation', e.target.value)}>
+                              <option value="">اختر أو اكتب...</option>
+                              {violationOptions.map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                            <input className="w-full text-right p-1 bg-slate-50 text-[10px] rounded border-none outline-none" placeholder="اكتب هنا..." value={v.violation} onChange={(e) => updateViolation(v.id, 'violation', e.target.value)} />
+                          </div>
+                        </td>
+                        <td className="p-2 border-e border-slate-100 text-[10px]">{v.day}</td>
+                      </>
+                    ) : null}
+
+                    <td className="p-2 border-e border-slate-100">
+                       <input type="date" className="w-full text-center bg-transparent outline-none text-[10px]" value={v.date} onChange={(e) => {
+                          const newDay = new Intl.DateTimeFormat('ar-EG', { weekday: 'long' }).format(new Date(e.target.value));
+                          updateViolation(v.id, 'date', e.target.value);
+                          updateViolation(v.id, 'day', newDay);
+                       }} />
+                    </td>
+
+                    {activeMode === 'students' ? (
+                      <td className="p-2 border-e border-slate-100">
+                         <input className="w-full text-right bg-transparent outline-none text-[11px]" value={v.violation} onChange={(e) => updateViolation(v.id, 'violation', e.target.value)} placeholder="..." />
+                      </td>
+                    ) : null}
+
+                    <td className="p-2 border-e border-slate-100">
+                       <input className="w-full text-right bg-transparent outline-none text-[11px]" value={v.procedure} onChange={(e) => updateViolation(v.id, 'procedure', e.target.value)} placeholder="الإجراء..." />
+                    </td>
+
+                    <td className="p-2 border-e border-slate-100">
+                      <div className="flex flex-col gap-1">
+                        {v.signature ? (
+                          <div className="p-2 bg-green-50 text-green-700 text-[9px] font-bold rounded leading-relaxed border border-green-100">
+                            {v.signature}
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => handleSignature(v.id)}
+                            className="bg-slate-900 text-white px-4 py-1 rounded-lg text-[9px] font-black hover:bg-black transition-all"
+                          >
+                            توقيع البصمة
+                          </button>
+                        )}
+                      </div>
+                    </td>
+
+                    <td className="p-2">
+                      <button onClick={() => deleteViolation(v.id)} className="text-red-300 hover:text-red-600 transition-colors">
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   );
 };
+// --- END OF CHANGE ---
 
 export const StudentsReportsPage: React.FC = () => {
   const { data, updateData, lang } = useGlobal();
