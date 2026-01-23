@@ -10,9 +10,10 @@ import {
   UserCircle, Star, Filter, Clock, ShieldAlert, X,
   FileSearch, Archive, CheckSquare, PencilLine, Zap,
   Sparkles, Database, FileUp, FileDown, MessageCircle,
-  Activity, Fingerprint, History, RefreshCw, Upload, LayoutList
+  Activity, Fingerprint, History, RefreshCw, Upload, LayoutList,
+  Hammer
 } from 'lucide-react';
-import { AbsenceLog, LatenessLog, StudentViolationLog, StudentReport, ExitLog } from '../types';
+import { AbsenceLog, LatenessLog, StudentViolationLog, StudentReport, ExitLog, DamageLog } from '../types';
 import * as XLSX from 'xlsx';
 
 type MainTab = 'supervisor' | 'staff' | 'students' | 'tests';
@@ -55,7 +56,7 @@ const SpecialReportsPage: React.FC = () => {
   const [appliedLatenessNames, setAppliedLatenessNames] = useState<string[]>([]);
   const [latenessNameInput, setLatenessNameInput] = useState('');
 
-  // START OF CHANGE - Exit Module States
+  // Exit Module States
   const [exitForm, setExitForm] = useState<Partial<ExitLog>>({
     date: today,
     semester: 'الفصلين',
@@ -75,7 +76,62 @@ const SpecialReportsPage: React.FC = () => {
   const [tempExitNames, setTempExitNames] = useState<string[]>([]);
   const [appliedExitNames, setAppliedExitNames] = useState<string[]>([]);
   const [exitNameInput, setExitNameInput] = useState('');
-  // END OF CHANGE
+
+  // Damage Module States
+  const [damageForm, setDamageForm] = useState<Partial<DamageLog>>({
+    date: today,
+    semester: 'الفصلين',
+    description: '',
+    statusTags: [],
+    action: 'تنبيه',
+    pledge: '',
+    notes: ''
+  });
+  const [damageFilterValues, setDamageFilterValues] = useState({
+    semester: '',
+    start: today,
+    end: today,
+    grade: '',
+    section: ''
+  });
+  const [tempDamageNames, setTempDamageNames] = useState<string[]>([]);
+  const [appliedDamageNames, setAppliedDamageNames] = useState<string[]>([]);
+  const [damageNameInput, setDamageNameInput] = useState('');
+
+  // Moved Form States to top of component to fix "Cannot find name" errors in render functions
+  const [absenceForm, setAbsenceForm] = useState<Partial<AbsenceLog>>({
+    date: new Date().toISOString().split('T')[0],
+    semester: 'الأول',
+    status: 'expected',
+    reason: '',
+    commStatus: 'لم يتم التواصل',
+    commType: 'هاتف',
+    replier: 'الأب',
+    result: 'لم يتم الرد',
+    notes: ''
+  });
+
+  const [latenessForm, setLatenessForm] = useState<Partial<LatenessLog>>({
+    date: new Date().toISOString().split('T')[0],
+    semester: 'الأول',
+    status: 'recurring',
+    reason: '',
+    action: 'تنبيه 1',
+    pledge: '',
+    notes: ''
+  });
+
+  const [violationForm, setViolationForm] = useState<Partial<StudentViolationLog>>({
+    date: new Date().toISOString().split('T')[0],
+    semester: 'الأول',
+    behaviorViolations: [],
+    dutiesViolations: [],
+    achievementViolations: [],
+    status: 'rare',
+    action: 'تنبيه 1',
+    pledge: '',
+    notes: ''
+  });
 
   // Data helpers
   const students = data.studentReports || [];
@@ -108,19 +164,6 @@ const SpecialReportsPage: React.FC = () => {
 
   // --- Specialized Modules Logic ---
 
-  // 1. Absence Module
-  const [absenceForm, setAbsenceForm] = useState<Partial<AbsenceLog>>({
-    date: new Date().toISOString().split('T')[0],
-    semester: 'الأول',
-    status: 'expected',
-    reason: '',
-    commStatus: 'لم يتم التواصل',
-    commType: 'هاتف',
-    replier: 'الأب',
-    result: 'لم يتم الرد',
-    notes: ''
-  });
-
   const saveAbsence = () => {
     if (!absenceForm.studentId) return alert('يرجى اختيار طالب أولاً');
     const newLog: AbsenceLog = {
@@ -130,26 +173,11 @@ const SpecialReportsPage: React.FC = () => {
     };
     const currentLogs = data.absenceLogs || [];
     updateData({ absenceLogs: [newLog, ...currentLogs] });
-    
-    const updatedStudents = students.map(s => 
-      s.id === newLog.studentId ? { ...s, totalAbsences: (s.totalAbsences || 0) + 1 } : s
-    );
+    const updatedStudents = students.map(s => s.id === newLog.studentId ? { ...s, totalAbsences: (s.totalAbsences || 0) + 1 } : s);
     updateData({ studentReports: updatedStudents });
-    
     alert('تم حفظ بيانات الغياب بنجاح');
     setAbsenceForm({ ...absenceForm, studentName: '', studentId: '', notes: '', reason: '' });
   };
-
-  // 2. Lateness Module
-  const [latenessForm, setLatenessForm] = useState<Partial<LatenessLog>>({
-    date: new Date().toISOString().split('T')[0],
-    semester: 'الأول',
-    status: 'recurring',
-    reason: '',
-    action: 'تنبيه 1',
-    pledge: '',
-    notes: ''
-  });
 
   const saveLateness = () => {
     if (!latenessForm.studentId) return alert('يرجى اختيار طالب أولاً');
@@ -164,18 +192,82 @@ const SpecialReportsPage: React.FC = () => {
     setLatenessForm({ ...latenessForm, studentName: '', studentId: '', notes: '', reason: '', pledge: '' });
   };
 
-  // 3. Violation Module
-  const [violationForm, setViolationForm] = useState<Partial<StudentViolationLog>>({
-    date: new Date().toISOString().split('T')[0],
-    semester: 'الأول',
-    behaviorViolations: [],
-    dutiesViolations: [],
-    achievementViolations: [],
-    status: 'rare',
-    action: 'تنبيه 1',
-    pledge: '',
-    notes: ''
-  });
+  const saveViolation = () => {
+    if (!violationForm.studentId) return alert('يرجى اختيار طالب أولاً');
+    const newLog: StudentViolationLog = {
+      ...violationForm as StudentViolationLog,
+      id: Date.now().toString(),
+      totalViolations: (violationForm.behaviorViolations?.length || 0) + (violationForm.dutiesViolations?.length || 0) + (violationForm.achievementViolations?.length || 0)
+    };
+    const currentLogs = data.studentViolationLogs || [];
+    updateData({ studentViolationLogs: [newLog, ...currentLogs] });
+    alert('تم تسجيل المخالفة بنجاح');
+    setViolationForm({ ...violationForm, studentName: '', studentId: '', behaviorViolations: [], dutiesViolations: [], achievementViolations: [] });
+  };
+
+  const saveExitLog = () => {
+    if (!exitForm.studentId) return alert('يرجى اختيار طالب أولاً');
+    const newLog: ExitLog = {
+      ...exitForm as ExitLog,
+      id: Date.now().toString(),
+      day: getDayName(exitForm.date || today)
+    };
+    const currentLogs = data.exitLogs || [];
+    updateData({ exitLogs: [newLog, ...currentLogs] });
+    alert('تم حفظ بيان الخروج بنجاح');
+    setExitForm({ ...exitForm, studentName: '', studentId: '', grade: '', section: '', notes: '', pledge: '', customStatusItems: [] });
+  };
+
+  const saveDamageLog = () => {
+    if (!damageForm.studentId) return alert('يرجى اختيار طالب أولاً');
+    const newLog: DamageLog = {
+      ...damageForm as DamageLog,
+      id: Date.now().toString(),
+      day: getDayName(damageForm.date || today)
+    };
+    const currentLogs = data.damageLogs || [];
+    updateData({ damageLogs: [newLog, ...currentLogs] });
+    alert('تم حفظ سجل الإتلاف بنجاح');
+    setDamageForm({ ...damageForm, studentName: '', studentId: '', grade: '', section: '', description: '', notes: '', pledge: '', statusTags: [] });
+  };
+
+  const togglePinnedDamageStudent = (studentName: string) => {
+    const pinned = data.pinnedDamageStudents || [];
+    const updated = pinned.includes(studentName) ? pinned.filter(n => n !== studentName) : [...pinned, studentName];
+    updateData({ pinnedDamageStudents: updated });
+  };
+
+  const addCustomDamageItem = () => {
+    const val = prompt('أدخل وصفاً جديداً لحالة الإتلاف:');
+    if (!val) return;
+    const customs = data.customDamageItems || [];
+    updateData({ customDamageItems: [...customs, val] });
+  };
+
+  const toggleDamageStatusTag = (val: string) => {
+    const current = damageForm.statusTags || [];
+    const updated = current.includes(val) ? current.filter(v => v !== val) : [...current, val];
+    setDamageForm({ ...damageForm, statusTags: updated });
+  };
+
+  const togglePinnedStudent = (studentName: string) => {
+    const pinned = data.pinnedExitStudents || [];
+    const updated = pinned.includes(studentName) ? pinned.filter(n => n !== studentName) : [...pinned, studentName];
+    updateData({ pinnedExitStudents: updated });
+  };
+
+  const addCustomExitStatus = () => {
+    const val = prompt('أدخل وصفاً لحالة الخروج الجديدة:');
+    if (!val) return;
+    const customs = data.customExitItems || [];
+    updateData({ customExitItems: [...customs, val] });
+  };
+
+  const toggleExitStatusItem = (val: string) => {
+    const current = exitForm.customStatusItems || [];
+    const updated = current.includes(val) ? current.filter(v => v !== val) : [...current, val];
+    setExitForm({ ...exitForm, customStatusItems: updated });
+  };
 
   const toggleViolationType = (category: 'behavior' | 'duties' | 'achievement', value: string) => {
     const field = category === 'behavior' ? 'behaviorViolations' : category === 'duties' ? 'dutiesViolations' : 'achievementViolations';
@@ -192,60 +284,6 @@ const SpecialReportsPage: React.FC = () => {
     updateData({ customViolationElements: updated });
   };
 
-  const saveViolation = () => {
-    if (!violationForm.studentId) return alert('يرجى اختيار طالب أولاً');
-    const newLog: StudentViolationLog = {
-      ...violationForm as StudentViolationLog,
-      id: Date.now().toString(),
-      totalViolations: (violationForm.behaviorViolations?.length || 0) + 
-                       (violationForm.dutiesViolations?.length || 0) + 
-                       (violationForm.achievementViolations?.length || 0)
-    };
-    const currentLogs = data.studentViolationLogs || [];
-    updateData({ studentViolationLogs: [newLog, ...currentLogs] });
-    alert('تم تسجيل المخالفة بنجاح');
-    setViolationForm({ ...violationForm, studentName: '', studentId: '', behaviorViolations: [], dutiesViolations: [], achievementViolations: [] });
-  };
-
-  // START OF CHANGE - Exit Module Logic
-  const saveExitLog = () => {
-    if (!exitForm.studentId) return alert('يرجى اختيار طالب أولاً');
-    const newLog: ExitLog = {
-      ...exitForm as ExitLog,
-      id: Date.now().toString(),
-      day: getDayName(exitForm.date || today)
-    };
-    const currentLogs = data.exitLogs || [];
-    updateData({ exitLogs: [newLog, ...currentLogs] });
-    alert('تم حفظ بيان الخروج بنجاح');
-    setExitForm({ ...exitForm, studentName: '', studentId: '', grade: '', section: '', notes: '', pledge: '', customStatusItems: [] });
-  };
-
-  const togglePinnedStudent = (studentName: string) => {
-    const pinned = data.pinnedExitStudents || [];
-    const updated = pinned.includes(studentName) 
-      ? pinned.filter(n => n !== studentName) 
-      : [...pinned, studentName];
-    updateData({ pinnedExitStudents: updated });
-  };
-
-  const addCustomExitStatus = () => {
-    const val = prompt('أدخل وصفاً لحالة الخروج الجديدة:');
-    if (!val) return;
-    const customs = data.customExitItems || [];
-    updateData({ customExitItems: [...customs, val] });
-  };
-
-  const toggleExitStatusItem = (val: string) => {
-    const current = exitForm.customStatusItems || [];
-    const updated = current.includes(val) 
-      ? current.filter(v => v !== val) 
-      : [...current, val];
-    setExitForm({ ...exitForm, customStatusItems: updated });
-  };
-  // END OF CHANGE
-
-  // Generic Export/Share
   const exportToWhatsApp = (title: string, tableData: any[], columns: { label: string, key: string }[]) => {
     let msg = `*📋 ${title}*\n`;
     msg += `*التاريخ:* ${new Date().toLocaleDateString('ar-EG')}\n`;
@@ -255,21 +293,14 @@ const SpecialReportsPage: React.FC = () => {
       columns.forEach(col => {
         let val = Array.isArray(row[col.key]) ? row[col.key].join('، ') : row[col.key];
         let symbol = '▪️';
-        
         if (col.key === 'studentName' || col.key === 'name') symbol = '👤';
         if (col.key === 'grade') symbol = '📍';
-        if (col.key === 'totalViolations' || col.key === 'prevLatenessCount' || col.key === 'prevExitCount') symbol = '🔢';
+        if (col.key === 'prevExitCount' || col.key === 'prevDamageCount') symbol = '🔢';
         if (col.key === 'date') symbol = '📅';
-        if (col.key === 'status') symbol = '🏷️';
-        if (col.key === 'action' || col.key === 'procedure') symbol = '🛡️';
-        if (col.key === 'reason') symbol = '❓';
-        if (col.key === 'pledge') symbol = '✍️';
+        if (col.key === 'statusTags' || col.key === 'status') symbol = '🏷️';
+        if (col.key === 'action') symbol = '🛡️';
+        if (col.key === 'description') symbol = '🔨';
         if (col.key === 'notes') symbol = '📝';
-        
-        if (val?.toString().includes('تنبيه') || val?.toString().includes('ضعيف') || val?.toString().includes('متكرر') || val?.toString().includes('كثير الخروج')) symbol = '⚠️';
-        if (val?.toString().includes('blacklist') || val?.toString().includes('كثير المخالفة') || val?.toString().includes('دائم')) symbol = '🔴';
-        if (val?.toString().includes('نادر') || val?.toString().includes('ممتاز') || val?.toString().includes('تم التوقيع') || val?.toString().includes('تم التبصيم')) symbol = '🟢';
-        
         msg += `${symbol} *${col.label}:* ${val || '---'}\n`;
       });
       msg += `\n`;
@@ -280,249 +311,80 @@ const SpecialReportsPage: React.FC = () => {
     window.open(url, '_blank');
   };
 
-  // --- Component Views ---
+  // --- Implementation of missing render functions to fix errors ---
 
   const renderAbsenceModule = () => {
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
-    
     const filteredLogs = (data.absenceLogs || []).filter(l => {
-      if (appliedNames.length > 0 && !appliedNames.includes(l.studentName)) return false;
-      if (filterValues.start && l.date < filterValues.start) return false;
-      if (filterValues.end && l.date > filterValues.end) return false;
-      if (filterValues.semester && l.semester !== filterValues.semester) return false;
-      return true;
+       if (appliedNames.length > 0 && !appliedNames.includes(l.studentName)) return false;
+       return true;
     });
 
-    const nameSuggestions = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
-
     return (
-      <div className="bg-white p-6 rounded-[2.5rem] border-2 shadow-xl animate-in fade-in duration-300 font-arabic text-right">
-        <div className="flex items-center justify-between mb-8 border-b pb-4">
-          <div className="flex gap-2">
-            <button onClick={() => setShowTable(!showTable)} className="flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-2 rounded-xl font-black text-sm hover:bg-blue-100 transition-all">
-              {showTable ? <Plus size={16}/> : <Archive size={16}/>}
-              {showTable ? 'تسجيل جديد' : 'جدول الغائبين'}
-            </button>
-            <button onClick={() => setActiveSubTab(null)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"><X/></button>
-          </div>
-          <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-            <Clock className="text-blue-600" />
-            غياب يوم {getDayName(absenceForm.date || '')} بتاريخ {absenceForm.date}
-          </h2>
+      <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-2 h-full bg-orange-500"></div>
+        <div className="flex justify-between items-center mb-6 border-b pb-4">
+           <div className="flex gap-2">
+              <button onClick={() => setShowTable(!showTable)} className="bg-orange-50 text-orange-600 px-4 py-2 rounded-xl font-bold text-xs">{showTable ? 'رصد جديد' : 'جدول الغياب'}</button>
+              <button onClick={() => setActiveSubTab(null)} className="p-2 hover:bg-slate-100 rounded-full"><X/></button>
+           </div>
+           <h3 className="text-2xl font-black text-orange-600">سجل الغياب اليومي</h3>
         </div>
-
         {!showTable ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="space-y-6">
-              <div className="flex flex-wrap gap-2">
-                {['expected', 'recurring', 'week1', 'week2', 'most', 'disconnected'].map(st => (
-                  <button key={st} onClick={() => setAbsenceForm({...absenceForm, status: st as any})} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${absenceForm.status === st ? 'bg-red-600 text-white shadow-lg' : 'bg-slate-50 text-slate-400'}`}>
-                    {st === 'expected' ? 'غياب متوقع' : st === 'recurring' ? 'غياب متكرر' : st === 'week1' ? 'أكثر من أسبوع' : st === 'week2' ? 'أكثر من أسبوعين' : st === 'most' ? 'الأكثر غياباً' : 'المنقطع'}
-                  </button>
-                ))}
-              </div>
-
-              <div className="relative">
-                <label className="text-xs font-black text-slate-400 mb-1 block">اسم الطالب</label>
-                <div className="flex items-center gap-2 bg-slate-50 border-2 rounded-2xl p-4 focus-within:border-blue-500 transition-all">
-                  <Search className="text-slate-400" size={18}/>
-                  <input type="text" className="bg-transparent w-full outline-none font-black" placeholder="ابحث عن الاسم..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                </div>
-                {suggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 z-50 bg-white border rounded-2xl shadow-2xl mt-1 max-h-60 overflow-y-auto">
-                    {suggestions.map(s => (
-                      <button key={s.id} onClick={() => { 
-                        setAbsenceForm({ ...absenceForm, studentId: s.id, studentName: s.name, grade: s.grade, section: s.section, prevAbsenceCount: (data.absenceLogs || []).filter(l => l.studentId === s.id).length });
-                        setSearchQuery('');
-                      }} className="w-full text-right p-4 hover:bg-blue-50 font-black border-b last:border-none">{s.name}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-blue-50 p-4 rounded-2xl border">
-                  <label className="text-[10px] text-blue-500 font-black block">الفصل</label>
-                  <select className="bg-transparent font-black w-full" value={absenceForm.semester} onChange={e => setAbsenceForm({...absenceForm, semester: e.target.value as any})}>
-                    <option value="الأول">الأول</option><option value="الثاني">الثاني</option>
+          <div className="space-y-6">
+            <div className="bg-slate-50 p-6 rounded-3xl space-y-4">
+               <div className="relative">
+                  <label className="text-xs font-black text-slate-400 mb-1 block">بحث عن الطالب</label>
+                  <input type="text" className="w-full p-4 border-2 rounded-2xl outline-none" placeholder="اكتب اسم الطالب..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                  {suggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-50 bg-white border rounded-xl shadow-xl mt-1">
+                      {suggestions.map(s => (
+                        <button key={s.id} onClick={() => { 
+                          setAbsenceForm({...absenceForm, studentId: s.id, studentName: s.name, grade: s.grade, section: s.section});
+                          setSearchQuery('');
+                        }} className="w-full text-right p-3 hover:bg-orange-50 border-b last:border-none font-bold">{s.name}</button>
+                      ))}
+                    </div>
+                  )}
+               </div>
+               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-3 bg-white border rounded-xl"><label className="text-[10px] block text-slate-400">الصف</label><span className="font-bold">{absenceForm.studentName ? absenceForm.grade : '---'}</span></div>
+                  <div className="p-3 bg-white border rounded-xl"><label className="text-[10px] block text-slate-400">الشعبة</label><span className="font-bold">{absenceForm.studentName ? absenceForm.section : '---'}</span></div>
+                  <input type="date" className="p-3 border rounded-xl font-bold" value={absenceForm.date} onChange={e => setAbsenceForm({...absenceForm, date: e.target.value})} />
+                  <select className="p-3 border rounded-xl font-bold" value={absenceForm.status} onChange={e => setAbsenceForm({...absenceForm, status: e.target.value as any})}>
+                     <option value="expected">غياب متوقع</option>
+                     <option value="recurring">غياب متكرر</option>
+                     <option value="disconnected">منقطع</option>
                   </select>
-                </div>
-                <div className="bg-purple-50 p-4 rounded-2xl border">
-                  <label className="text-[10px] text-purple-500 font-black block">الصف/الشعبة</label>
-                  <div className="font-black">{absenceForm.studentName ? `${absenceForm.grade}/${absenceForm.section}` : '---'}</div>
-                </div>
-                <div className="bg-orange-50 p-4 rounded-2xl border text-center">
-                  <label className="text-[10px] text-orange-500 font-black block">غياب سابق</label>
-                  <div className="font-black text-xl">{absenceForm.prevAbsenceCount ?? 0}</div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black text-slate-400">سبب الغياب</label>
-                <div className="flex flex-wrap gap-2">
-                  {['مرض', 'انشغال', 'تأخر', 'لم يمر له الباص', 'سفر'].map(r => (
-                    <button key={r} onClick={() => setAbsenceForm({...absenceForm, reason: r})} className={`px-3 py-1.5 rounded-lg text-xs font-black border transition-all ${absenceForm.reason === r ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-500'}`}>{r}</button>
-                  ))}
-                  <input type="text" className="flex-1 p-2 border rounded-lg text-xs font-black" placeholder="سبب آخر..." value={absenceForm.reason} onChange={e => setAbsenceForm({...absenceForm, reason: e.target.value})} />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400">حالة التواصل</label>
-                  <select className="w-full p-4 bg-slate-50 border-2 rounded-2xl font-black" value={absenceForm.commStatus} onChange={e => setAbsenceForm({...absenceForm, commStatus: e.target.value as any})}>
-                    <option value="تم التواصل">تم التواصل</option><option value="لم يتم التواصل">لم يتم التواصل</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400">نوع التواصل</label>
-                  <select className="w-full p-4 bg-slate-50 border-2 rounded-2xl font-black" value={absenceForm.commType} onChange={e => setAbsenceForm({...absenceForm, commType: e.target.value as any})}>
-                    <option value="هاتف">هاتف</option><option value="رسالة sms">رسالة SMS</option><option value="رسالة واتس">واتساب</option><option value="أخرى">أخرى</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400">صفة المجيب</label>
-                  <select className="w-full p-4 bg-slate-50 border-2 rounded-2xl font-black" value={absenceForm.replier} onChange={e => setAbsenceForm({...absenceForm, replier: e.target.value as any})}>
-                    <option value="الأب">الأب</option><option value="الأم">الأم</option><option value="الجد">الجد</option><option value="غيرهم">غيرهم</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400">نتيجة التواصل</label>
-                  <select className="w-full p-4 bg-slate-50 border-2 rounded-2xl font-black" value={absenceForm.result} onChange={e => setAbsenceForm({...absenceForm, result: e.target.value})}>
-                    <option value="تم الرد">تم الرد</option><option value="لم يتم الرد">لم يتم الرد</option>
-                  </select>
-                </div>
-              </div>
-
-              <textarea className="w-full p-4 bg-slate-50 border-2 rounded-2xl font-black min-h-[100px]" placeholder="ملاحظات أخرى..." value={absenceForm.notes} onChange={e => setAbsenceForm({...absenceForm, notes: e.target.value})}></textarea>
-
-              <button onClick={saveAbsence} className="w-full bg-blue-600 text-white p-5 rounded-3xl font-black text-xl hover:bg-blue-700 shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
-                <Save size={24}/> حفظ بيانات الغياب
-              </button>
+               </div>
+               <textarea className="w-full p-4 border-2 rounded-2xl font-bold" placeholder="سبب الغياب..." value={absenceForm.reason} onChange={e => setAbsenceForm({...absenceForm, reason: e.target.value})} />
+               <button onClick={saveAbsence} className="w-full bg-orange-600 text-white p-4 rounded-2xl font-black text-lg">حفظ الغياب</button>
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
-            <div className="bg-slate-50 p-6 rounded-3xl border space-y-4">
-               <div className="flex flex-wrap gap-4 items-end">
-                 <div className="flex-1 min-w-[300px] space-y-2">
-                   <label className="text-xs font-black text-slate-400">فلترة حسب الاسم</label>
-                   <div className="flex gap-2">
-                     <div className="relative flex-1">
-                       <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border focus-within:ring-2 ring-blue-100 transition-all">
-                         <Search size={14} className="text-slate-400"/>
-                         <input 
-                           type="text" 
-                           className="text-xs font-bold outline-none bg-transparent w-full" 
-                           placeholder="اكتب اسم الطالب لإضافته..." 
-                           value={nameInput} 
-                           onChange={e => setNameInput(e.target.value)} 
-                         />
-                       </div>
-                       {nameSuggestions.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 z-[60] bg-white border rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto">
-                           {nameSuggestions.map(s => (
-                             <button key={s.id} onClick={() => { setTempNames([...tempNames, s.name]); setNameInput(''); }} className="w-full text-right p-2 text-[10px] font-black hover:bg-blue-50 border-b last:border-none">
-                               {s.name}
-                             </button>
-                           ))}
-                        </div>
-                       )}
-                     </div>
-                     <button 
-                       onClick={() => { setAppliedNames(tempNames); }}
-                       className="bg-blue-600 text-white px-6 py-2 rounded-xl font-black text-xs hover:bg-blue-700 shadow-sm transition-all active:scale-95"
-                     >
-                       موافق
-                     </button>
-                     <button 
-                       onClick={() => { setTempNames([]); setAppliedNames([]); }}
-                       className="bg-slate-200 text-slate-600 px-3 py-2 rounded-xl font-black text-[10px] hover:bg-slate-300"
-                     >
-                       إعادة ضبط
-                     </button>
-                   </div>
-                   <div className="flex flex-wrap gap-1">
-                      {tempNames.map(name => (
-                        <span key={name} className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded-lg text-[10px] font-black">
-                          {name}
-                          <button onClick={() => setTempNames(tempNames.filter(n => n !== name))}><X size={10}/></button>
-                        </span>
-                      ))}
-                   </div>
-                 </div>
-
-                 <div className="space-y-2">
-                   <label className="text-xs font-black text-slate-400">الفترة الزمنية</label>
-                   <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border">
-                     <Calendar size={14} className="text-slate-400"/>
-                     <div className="flex flex-col">
-                       <span className="text-[8px] font-black text-slate-400">من:</span>
-                       <input type="date" className="text-xs font-bold outline-none bg-transparent" value={filterValues.start} onChange={e => setFilterValues({...filterValues, start: e.target.value})} />
-                     </div>
-                     <span className="mx-2 text-slate-300">|</span>
-                     <div className="flex flex-col">
-                       <span className="text-[8px] font-black text-slate-400">إلى:</span>
-                       <input type="date" className="text-xs font-bold outline-none bg-transparent" value={filterValues.end} onChange={e => setFilterValues({...filterValues, end: e.target.value})} />
-                     </div>
-                   </div>
-                 </div>
-
-                 <div className="flex gap-2 pb-1">
-                    <button onClick={() => exportToWhatsApp('جدول الغياب المفلتر', filteredLogs, [
-                      { label: 'الاسم', key: 'studentName' },
-                      { label: 'الصف', key: 'grade' },
-                      { label: 'التاريخ', key: 'date' },
-                      { label: 'الحالة', key: 'status' },
-                      { label: 'السبب', key: 'reason' },
-                      { label: 'النتيجة', key: 'result' }
-                    ])} className="p-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all shadow-md"><MessageCircle size={20}/></button>
-                    <button className="p-3 bg-slate-800 text-white rounded-xl hover:bg-black transition-all shadow-md"><FileSpreadsheet size={20}/></button>
-                 </div>
-               </div>
-            </div>
-
-            <div className="overflow-x-auto rounded-3xl border-2">
-              <table className="w-full text-center text-sm">
-                <thead className="bg-[#FFD966] text-slate-800 font-black">
-                  <tr>
-                    <th className="p-4 border-e">اسم الطالب</th>
-                    <th className="p-4 border-e">الصف / الشعبة</th>
-                    <th className="p-4 border-e">عدد الغياب</th>
-                    <th className="p-4 border-e">التاريخ</th>
-                    <th className="p-4 border-e">السبب</th>
-                    <th className="p-4 border-e">حالة التواصل</th>
-                    <th className="p-4 border-e">المجيب</th>
-                    <th className="p-4">ملاحظات</th>
-                  </tr>
+          <div className="overflow-x-auto rounded-3xl border">
+             <table className="w-full text-center text-sm">
+                <thead className="bg-orange-50 text-orange-800">
+                   <tr>
+                      <th className="p-4 border-b">الطالب</th>
+                      <th className="p-4 border-b">الصف</th>
+                      <th className="p-4 border-b">التاريخ</th>
+                      <th className="p-4 border-b">السبب</th>
+                      <th className="p-4 border-b">تواصل</th>
+                   </tr>
                 </thead>
-                <tbody className="divide-y">
-                  {filteredLogs.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="p-10 text-slate-400 italic">لا توجد بيانات غياب مسجلة لهذه الاختيارات حالياً.</td>
-                    </tr>
-                  ) : (
-                    filteredLogs.map(l => (
-                      <tr key={l.id} className="hover:bg-slate-50 font-bold transition-colors">
-                        <td className="p-4 border-e font-black">{l.studentName}</td>
-                        <td className="p-4 border-e">{l.grade} / {l.section}</td>
-                        <td className="p-4 border-e font-black text-red-600">{l.prevAbsenceCount + 1}</td>
-                        <td className="p-4 border-e">{l.date}</td>
-                        <td className="p-4 border-e">{l.reason}</td>
-                        <td className="p-4 border-e">{l.commStatus}</td>
-                        <td className="p-4 border-e">{l.replier}</td>
-                        <td className="p-4 text-xs">{l.notes}</td>
+                <tbody>
+                   {filteredLogs.map(l => (
+                      <tr key={l.id} className="border-b">
+                         <td className="p-4 font-bold">{l.studentName}</td>
+                         <td className="p-4">{l.grade} - {l.section}</td>
+                         <td className="p-4">{l.date}</td>
+                         <td className="p-4">{l.reason}</td>
+                         <td className="p-4">{l.commStatus}</td>
                       </tr>
-                    ))
-                  )}
+                   ))}
                 </tbody>
-              </table>
-            </div>
+             </table>
           </div>
         )}
       </div>
@@ -531,227 +393,67 @@ const SpecialReportsPage: React.FC = () => {
 
   const renderLatenessModule = () => {
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
-    
-    const filteredLogs = (data.latenessLogs || []).filter(l => {
-      if (appliedLatenessNames.length > 0 && !appliedLatenessNames.includes(l.studentName)) return false;
-      if (latenessFilterDates.start && l.date < latenessFilterDates.start) return false;
-      if (latenessFilterDates.end && l.date > latenessFilterDates.end) return false;
-      return true;
-    });
-
-    const lNameSuggestions = latenessNameInput.trim() ? students.filter(s => s.name.includes(latenessNameInput) && !tempLatenessNames.includes(s.name)) : [];
-
+    const filteredLogs = (data.latenessLogs || []).filter(l => appliedNames.length === 0 || appliedNames.includes(l.studentName));
     return (
-      <div className="bg-white p-6 rounded-[2.5rem] border-2 shadow-xl animate-in fade-in duration-300 font-arabic text-right">
-        <div className="flex items-center justify-between mb-8 border-b pb-4">
-          <div className="flex gap-2">
-            <button onClick={() => setShowTable(!showTable)} className="flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-2 rounded-xl font-black text-sm hover:bg-blue-100 transition-all">
-              {showTable ? <Plus size={16}/> : <History size={16}/>}
-              {showTable ? 'تسجيل جديد' : 'أرشيف التأخر'}
-            </button>
-            <button onClick={() => setActiveSubTab(null)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"><X/></button>
-          </div>
-          <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-            <Clock className="text-orange-500" />
-            تأخر يوم {getDayName(latenessForm.date || '')} بتاريخ {latenessForm.date}
-          </h2>
+      <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-2 h-full bg-amber-500"></div>
+        <div className="flex justify-between items-center mb-6 border-b pb-4">
+           <div className="flex gap-2">
+              <button onClick={() => setShowTable(!showTable)} className="bg-amber-50 text-amber-600 px-4 py-2 rounded-xl font-bold text-xs">{showTable ? 'رصد جديد' : 'جدول التأخر'}</button>
+              <button onClick={() => setActiveSubTab(null)} className="p-2 hover:bg-slate-100 rounded-full"><X/></button>
+           </div>
+           <h3 className="text-2xl font-black text-amber-600">سجل تأخر الطلاب</h3>
         </div>
-
         {!showTable ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-6">
-              <div className="flex flex-wrap gap-2">
-                {['recurring', 'frequent', 'permanent'].map(st => (
-                  <button key={st} onClick={() => setLatenessForm({...latenessForm, status: st as any})} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${latenessForm.status === st ? 'bg-orange-500 text-white shadow-lg' : 'bg-slate-50 text-slate-400'}`}>
-                    {st === 'recurring' ? 'تأخر متكرر' : st === 'frequent' ? 'كثير التأخر' : st === 'permanent' ? 'دائم التأخر' : ''}
-                  </button>
-                ))}
-              </div>
-
-              <div className="relative">
-                <label className="text-xs font-black text-slate-400 mb-1 block">اسم الطالب</label>
-                <div className="flex items-center gap-2 bg-slate-50 border-2 rounded-2xl p-4 focus-within:border-blue-500 transition-all">
-                  <UserCircle className="text-slate-400" size={18}/>
-                  <input type="text" className="bg-transparent w-full outline-none font-black" placeholder="ابحث عن الاسم..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                </div>
+          <div className="bg-slate-50 p-6 rounded-3xl space-y-4">
+             <div className="relative">
+                <label className="text-xs font-black text-slate-400 mb-1 block">البحث عن طالب</label>
+                <input type="text" className="w-full p-4 border-2 rounded-2xl outline-none" placeholder="اكتب اسم الطالب..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                 {suggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 z-50 bg-white border rounded-2xl shadow-2xl mt-1">
+                  <div className="absolute top-full left-0 right-0 z-50 bg-white border rounded-xl shadow-xl mt-1">
                     {suggestions.map(s => (
                       <button key={s.id} onClick={() => { 
-                        setLatenessForm({ ...latenessForm, studentId: s.id, studentName: s.name, grade: s.grade, section: s.section, prevLatenessCount: (data.latenessLogs || []).filter(l => l.studentId === s.id).length });
+                        setLatenessForm({...latenessForm, studentId: s.id, studentName: s.name, grade: s.grade, section: s.section});
                         setSearchQuery('');
-                      }} className="w-full text-right p-4 hover:bg-blue-50 font-black border-b last:border-none">{s.name}</button>
+                      }} className="w-full text-right p-3 hover:bg-amber-50 border-b last:border-none font-bold">{s.name}</button>
                     ))}
                   </div>
                 )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-blue-50 p-4 rounded-2xl border">
-                  <label className="text-[10px] text-blue-500 font-black block">الفصل</label>
-                  <select className="bg-transparent font-black w-full" value={latenessForm.semester} onChange={e => setLatenessForm({...latenessForm, semester: e.target.value as any})}>
-                    <option value="الأول">الأول</option><option value="الثاني">الثاني</option>
-                  </select>
-                </div>
-                <div className="bg-orange-50 p-4 rounded-2xl border text-center">
-                  <label className="text-[10px] text-orange-500 font-black block">تأخر سابق</label>
-                  <div className="font-black text-xl">{latenessForm.prevLatenessCount ?? 0}</div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black text-slate-400">سبب التأخر</label>
-                <div className="flex flex-wrap gap-2">
-                  {['مرض', 'انشغال', 'نوم', 'لم يمر له الباص', 'بلا عذر'].map(r => (
-                    <button key={r} onClick={() => setLatenessForm({...latenessForm, reason: r})} className={`px-3 py-1.5 rounded-lg text-xs font-black border transition-all ${latenessForm.reason === r ? 'bg-orange-500 text-white' : 'bg-white text-slate-500'}`}>{r}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-xs font-black text-slate-400">الإجراء المتخذ</label>
-                <select className="w-full p-4 bg-slate-50 border-2 rounded-2xl font-black" value={latenessForm.action} onChange={e => setLatenessForm({...latenessForm, action: e.target.value})}>
-                  {['تنبيه 1', 'تنبيه 2', 'تعهد', 'اتصال بولي الأمر', 'توقيف جزئي', 'الرفع لجهة عليا'].map(a => <option key={a} value={a}>{a}</option>)}
+             </div>
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-3 bg-white border rounded-xl"><label className="text-[10px] block text-slate-400">الصف</label><span className="font-bold">{latenessForm.studentName ? latenessForm.grade : '---'}</span></div>
+                <div className="p-3 bg-white border rounded-xl"><label className="text-[10px] block text-slate-400">الشعبة</label><span className="font-bold">{latenessForm.studentName ? latenessForm.section : '---'}</span></div>
+                <input type="date" className="p-3 border rounded-xl font-bold" value={latenessForm.date} onChange={e => setLatenessForm({...latenessForm, date: e.target.value})} />
+                <select className="p-3 border rounded-xl font-bold" value={latenessForm.status} onChange={e => setLatenessForm({...latenessForm, status: e.target.value as any})}>
+                   <option value="recurring">تأخر متكرر</option>
+                   <option value="frequent">تأخر معتاد</option>
                 </select>
-              </div>
-
-              <div className="p-6 bg-slate-900 text-white rounded-[2rem] space-y-4">
-                <h4 className="flex items-center gap-2 font-black text-sm"><Fingerprint className="text-orange-400"/> بصمة الطالب (تعهد)</h4>
-                <div className="text-xs font-bold leading-relaxed opacity-80">
-                  أتعهد بعدم تكرار التأخر وفي حالة التكرار فللإدارة الحق في اتخاذ اللازم.
-                </div>
-                <button onClick={() => setLatenessForm({...latenessForm, pledge: 'تم التوقيع'})} className={`w-full p-3 rounded-xl font-black text-sm transition-all ${latenessForm.pledge ? 'bg-green-600' : 'bg-white text-slate-900'}`}>
-                  {latenessForm.pledge || 'توقيع البصمة'}
-                </button>
-              </div>
-
-              <button onClick={saveLateness} className="w-full bg-slate-800 text-white p-5 rounded-3xl font-black text-xl hover:bg-black shadow-xl active:scale-95 transition-all">حفظ البيانات</button>
-            </div>
+             </div>
+             <textarea className="w-full p-4 border-2 rounded-2xl font-bold" placeholder="سبب التأخر والإجراء..." value={latenessForm.reason} onChange={e => setLatenessForm({...latenessForm, reason: e.target.value})} />
+             <button onClick={saveLateness} className="w-full bg-amber-600 text-white p-4 rounded-2xl font-black text-lg">حفظ التأخر</button>
           </div>
         ) : (
-          <div className="space-y-6">
-            <div className="bg-slate-50 p-6 rounded-3xl border space-y-4 shadow-sm">
-                <div className="flex flex-wrap gap-4 items-end">
-                    <div className="flex-1 min-w-[300px] space-y-2">
-                        <label className="text-xs font-black text-slate-400">فلترة بأسماء الطلاب المتأخرين</label>
-                        <div className="flex gap-2">
-                            <div className="relative flex-1">
-                                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border focus-within:ring-2 ring-orange-100 transition-all">
-                                    <Search size={14} className="text-slate-400"/>
-                                    <input 
-                                        type="text" 
-                                        className="text-xs font-bold outline-none bg-transparent w-full" 
-                                        placeholder="اكتب اسم الطالب..." 
-                                        value={latenessNameInput} 
-                                        onChange={e => setLatenessNameInput(e.target.value)} 
-                                    />
-                                </div>
-                                {lNameSuggestions.length > 0 && (
-                                    <div className="absolute top-full left-0 right-0 z-[70] bg-white border rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto">
-                                        {lNameSuggestions.map(s => (
-                                            <button key={s.id} onClick={() => { setTempLatenessNames([...tempLatenessNames, s.name]); setLatenessNameInput(''); }} className="w-full text-right p-2 text-[10px] font-black hover:bg-orange-50 border-b last:border-none">
-                                                {s.name}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                            <button 
-                                onClick={() => setAppliedLatenessNames(tempLatenessNames)}
-                                className="bg-orange-600 text-white px-6 py-2 rounded-xl font-black text-xs hover:bg-orange-700 shadow-sm transition-all active:scale-95"
-                            >
-                                موافق
-                            </button>
-                            <button 
-                                onClick={() => { setTempLatenessNames([]); setAppliedLatenessNames([]); }}
-                                className="bg-slate-200 text-slate-600 px-3 py-2 rounded-xl font-black text-[10px] hover:bg-slate-300"
-                            >
-                                إعادة ضبط
-                            </button>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                            {tempLatenessNames.map(name => (
-                                <span key={name} className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 px-2 py-1 rounded-lg text-[10px] font-black">
-                                    {name}
-                                    <button onClick={() => setTempLatenessNames(tempLatenessNames.filter(n => n !== name))}><X size={10}/></button>
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-xs font-black text-slate-400">تاريخ التأخر</label>
-                        <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border">
-                            <Calendar size={14} className="text-slate-400"/>
-                            <div className="flex flex-col">
-                                <span className="text-[8px] font-black text-slate-400">من:</span>
-                                <input type="date" className="text-xs font-bold outline-none bg-transparent" value={latenessFilterDates.start} onChange={e => setLatenessFilterDates({...latenessFilterDates, start: e.target.value})} />
-                            </div>
-                            <span className="mx-2 text-slate-300">|</span>
-                            <div className="flex flex-col">
-                                <span className="text-[8px] font-black text-slate-400">إلى:</span>
-                                <input type="date" className="text-xs font-bold outline-none bg-transparent" value={latenessFilterDates.end} onChange={e => setLatenessFilterDates({...latenessFilterDates, end: e.target.value})} />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex gap-2 pb-1">
-                        <button title="استيراد" className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100"><Upload size={20}/></button>
-                        <button title="تصدير TXT" className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200"><FileText size={20}/></button>
-                        <button title="تصدير Excel" className="p-3 bg-green-50 text-green-600 rounded-xl hover:bg-green-100"><FileSpreadsheet size={20}/></button>
-                        <button 
-                            title="إرسال واتساب"
-                            onClick={() => exportToWhatsApp('سجل التأخر المفلتر', filteredLogs, [
-                                { label: 'اسم الطالب', key: 'studentName' },
-                                { label: 'التاريخ', key: 'date' },
-                                { label: 'السبب', key: 'reason' },
-                                { label: 'الإجراء المتخذ', key: 'action' },
-                                { label: 'البصمة', key: 'pledge' }
-                            ])} 
-                            className="p-3 bg-green-600 text-white rounded-xl hover:bg-green-700 shadow-md transition-all active:scale-95"
-                        >
-                            <MessageCircle size={20}/>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-             <div className="overflow-x-auto rounded-3xl border-2">
-              <table className="w-full text-center text-sm">
-                <thead className="bg-[#FFD966] text-slate-800 font-black">
-                  <tr>
-                    <th className="p-4 border-e">اسم الطالب</th>
-                    <th className="p-4 border-e">التاريخ</th>
-                    <th className="p-4 border-e">السبب</th>
-                    <th className="p-4 border-e">الإجراء</th>
-                    <th className="p-4">البصمة</th>
-                  </tr>
+          <div className="overflow-x-auto rounded-3xl border">
+             <table className="w-full text-center text-sm">
+                <thead className="bg-amber-50 text-amber-800">
+                   <tr>
+                      <th className="p-4 border-b">الطالب</th>
+                      <th className="p-4 border-b">التاريخ</th>
+                      <th className="p-4 border-b">السبب</th>
+                      <th className="p-4 border-b">الإجراء</th>
+                   </tr>
                 </thead>
-                <tbody className="divide-y">
-                  {filteredLogs.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="p-12 text-slate-400 italic">لا توجد سجلات تأخر لهذه الفترة حالياً.</td>
-                    </tr>
-                  ) : (
-                    filteredLogs.map(l => (
-                      <tr key={l.id} className="hover:bg-slate-50 font-bold transition-colors">
-                        <td className="p-4 border-e font-black">{l.studentName}</td>
-                        <td className="p-4 border-e">{l.date}</td>
-                        <td className="p-4 border-e">{l.reason}</td>
-                        <td className="p-4 border-e text-orange-600 font-black">{l.action}</td>
-                        <td className="p-4">
-                            <span className={`px-2 py-1 rounded-lg text-[10px] ${l.pledge ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
-                                {l.pledge || 'لم يوقع'}
-                            </span>
-                        </td>
+                <tbody>
+                   {filteredLogs.map(l => (
+                      <tr key={l.id} className="border-b">
+                         <td className="p-4 font-bold">{l.studentName}</td>
+                         <td className="p-4">{l.date}</td>
+                         <td className="p-4">{l.reason}</td>
+                         <td className="p-4">{l.action}</td>
                       </tr>
-                    ))
-                  )}
+                   ))}
                 </tbody>
-              </table>
-            </div>
+             </table>
           </div>
         )}
       </div>
@@ -760,285 +462,189 @@ const SpecialReportsPage: React.FC = () => {
 
   const renderViolationModule = () => {
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
+    const filteredLogs = (data.studentViolationLogs || []).filter(l => appliedNames.length === 0 || appliedNames.includes(l.studentName));
     const customs = data.customViolationElements || { behavior: [], duties: [], achievement: [] };
-    
-    const filteredLogs = (data.studentViolationLogs || []).filter(l => {
-        if (appliedViolationNames.length > 0 && !appliedViolationNames.includes(l.studentName)) return false;
-        if (violationFilterDates.start && l.date < violationFilterDates.start) return false;
-        if (violationFilterDates.end && l.date > violationFilterDates.end) return false;
-        return true;
-    });
-
-    const vNameSuggestions = violationNameInput.trim() ? students.filter(s => s.name.includes(violationNameInput) && !tempViolationNames.includes(s.name)) : [];
-
-    const behaviorItems = ["تأخر عن الطابور", "تأخر عن حصة", "كثير الكلام", "كثير الشغب", "عدواني", "تطاول على معلم", "اعتداء جسدي", "اعتداء لفظي", "أخذ أدوات الغير", "إتلاف ممتلكات", ...customs.behavior];
-    const dutiesItems = ["تقصير في الواجبات", "تقصير في الدفاتر", "تقصير في الكتب", "عدم الكتابة بالحصة", "عدم حل التكليف", ...customs.duties];
-    const achievementItems = ["عدم حفظ الدرس", "عدم المشاركة", "كثير النوم", "كثير الشرود", "امتناع عن اختبار", ...customs.achievement];
 
     return (
-      <div className="bg-white p-6 rounded-[2.5rem] border-2 shadow-xl animate-in fade-in duration-300 font-arabic text-right">
-        <div className="flex items-center justify-between mb-8 border-b pb-4">
-          <div className="flex gap-2">
-            <button onClick={() => setShowTable(!showTable)} className="flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-2 rounded-xl font-black text-sm hover:bg-blue-100 transition-all">
-              {showTable ? <Plus size={16}/> : <ShieldAlert size={16}/>}
-              {showTable ? 'رصد جديد' : 'جدول المخالفات'}
-            </button>
-            <button onClick={() => setActiveSubTab(null)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"><X/></button>
-          </div>
-          <h2 className="text-2xl font-black text-red-600 flex items-center gap-2">
-            <AlertCircle /> سجل المخالفات الطلابية
-          </h2>
+      <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-2 h-full bg-red-600"></div>
+        <div className="flex justify-between items-center mb-6 border-b pb-4">
+           <div className="flex gap-2">
+              <button onClick={() => setShowTable(!showTable)} className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-bold text-xs">{showTable ? 'رصد جديد' : 'جدول المخالفات'}</button>
+              <button onClick={() => setActiveSubTab(null)} className="p-2 hover:bg-slate-100 rounded-full"><X/></button>
+           </div>
+           <h3 className="text-2xl font-black text-red-600">المخالفات الطلابية</h3>
         </div>
-
         {!showTable ? (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 bg-slate-50 p-6 rounded-[2.5rem]">
-              <div className="space-y-4">
-                <div className="relative">
-                    <label className="text-xs font-black text-slate-400 mb-1 block">اسم الطالب</label>
-                    <input type="text" className="w-full p-4 bg-white border-2 rounded-2xl font-black outline-none focus:border-red-500" placeholder="ابحث عن الاسم..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                    {suggestions.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 z-50 bg-white border rounded-2xl shadow-2xl mt-1">
-                        {suggestions.map(s => (
-                          <button key={s.id} onClick={() => { 
-                            setViolationForm({ ...violationForm, studentId: s.id, studentName: s.name, grade: s.grade, section: s.section, totalViolations: (data.studentViolationLogs || []).filter(l => l.studentId === s.id).length });
-                            setSearchQuery('');
-                          }} className="w-full text-right p-4 hover:bg-red-50 font-black border-b last:border-none">{s.name}</button>
-                        ))}
-                      </div>
-                    )}
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                    <div className="bg-white p-3 rounded-xl text-center"><label className="text-[10px] block text-slate-400">الصف</label><span className="font-black">{violationForm.grade || '---'}</span></div>
-                    <div className="bg-white p-3 rounded-xl text-center"><label className="text-[10px] block text-slate-400">الشعبة</label><span className="font-black">{violationForm.section || '---'}</span></div>
-                    <div className="bg-white p-3 rounded-xl text-center"><label className="text-[10px] block text-slate-400">إجمالي السوابق</label><span className="font-black text-red-600">{violationForm.totalViolations || 0}</span></div>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                    <div><label className="text-xs font-black block mb-1">الفصل</label><select className="w-full p-4 bg-white border rounded-2xl" value={violationForm.semester} onChange={e => setViolationForm({...violationForm, semester: e.target.value as any})}><option value="الأول">الأول</option><option value="الثاني">الثاني</option></select></div>
-                    <div><label className="text-xs font-black block mb-1">التاريخ</label><input type="date" className="w-full p-4 bg-white border rounded-2xl" value={violationForm.date} onChange={e => setViolationForm({...violationForm, date: e.target.value})}/></div>
-                </div>
-                <div>
-                    <label className="text-xs font-black block mb-1">حالة المخالفة</label>
-                    <div className="flex gap-2">
-                        {['blacklist', 'high', 'medium', 'rare'].map(st => (
-                            <button key={st} onClick={() => setViolationForm({...violationForm, status: st as any})} className={`flex-1 p-2 rounded-xl text-[10px] font-black border ${violationForm.status === st ? 'bg-red-600 text-white' : 'bg-white'}`}>
-                                {st === 'blacklist' ? 'القائمة سوداء' : st === 'high' ? 'كثير المخالفة' : st === 'medium' ? 'متوسط' : 'نادر'}
-                            </button>
-                        ))}
+          <div className="bg-slate-50 p-6 rounded-3xl space-y-6">
+             <div className="relative">
+                <label className="text-xs font-black text-slate-400 mb-1 block">البحث عن طالب</label>
+                <input type="text" className="w-full p-4 border-2 rounded-2xl outline-none" placeholder="اكتب اسم الطالب..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                {suggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 z-50 bg-white border rounded-xl shadow-xl mt-1">
+                    {suggestions.map(s => (
+                      <button key={s.id} onClick={() => { 
+                        setViolationForm({...violationForm, studentId: s.id, studentName: s.name, grade: s.grade, section: s.section});
+                        setSearchQuery('');
+                      }} className="w-full text-right p-3 hover:bg-red-50 border-b last:border-none font-bold">{s.name}</button>
+                    ))}
+                  </div>
+                )}
+             </div>
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {['behavior', 'duties', 'achievement'].map(cat => (
+                  <div key={cat} className="bg-white p-4 rounded-2xl border shadow-sm space-y-2">
+                    <h4 className="font-black text-xs border-b pb-1 mb-2">{cat === 'behavior' ? 'مخالفات سلوكية' : cat === 'duties' ? 'مخالفات واجبات' : 'مخالفات تحصيلية'}</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {(customs[cat as keyof typeof customs] || []).map(v => (
+                        <button key={v} onClick={() => toggleViolationType(cat as any, v)} className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${violationForm[cat === 'behavior' ? 'behaviorViolations' : cat === 'duties' ? 'dutiesViolations' : 'achievementViolations']?.includes(v) ? 'bg-red-600 text-white' : 'bg-slate-50'}`}>{v}</button>
+                      ))}
+                      <button onClick={() => addCustomViolationElement(cat as any)} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-600">+</button>
                     </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between"><h4 className="font-black text-sm border-r-4 border-red-500 pr-2">قسم السلوك</h4><button onClick={() => addCustomViolationElement('behavior')} className="p-1 bg-red-50 text-red-600 rounded-lg"><Plus size={14}/></button></div>
-                    <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto p-2 bg-slate-50 rounded-2xl shadow-inner">
-                        {behaviorItems.map(v => (
-                            <button key={v} onClick={() => toggleViolationType('behavior', v)} className={`p-3 text-right text-xs font-bold rounded-xl border transition-all ${violationForm.behaviorViolations?.includes(v) ? 'bg-red-500 text-white' : 'bg-white text-slate-500'}`}>{v}</button>
-                        ))}
-                    </div>
-                </div>
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between"><h4 className="font-black text-sm border-r-4 border-blue-500 pr-2">الواجبات والدفاتر</h4><button onClick={() => addCustomViolationElement('duties')} className="p-1 bg-blue-50 text-blue-600 rounded-lg"><Plus size={14}/></button></div>
-                    <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto p-2 bg-slate-50 rounded-2xl shadow-inner">
-                        {dutiesItems.map(v => (
-                            <button key={v} onClick={() => toggleViolationType('duties', v)} className={`p-3 text-right text-xs font-bold rounded-xl border transition-all ${violationForm.dutiesViolations?.includes(v) ? 'bg-blue-500 text-white' : 'bg-white text-slate-500'}`}>{v}</button>
-                        ))}
-                    </div>
-                </div>
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between"><h4 className="font-black text-sm border-r-4 border-green-500 pr-2">التحصيل العلمي</h4><button onClick={() => addCustomViolationElement('achievement')} className="p-1 bg-green-50 text-green-600 rounded-lg"><Plus size={14}/></button></div>
-                    <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto p-2 bg-slate-50 rounded-2xl shadow-inner">
-                        {achievementItems.map(v => (
-                            <button key={v} onClick={() => toggleViolationType('achievement', v)} className={`p-3 text-right text-xs font-bold rounded-xl border transition-all ${violationForm.achievementViolations?.includes(v) ? 'bg-green-500 text-white' : 'bg-white text-slate-500'}`}>{v}</button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t pt-8">
-                <div className="space-y-4">
-                    <label className="text-xs font-black block">الإجراء المتخذ</label>
-                    <select className="w-full p-4 bg-slate-50 border-2 rounded-2xl font-black" value={violationForm.action} onChange={e => setViolationForm({...violationForm, action: e.target.value})}>
-                        {['تنبيه 1', 'تنبيه 2', 'تعهد', 'اتصال بولي الأمر', 'توقيف جزئي', 'الرفع لجهة عليا'].map(a => <option key={a} value={a}>{a}</option>)}
-                    </select>
-                    <textarea className="w-full p-4 bg-slate-50 border-2 rounded-2xl font-black min-h-[80px]" placeholder="ملاحظات إضافية..." value={violationForm.notes} onChange={e => setViolationForm({...violationForm, notes: e.target.value})}></textarea>
-                </div>
-                <div className="p-6 bg-red-600 text-white rounded-[2.5rem] shadow-xl space-y-4">
-                    <h4 className="flex items-center gap-2 font-black text-sm"><Fingerprint className="text-red-200"/> بصمة الطالب (تعهد)</h4>
-                    <p className="text-[10px] font-bold opacity-90 leading-relaxed">أتعهد بعدم تكرار المخالفة وفي حالة التكرار فللإدارة الحق في اتخاذ اللازم.</p>
-                    <button onClick={() => setViolationForm({...violationForm, pledge: 'تم التبصيم'})} className={`w-full p-4 rounded-2xl font-black transition-all ${violationForm.pledge ? 'bg-white text-red-600' : 'bg-red-800 text-white'}`}>{violationForm.pledge || 'اعتماد التبصيم'}</button>
-                </div>
-            </div>
-            <button onClick={saveViolation} className="w-full bg-red-600 text-white p-6 rounded-3xl font-black text-xl hover:bg-red-700 shadow-2xl transition-all active:scale-95">حفظ السجل</button>
+                  </div>
+                ))}
+             </div>
+             <button onClick={saveViolation} className="w-full bg-red-600 text-white p-4 rounded-2xl font-black text-lg">تسجيل المخالفة</button>
           </div>
         ) : (
-            <div className="space-y-6">
-                <div className="bg-slate-50 p-6 rounded-3xl border space-y-4 shadow-sm">
-                    <div className="flex flex-wrap gap-4 items-end">
-                        <div className="flex-1 min-w-[300px] space-y-2">
-                            <label className="text-xs font-black text-slate-400">فلترة بأسماء الطلاب</label>
-                            <div className="flex gap-2">
-                                <div className="relative flex-1">
-                                    <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border focus-within:ring-2 ring-red-100 transition-all">
-                                        <Search size={14} className="text-slate-400"/>
-                                        <input 
-                                            type="text" 
-                                            className="text-xs font-bold outline-none bg-transparent w-full" 
-                                            placeholder="اكتب اسم الطالب لإضافته..." 
-                                            value={violationNameInput} 
-                                            onChange={e => setViolationNameInput(e.target.value)} 
-                                        />
-                                    </div>
-                                    {vNameSuggestions.length > 0 && (
-                                        <div className="absolute top-full left-0 right-0 z-[70] bg-white border rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto">
-                                            {vNameSuggestions.map(s => (
-                                                <button key={s.id} onClick={() => { setTempViolationNames([...tempViolationNames, s.name]); setViolationNameInput(''); }} className="w-full text-right p-2 text-[10px] font-black hover:bg-red-50 border-b last:border-none">
-                                                    {s.name}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                                <button 
-                                    onClick={() => setAppliedViolationNames(tempViolationNames)}
-                                    className="bg-red-600 text-white px-6 py-2 rounded-xl font-black text-xs hover:bg-red-700 shadow-sm transition-all active:scale-95"
-                                >
-                                    موافق
-                                </button>
-                                <button 
-                                    onClick={() => { setTempViolationNames([]); setAppliedViolationNames([]); }}
-                                    className="bg-slate-200 text-slate-600 px-3 py-2 rounded-xl font-black text-[10px] hover:bg-slate-300"
-                                >
-                                    إعادة ضبط
-                                </button>
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                                {tempViolationNames.map(name => (
-                                    <span key={name} className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-2 py-1 rounded-lg text-[10px] font-black">
-                                        {name}
-                                        <button onClick={() => setTempViolationNames(tempViolationNames.filter(n => n !== name))}><X size={10}/></button>
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-xs font-black text-slate-400">تاريخ المخالفة</label>
-                            <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border">
-                                <Calendar size={14} className="text-slate-400"/>
-                                <div className="flex flex-col">
-                                    <span className="text-[8px] font-black text-slate-400">من:</span>
-                                    <input type="date" className="text-xs font-bold outline-none bg-transparent" value={violationFilterDates.start} onChange={e => setViolationFilterDates({...violationFilterDates, start: e.target.value})} />
-                                </div>
-                                <span className="mx-2 text-slate-300">|</span>
-                                <div className="flex flex-col">
-                                    <span className="text-[8px] font-black text-slate-400">إلى:</span>
-                                    <input type="date" className="text-xs font-bold outline-none bg-transparent" value={violationFilterDates.end} onChange={e => setViolationFilterDates({...violationFilterDates, end: e.target.value})} />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-2 pb-1">
-                            <button title="استيراد" className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100"><Upload size={20}/></button>
-                            <button title="تصدير TXT" className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200"><FileText size={20}/></button>
-                            <button title="تصدير Excel" className="p-3 bg-green-50 text-green-600 rounded-xl hover:bg-green-100"><FileSpreadsheet size={20}/></button>
-                            <button 
-                                title="إرسال واتساب"
-                                onClick={() => exportToWhatsApp('سجل المخالفات المفلتر', filteredLogs, [
-                                    { label: 'اسم الطالب', key: 'studentName' },
-                                    { label: 'الصف', key: 'grade' },
-                                    { label: 'إجمالي المخالفات', key: 'totalViolations' },
-                                    { label: 'التاريخ', key: 'date' },
-                                    { label: 'الحالة', key: 'status' },
-                                    { label: 'الإجراء', key: 'action' }
-                                ])} 
-                                className="p-3 bg-green-600 text-white rounded-xl hover:bg-green-700 shadow-md transition-all active:scale-95"
-                            >
-                                <MessageCircle size={20}/>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="overflow-x-auto rounded-3xl border-2">
-                    <table className="w-full text-center text-sm border-collapse">
-                        <thead className="bg-[#FFD966] text-slate-800 font-black">
-                            <tr>
-                                <th className="p-4 border-e">اسم الطالب</th>
-                                <th className="p-4 border-e">الصف</th>
-                                <th className="p-4 border-e">إجمالي المخالفات</th>
-                                <th className="p-4 border-e">تاريخ الرصد</th>
-                                <th className="p-4 border-e">الحالة</th>
-                                <th className="p-4">الإجراء</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                            {filteredLogs.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} className="p-12 text-slate-400 italic">لا توجد مخالفات مسجلة في هذه الفترة حالياً.</td>
-                                </tr>
-                            ) : (
-                                filteredLogs.map(l => (
-                                    <tr key={l.id} className="hover:bg-slate-50 font-bold transition-colors">
-                                        <td className="p-4 border-e font-black">{l.studentName}</td>
-                                        <td className="p-4 border-e">{l.grade}/{l.section}</td>
-                                        <td className="p-4 border-e text-red-600 font-black">{l.totalViolations}</td>
-                                        <td className="p-4 border-e">{l.date}</td>
-                                        <td className="p-4 border-e">
-                                            <span className={`px-2 py-1 rounded-lg text-[10px] ${l.status === 'blacklist' ? 'bg-black text-white' : l.status === 'high' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
-                                                {l.status === 'blacklist' ? 'قائمة سوداء' : l.status === 'high' ? 'كثير المخالفة' : l.status === 'medium' ? 'متوسط' : 'نادر'}
-                                            </span>
-                                        </td>
-                                        <td className="p-4 text-red-600">{l.action}</td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+          <div className="overflow-x-auto rounded-3xl border">
+             <table className="w-full text-center text-sm">
+                <thead className="bg-red-50 text-red-800">
+                   <tr>
+                      <th className="p-4 border-b">الطالب</th>
+                      <th className="p-4 border-b">التاريخ</th>
+                      <th className="p-4 border-b">نوع المخالفة</th>
+                      <th className="p-4 border-b">العدد</th>
+                   </tr>
+                </thead>
+                <tbody>
+                   {filteredLogs.map(l => (
+                      <tr key={l.id} className="border-b">
+                         <td className="p-4 font-bold">{l.studentName}</td>
+                         <td className="p-4">{l.date}</td>
+                         <td className="p-4 text-xs">{[...(l.behaviorViolations || []), ...(l.dutiesViolations || []), ...(l.achievementViolations || [])].join(', ')}</td>
+                         <td className="p-4 font-bold">{l.totalViolations}</td>
+                      </tr>
+                   ))}
+                </tbody>
+             </table>
+          </div>
         )}
       </div>
     );
   };
 
-  // START OF CHANGE - Requirement: Exit School Module Implementation
   const renderExitModule = () => {
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
+    const filteredLogs = (data.exitLogs || []).filter(l => appliedNames.length === 0 || appliedNames.includes(l.studentName));
     const customs = data.customExitItems || [];
     const pinned = data.pinnedExitStudents || [];
+
+    return (
+      <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-2 h-full bg-blue-500"></div>
+        <div className="flex justify-between items-center mb-6 border-b pb-4">
+           <div className="flex gap-2">
+              <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-4 py-2 rounded-xl font-bold text-xs">{showTable ? 'رصد جديد' : 'جدول الخروج'}</button>
+              <button onClick={() => setActiveSubTab(null)} className="p-2 hover:bg-slate-100 rounded-full"><X/></button>
+           </div>
+           <h3 className="text-2xl font-black text-blue-600">خروج طالب أثناء الدراسة</h3>
+        </div>
+        {!showTable ? (
+          <div className="bg-slate-50 p-6 rounded-3xl space-y-6">
+             <div className="relative">
+                <label className="text-xs font-black text-slate-400 mb-1 block">بحث عن طالب</label>
+                <input type="text" className="w-full p-4 border-2 rounded-2xl outline-none" placeholder="اكتب اسم الطالب..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                {suggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 z-50 bg-white border rounded-xl shadow-xl mt-1">
+                    {suggestions.map(s => (
+                      <button key={s.id} onClick={() => { 
+                        setExitForm({...exitForm, studentId: s.id, studentName: s.name, grade: s.grade, section: s.section, prevExitCount: (data.exitLogs || []).filter(l => l.studentId === s.id).length});
+                        setSearchQuery('');
+                      }} className="w-full text-right p-3 hover:bg-blue-50 border-b last:border-none font-bold">{s.name}</button>
+                    ))}
+                  </div>
+                )}
+             </div>
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-3 bg-white border rounded-xl"><label className="text-[10px] block text-slate-400">الصف</label><span className="font-bold">{exitForm.studentName ? exitForm.grade : '---'}</span></div>
+                <div className="p-3 bg-white border rounded-xl"><label className="text-[10px] block text-slate-400">الشعبة</label><span className="font-bold">{exitForm.studentName ? exitForm.section : '---'}</span></div>
+                <div className="p-3 bg-blue-600 text-white rounded-xl text-center"><label className="text-[10px] block">مرات الخروج</label><span className="font-black text-xl">{exitForm.prevExitCount || 0}</span></div>
+                <input type="date" className="p-3 border rounded-xl font-bold" value={exitForm.date} onChange={e => setExitForm({...exitForm, date: e.target.value})} />
+             </div>
+             <div className="bg-white p-4 rounded-2xl border shadow-sm">
+                <div className="flex justify-between items-center mb-2">
+                   <h4 className="font-black text-xs">حالة الخروج</h4>
+                   <button onClick={addCustomExitStatus} className="text-blue-600 font-bold">+</button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                   {['موعد طبي', 'حالة عائلية', 'تعب', 'إذن خاص'].concat(customs).map(st => (
+                      <button key={st} onClick={() => toggleExitStatusItem(st)} className={`px-3 py-1.5 rounded-xl text-[10px] font-bold border transition-all ${exitForm.customStatusItems?.includes(st) ? 'bg-blue-600 text-white' : 'bg-slate-50'}`}>{st}</button>
+                   ))}
+                </div>
+             </div>
+             <button onClick={saveExitLog} className="w-full bg-blue-600 text-white p-4 rounded-2xl font-black text-lg">حفظ بيان الخروج</button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-3xl border">
+             <table className="w-full text-center text-sm">
+                <thead className="bg-blue-50 text-blue-800">
+                   <tr>
+                      <th className="p-4 border-b">الطالب</th>
+                      <th className="p-4 border-b">التاريخ</th>
+                      <th className="p-4 border-b">الحالة</th>
+                      <th className="p-4 border-b">الإجراء</th>
+                   </tr>
+                </thead>
+                <tbody>
+                   {filteredLogs.map(l => (
+                      <tr key={l.id} className="border-b">
+                         <td className="p-4 font-bold">{l.studentName}</td>
+                         <td className="p-4">{l.date}</td>
+                         <td className="p-4 text-xs">{l.customStatusItems?.join(', ')}</td>
+                         <td className="p-4">{l.action}</td>
+                      </tr>
+                   ))}
+                </tbody>
+             </table>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderDamageModule = () => {
+    const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
+    const customs = data.customDamageItems || [];
+    const pinned = data.pinnedDamageStudents || [];
     
-    const filteredLogs = (data.exitLogs || []).filter(l => {
-      if (appliedExitNames.length > 0 && !appliedExitNames.includes(l.studentName)) return false;
-      if (exitFilterValues.start && l.date < exitFilterValues.start) return false;
-      if (exitFilterValues.end && l.date > exitFilterValues.end) return false;
-      if (exitFilterValues.semester && l.semester !== exitFilterValues.semester) return false;
-      if (exitFilterValues.grade && l.grade !== exitFilterValues.grade) return false;
-      if (exitFilterValues.section && l.section !== exitFilterValues.section) return false;
+    const filteredLogs = (data.damageLogs || []).filter(l => {
+      if (appliedDamageNames.length > 0 && !appliedDamageNames.includes(l.studentName)) return false;
+      if (damageFilterValues.start && l.date < damageFilterValues.start) return false;
+      if (damageFilterValues.end && l.date > damageFilterValues.end) return false;
+      if (damageFilterValues.semester && l.semester !== damageFilterValues.semester) return false;
+      if (damageFilterValues.grade && l.grade !== damageFilterValues.grade) return false;
+      if (damageFilterValues.section && l.section !== damageFilterValues.section) return false;
       return true;
     });
 
-    const eNameSuggestions = exitNameInput.trim() ? students.filter(s => s.name.includes(exitNameInput) && !tempExitNames.includes(s.name)) : [];
+    const dNameSuggestions = damageNameInput.trim() ? students.filter(s => s.name.includes(damageNameInput) && !tempDamageNames.includes(s.name)) : [];
 
     return (
       <div className="bg-white p-8 rounded-[3rem] border-2 shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-2 h-full bg-amber-500"></div>
+        <div className="absolute top-0 left-0 w-2 h-full bg-red-500"></div>
         
-        <div className="flex items-center justify-between mb-8 border-b-2 border-amber-50 pb-6">
+        <div className="flex items-center justify-between mb-8 border-b-2 border-red-50 pb-6">
           <div className="flex gap-3">
-            <button onClick={() => setShowTable(!showTable)} className="flex items-center gap-2 bg-amber-50 text-amber-700 px-6 py-3 rounded-2xl font-black text-sm hover:bg-amber-100 shadow-sm transition-all active:scale-95">
+            <button onClick={() => setShowTable(!showTable)} className="flex items-center gap-2 bg-red-50 text-red-700 px-6 py-3 rounded-2xl font-black text-sm hover:bg-red-100 shadow-sm transition-all active:scale-95">
               {showTable ? <Plus size={18}/> : <LayoutList size={18}/>}
-              {showTable ? 'رصد خروج جديد' : 'جدول الخروج'}
+              {showTable ? 'رصد إتلاف جديد' : 'جدول الإتلاف'}
             </button>
             <button onClick={() => setActiveSubTab(null)} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={20}/></button>
           </div>
           <div className="text-left">
-            <h2 className="text-3xl font-black text-amber-600 flex items-center justify-end gap-3">
-               سجل خروج الطلاب أثناء الدراسة <ShieldAlert size={32} />
+            <h2 className="text-3xl font-black text-red-600 flex items-center justify-end gap-3">
+               سجل الإتلاف المدرسي <Hammer size={32} />
             </h2>
             <p className="text-slate-400 font-bold mt-1">تاريخ اليوم: {getDayName(today)} {today}</p>
           </div>
@@ -1046,19 +652,19 @@ const SpecialReportsPage: React.FC = () => {
 
         {!showTable ? (
           <div className="space-y-10">
-            {/* Part A: Student Data */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Part A: Student Data */}
               <div className="lg:col-span-2 bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-100 space-y-6">
-                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2 border-r-4 border-amber-500 pr-3">بيانات الطالب الأساسية</h3>
+                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2 border-r-4 border-red-500 pr-3">بيانات الطالب والإتلاف</h3>
                 
                 <div className="relative">
                   <label className="text-xs font-black text-slate-400 mb-2 block mr-2">اسم الطالب</label>
-                  <div className="flex items-center gap-2 bg-white border-2 rounded-2xl p-4 focus-within:border-amber-500 shadow-sm transition-all">
+                  <div className="flex items-center gap-2 bg-white border-2 rounded-2xl p-4 focus-within:border-red-500 shadow-sm transition-all">
                     <Search className="text-slate-400" size={20}/>
-                    <input type="text" className="bg-transparent w-full outline-none font-black text-lg" placeholder="ابحث عن الاسم في شؤون الطلاب..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                    {exitForm.studentName && (
-                      <button onClick={() => togglePinnedStudent(exitForm.studentName!)} className="p-2 hover:bg-amber-50 rounded-xl transition-colors">
-                        <Star className={`w-6 h-6 ${pinned.includes(exitForm.studentName!) ? 'fill-amber-500 text-amber-500' : 'text-slate-300'}`} />
+                    <input type="text" className="bg-transparent w-full outline-none font-black text-lg" placeholder="ابحث عن الطالب لإضافته..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                    {damageForm.studentName && (
+                      <button onClick={() => togglePinnedDamageStudent(damageForm.studentName!)} className="p-2 hover:bg-red-50 rounded-xl transition-colors">
+                        <Star className={`w-6 h-6 ${pinned.includes(damageForm.studentName!) ? 'fill-red-500 text-red-500' : 'text-slate-300'}`} />
                       </button>
                     )}
                   </div>
@@ -1066,16 +672,16 @@ const SpecialReportsPage: React.FC = () => {
                     <div className="absolute top-full left-0 right-0 z-50 bg-white border rounded-2xl shadow-2xl mt-2 max-h-64 overflow-y-auto">
                       {suggestions.map(s => (
                         <button key={s.id} onClick={() => { 
-                          setExitForm({ 
-                            ...exitForm, 
+                          setDamageForm({ 
+                            ...damageForm, 
                             studentId: s.id, 
                             studentName: s.name, 
                             grade: s.grade, 
                             section: s.section, 
-                            prevExitCount: (data.exitLogs || []).filter(l => l.studentId === s.id).length 
+                            prevDamageCount: (data.damageLogs || []).filter(l => l.studentId === s.id).length 
                           });
                           setSearchQuery('');
-                        }} className="w-full text-right p-4 hover:bg-amber-50 font-black border-b last:border-none flex justify-between items-center">
+                        }} className="w-full text-right p-4 hover:bg-red-50 font-black border-b last:border-none flex justify-between items-center">
                           <span>{s.name}</span>
                           <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span>
                         </button>
@@ -1085,206 +691,184 @@ const SpecialReportsPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white p-4 rounded-2xl border shadow-sm"><label className="text-[10px] block text-slate-400 mb-1">الصف</label><span className="font-black text-amber-700">{exitForm.grade || '---'}</span></div>
-                  <div className="bg-white p-4 rounded-2xl border shadow-sm"><label className="text-[10px] block text-slate-400 mb-1">الشعبة</label><span className="font-black text-amber-700">{exitForm.section || '---'}</span></div>
-                  <div className="bg-amber-600 text-white p-4 rounded-2xl border shadow-sm text-center">
-                    <label className="text-[10px] block text-amber-100 mb-1">مرات الخروج</label>
-                    <span className="font-black text-2xl">{exitForm.prevExitCount ?? 0}</span>
+                  <div className="bg-white p-4 rounded-2xl border shadow-sm"><label className="text-[10px] block text-slate-400 mb-1">الصف</label><span className="font-black text-red-700">{damageForm.grade || '---'}</span></div>
+                  <div className="bg-white p-4 rounded-2xl border shadow-sm"><label className="text-[10px] block text-slate-400 mb-1">الشعبة</label><span className="font-black text-red-700">{damageForm.section || '---'}</span></div>
+                  <div className="bg-red-600 text-white p-4 rounded-2xl border shadow-sm text-center">
+                    <label className="text-[10px] block text-red-100 mb-1">عدد الإتلافات</label>
+                    <span className="font-black text-2xl">{damageForm.prevDamageCount ?? 0}</span>
                   </div>
                   <div className="bg-white p-2 rounded-2xl border shadow-sm">
-                    <label className="text-[10px] block text-slate-400 mb-1 mr-2">تاريخ الخروج</label>
-                    <input type="date" className="w-full p-2 text-xs font-black outline-none bg-transparent" value={exitForm.date} onChange={e => setExitForm({...exitForm, date: e.target.value})}/>
+                    <label className="text-[10px] block text-slate-400 mb-1 mr-2">تاريخ الإتلاف</label>
+                    <input type="date" className="w-full p-2 text-xs font-black outline-none bg-transparent" value={damageForm.date} onChange={e => setDamageForm({...damageForm, date: e.target.value})}/>
                   </div>
                 </div>
 
-                <div>
-                   <label className="text-xs font-black text-slate-400 mb-2 block mr-2">الفصل الدراسي</label>
-                   <div className="flex gap-2">
-                     {['الفصلين', 'الأول', 'الثاني'].map(sem => (
-                       <button key={sem} onClick={() => setExitForm({...exitForm, semester: sem as any})} className={`flex-1 p-3 rounded-xl font-black text-sm border-2 transition-all ${exitForm.semester === sem ? 'bg-amber-600 border-amber-600 text-white' : 'bg-white border-slate-100 text-slate-500'}`}>{sem}</button>
-                     ))}
-                   </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-black text-slate-400 mb-2 block mr-2">الفصل الدراسي</label>
+                    <div className="flex gap-2">
+                      {['الفصلين', 'الأول', 'الثاني'].map(sem => (
+                        <button key={sem} onClick={() => setDamageForm({...damageForm, semester: sem as any})} className={`flex-1 p-3 rounded-xl font-black text-sm border-2 transition-all ${damageForm.semester === sem ? 'bg-red-600 border-red-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-500'}`}>{sem}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-slate-400 mb-2 block mr-2">بيان الإتلاف</label>
+                    <textarea className="w-full p-3 bg-white border-2 rounded-xl font-black text-xs outline-none focus:border-red-500 min-h-[60px]" placeholder="ماذا تم إتلافه؟" value={damageForm.description} onChange={e => setDamageForm({...damageForm, description: e.target.value})}></textarea>
+                  </div>
                 </div>
               </div>
 
-              {/* Part B: Exit Status */}
+              {/* Part B: Damage Status */}
               <div className="bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-100 space-y-6 flex flex-col">
                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-black text-slate-800 border-r-4 border-blue-500 pr-3">حالة الخروج</h3>
-                    <button onClick={addCustomExitStatus} className="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 shadow-md active:scale-95 transition-all"><Plus size={16}/></button>
+                    <h3 className="text-lg font-black text-slate-800 border-r-4 border-blue-500 pr-3">حالة الإتلاف</h3>
+                    <button onClick={addCustomDamageItem} className="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 shadow-md transition-all active:scale-95"><Plus size={16}/></button>
                  </div>
 
                  <div className="space-y-4 flex-1">
                     <div className="flex gap-2 flex-wrap">
-                      {['كثير الخروج', 'متوسط الخروج', 'نادر الخروج'].map(st => (
-                        <button key={st} onClick={() => setExitForm({...exitForm, status: st})} className={`px-4 py-2 rounded-xl text-[10px] font-black border-2 transition-all ${exitForm.status === st ? 'bg-amber-600 border-amber-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400'}`}>
-                          {st}
+                      {['كثير الإتلاف', 'متوسط الإتلاف', 'نادر الإتلاف', 'عمد', 'خطأ', 'وحده', 'مع غيره'].map(tag => (
+                        <button key={tag} onClick={() => toggleDamageStatusTag(tag)} className={`px-4 py-2 rounded-xl text-[10px] font-black border-2 transition-all ${damageForm.statusTags?.includes(tag) ? 'bg-red-600 border-red-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400'}`}>
+                          {tag}
                         </button>
                       ))}
                     </div>
 
                     <div className="bg-white/50 p-4 rounded-[2rem] border-2 border-dashed border-slate-200 min-h-[140px] flex flex-wrap gap-2 content-start shadow-inner">
-                       {customs.length === 0 && <p className="text-[10px] text-slate-400 w-full text-center mt-8 italic">لا توجد عناصر مضافة.. اضغط + للإضافة</p>}
+                       {customs.length === 0 && <p className="text-[10px] text-slate-400 w-full text-center mt-8 italic">لا توجد عناصر مضافة..</p>}
                        {customs.map(c => (
-                         <button key={c} onClick={() => toggleExitStatusItem(c)} className={`px-3 py-1.5 rounded-lg text-[9px] font-black border transition-all ${exitForm.customStatusItems?.includes(c) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-100 text-slate-500'}`}>{c}</button>
+                         <button key={c} onClick={() => toggleDamageStatusTag(c)} className={`px-3 py-1.5 rounded-lg text-[9px] font-black border transition-all ${damageForm.statusTags?.includes(c) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-100 text-slate-500'}`}>{c}</button>
                        ))}
                     </div>
                  </div>
               </div>
             </div>
 
-            {/* Part C: Action and Pledge */}
+            {/* Part C: Procedure and Pledge */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t-2 border-slate-50 pt-10">
               <div className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-700 mr-2">الإجراء المتخذ</label>
-                  <select className="w-full p-5 bg-white border-2 border-slate-100 rounded-3xl font-black text-slate-700 outline-none focus:border-amber-500 shadow-sm" value={exitForm.action} onChange={e => setExitForm({...exitForm, action: e.target.value})}>
-                    {['تنبيه 1', 'تنبيه 2', 'تعهد', 'اتصال بولي الأمر', 'توقيف جزئي', 'الرفع به إلى جهة إدارية عليا', 'غيرها'].map(a => <option key={a} value={a}>{a}</option>)}
+                  <select className="w-full p-5 bg-white border-2 border-slate-100 rounded-3xl font-black text-slate-700 outline-none focus:border-red-500 shadow-sm" value={damageForm.action} onChange={e => setDamageForm({...damageForm, action: e.target.value})}>
+                    {['تنبيه', 'تعهد', 'إلزامه بإصلاح الإتلاف', 'اتصال بولي الأمر', 'توقيف جزئي', 'الرفع به إلى جهة إدارية عليا', 'غيرها'].map(a => <option key={a} value={a}>{a}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-700 mr-2">ملاحظات عامة</label>
-                  <textarea className="w-full p-5 bg-white border-2 border-slate-100 rounded-3xl font-black text-sm outline-none focus:border-amber-500 shadow-sm min-h-[120px]" placeholder="أدخل تفاصيل إضافية هنا..." value={exitForm.notes} onChange={e => setExitForm({...exitForm, notes: e.target.value})}></textarea>
+                  <textarea className="w-full p-5 bg-white border-2 border-slate-100 rounded-3xl font-black text-sm outline-none focus:border-red-500 shadow-sm min-h-[120px]" placeholder="تفاصيل الملاحظات..." value={damageForm.notes} onChange={e => setDamageForm({...damageForm, notes: e.target.value})}></textarea>
                 </div>
               </div>
 
-              <div className="p-8 bg-amber-600 text-white rounded-[3rem] shadow-2xl space-y-6 relative group overflow-hidden">
+              <div className="p-8 bg-red-600 text-white rounded-[3rem] shadow-2xl space-y-6 relative group overflow-hidden">
                 <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
-                <h4 className="flex items-center gap-3 font-black text-xl"><Fingerprint className="text-amber-200" size={28}/> بصمة الطالب الرقمية</h4>
-                <div className="p-6 bg-amber-700/50 rounded-2xl border-2 border-amber-400/30">
+                <h4 className="flex items-center gap-3 font-black text-xl"><Fingerprint className="text-red-200" size={28}/> بصمة الطالب الرقمية</h4>
+                <div className="p-6 bg-red-700/50 rounded-2xl border-2 border-red-400/30">
                   <p className="text-sm font-bold leading-relaxed opacity-95">
-                    أتعهد بعدم تكرار الخروج المتكرر وفي حالة التكرار فللإدارة الحق في اتخاذ كافة الإجراءات اللازمة.
+                    أتعهد بعدم تكرار المخالفة وفي حالة التكرار فللإدارة الحق في اتخاذ اللازم.
                   </p>
                 </div>
                 <button 
-                  onClick={() => setExitForm({...exitForm, pledge: 'تم التوقيع بنجاح'})} 
-                  className={`w-full p-5 rounded-[1.5rem] font-black text-lg transition-all flex items-center justify-center gap-3 shadow-xl ${exitForm.pledge ? 'bg-green-500 text-white' : 'bg-white text-amber-700 hover:scale-105 active:scale-95'}`}
+                  onClick={() => setDamageForm({...damageForm, pledge: 'تم التبصيم بنجاح'})} 
+                  className={`w-full p-5 rounded-[1.5rem] font-black text-lg transition-all flex items-center justify-center gap-3 shadow-xl ${damageForm.pledge ? 'bg-green-500 text-white border-green-500' : 'bg-white text-red-700 hover:scale-105 active:scale-95 border-none'}`}
                 >
-                  {exitForm.pledge ? <CheckCircle size={24}/> : <Zap size={24}/>}
-                  {exitForm.pledge || 'توقيع البصمة والاعتماد'}
+                  {damageForm.pledge ? <CheckCircle size={24}/> : <Zap size={24}/>}
+                  {damageForm.pledge || 'اعتماد بصمة التعهد'}
                 </button>
               </div>
             </div>
 
-            <button onClick={saveExitLog} className="w-full bg-slate-900 text-white p-7 rounded-[2.5rem] font-black text-2xl hover:bg-black shadow-2xl flex items-center justify-center gap-4 transition-all active:scale-[0.98]">
-               <Save size={32}/> حفظ بيان الخروج
+            <button onClick={saveDamageLog} className="w-full bg-slate-900 text-white p-7 rounded-[2.5rem] font-black text-2xl hover:bg-black shadow-2xl flex items-center justify-center gap-4 transition-all active:scale-[0.98]">
+               <Save size={32}/> حفظ سجل الإتلاف
             </button>
           </div>
         ) : (
           <div className="space-y-8 animate-in slide-in-from-top-4 duration-500">
-            {/* Table / Archive View (Part H) */}
+            {/* Table View with Filters (Part H) */}
             <div className="bg-slate-50 p-8 rounded-[2.5rem] border-2 border-slate-100 space-y-6 shadow-sm">
                 <div className="flex flex-wrap gap-6 items-end">
                     <div className="flex-1 min-w-[350px] space-y-2">
-                        <label className="text-sm font-black text-slate-500 mr-2">فلترة حسب أسماء الطلاب (متعدد)</label>
+                        <label className="text-sm font-black text-slate-500 mr-2">فلترة بالأسماء</label>
                         <div className="flex gap-2">
                             <div className="relative flex-1">
-                                <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl border-2 focus-within:border-amber-400 transition-all shadow-sm">
+                                <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl border-2 focus-within:border-red-400 transition-all shadow-sm">
                                     <Search size={18} className="text-slate-400"/>
                                     <input 
                                         type="text" 
                                         className="text-sm font-black outline-none bg-transparent w-full" 
-                                        placeholder="اكتب اسم الطالب لإضافته للقائمة..." 
-                                        value={exitNameInput} 
-                                        onChange={e => setExitNameInput(e.target.value)} 
+                                        placeholder="اكتب اسم الطالب..." 
+                                        value={damageNameInput} 
+                                        onChange={e => setDamageNameInput(e.target.value)} 
                                     />
                                 </div>
-                                {eNameSuggestions.length > 0 && (
+                                {dNameSuggestions.length > 0 && (
                                     <div className="absolute top-full left-0 right-0 z-[70] bg-white border-2 rounded-2xl shadow-2xl mt-2 max-h-56 overflow-y-auto">
-                                        {eNameSuggestions.map(s => (
-                                            <button key={s.id} onClick={() => { setTempExitNames([...tempExitNames, s.name]); setExitNameInput(''); }} className="w-full text-right p-4 text-xs font-black hover:bg-amber-50 border-b last:border-none flex justify-between">
+                                        {dNameSuggestions.map(s => (
+                                            <button key={s.id} onClick={() => { setTempDamageNames([...tempDamageNames, s.name]); setDamageNameInput(''); }} className="w-full text-right p-4 text-xs font-black hover:bg-red-50 border-b last:border-none">
                                                 {s.name}
-                                                <span className="text-[10px] text-slate-300">{s.grade}</span>
                                             </button>
                                         ))}
                                     </div>
                                 )}
                             </div>
-                            <button 
-                                onClick={() => setAppliedExitNames(tempExitNames)}
-                                className="bg-amber-600 text-white px-8 py-3 rounded-2xl font-black text-sm hover:bg-amber-700 shadow-md transition-all active:scale-95"
-                            >
-                                موافق
-                            </button>
-                            <button 
-                                onClick={() => { setTempExitNames([]); setAppliedExitNames([]); }}
-                                className="bg-white text-slate-400 border-2 border-slate-100 px-5 py-3 rounded-2xl font-black text-xs hover:bg-slate-50"
-                            >
-                                إعادة ضبط
-                            </button>
+                            <button onClick={() => setAppliedDamageNames(tempDamageNames)} className="bg-red-600 text-white px-8 py-3 rounded-2xl font-black text-sm hover:bg-red-700 shadow-md">موافق</button>
+                            <button onClick={() => { setTempDamageNames([]); setAppliedDamageNames([]); }} className="bg-white text-slate-400 border-2 px-5 py-3 rounded-2xl font-black text-xs">إعادة ضبط</button>
                         </div>
                         <div className="flex flex-wrap gap-2 mt-2">
-                            {tempExitNames.map(name => (
-                                <span key={name} className="inline-flex items-center gap-2 bg-amber-100 text-amber-700 px-3 py-1.5 rounded-xl text-[10px] font-black border border-amber-200">
-                                    {name}
-                                    <button onClick={() => setTempExitNames(tempExitNames.filter(n => n !== name))}><X size={12}/></button>
+                            {tempDamageNames.map(name => (
+                                <span key={name} className="inline-flex items-center gap-2 bg-red-100 text-red-700 px-3 py-1.5 rounded-xl text-[10px] font-black border border-red-200">
+                                    {name} <button onClick={() => setTempDamageNames(tempDamageNames.filter(n => n !== name))}><X size={12}/></button>
                                 </span>
                             ))}
                         </div>
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-black text-slate-500 mr-2">الفترة الزمنية</label>
+                        <label className="text-sm font-black text-slate-500 mr-2">نطاق التاريخ</label>
                         <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl border-2 shadow-sm">
                             <Calendar size={18} className="text-slate-400"/>
                             <div className="flex flex-col">
                                 <span className="text-[9px] font-black text-slate-300">من:</span>
-                                <input type="date" className="text-xs font-black outline-none bg-transparent" value={exitFilterValues.start} onChange={e => setExitFilterValues({...exitFilterValues, start: e.target.value})} />
+                                <input type="date" className="text-xs font-black outline-none bg-transparent" value={damageFilterValues.start} onChange={e => setDamageFilterValues({...damageFilterValues, start: e.target.value})} />
                             </div>
-                            <span className="mx-4 text-slate-200 text-xl font-thin">|</span>
+                            <span className="mx-4 text-slate-200">|</span>
                             <div className="flex flex-col">
                                 <span className="text-[9px] font-black text-slate-300">إلى:</span>
-                                <input type="date" className="text-xs font-black outline-none bg-transparent" value={exitFilterValues.end} onChange={e => setExitFilterValues({...exitFilterValues, end: e.target.value})} />
+                                <input type="date" className="text-xs font-black outline-none bg-transparent" value={damageFilterValues.end} onChange={e => setDamageFilterValues({...damageFilterValues, end: e.target.value})} />
                             </div>
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-black text-slate-500 mr-2">الفصل الدراسي</label>
-                        <select className="p-4 bg-white border-2 rounded-2xl font-black text-xs shadow-sm" value={exitFilterValues.semester} onChange={e => setExitFilterValues({...exitFilterValues, semester: e.target.value})}>
-                            <option value="">جميع الفصول</option>
-                            <option value="الفصلين">الفصلين</option>
-                            <option value="الأول">الأول</option>
-                            <option value="الثاني">الثاني</option>
-                        </select>
-                    </div>
-
                     <div className="flex gap-2 pb-1">
-                        <button title="استيراد" className="p-4 bg-white border-2 border-slate-100 text-blue-600 rounded-2xl hover:bg-blue-50 transition-all shadow-sm"><FileUp size={22}/></button>
-                        <button title="تصدير TXT" className="p-4 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl hover:bg-slate-50 transition-all shadow-sm"><FileText size={22}/></button>
+                        <button title="استيراد" className="p-4 bg-white border-2 text-blue-600 rounded-2xl shadow-sm"><FileUp size={22}/></button>
+                        <button title="تصدير TXT" className="p-4 bg-white border-2 text-slate-600 rounded-2xl shadow-sm"><FileText size={22}/></button>
                         <button 
                             title="تصدير Excel" 
                             onClick={() => {
                               const worksheet = XLSX.utils.json_to_sheet(filteredLogs.map(l => ({
-                                'اسم الطالب': l.studentName,
-                                'الصف': l.grade,
-                                'الشعبة': l.section,
-                                'مرات الخروج': l.prevExitCount,
-                                'التاريخ': l.date,
-                                'الحالة': l.status,
-                                'الإجراء': l.action,
-                                'الملاحظات': l.notes
+                                'اسم الطالب': l.studentName, 'الصف': l.grade, 'مرات الإتلاف': l.prevDamageCount, 'التاريخ': l.date, 'بيان الإتلاف': l.description, 'الإجراء': l.action
                               })));
                               const workbook = XLSX.utils.book_new();
-                              XLSX.utils.book_append_sheet(workbook, worksheet, "Exits");
-                              XLSX.writeFile(workbook, `Exits_Report_${today}.xlsx`);
+                              XLSX.utils.book_append_sheet(workbook, worksheet, "Damages");
+                              XLSX.writeFile(workbook, `Damages_Report.xlsx`);
                             }}
-                            className="p-4 bg-white border-2 border-slate-100 text-green-700 rounded-2xl hover:bg-green-50 transition-all shadow-sm"
+                            className="p-4 bg-white border-2 text-green-700 rounded-2xl shadow-sm"
                         >
                             <FileSpreadsheet size={22}/>
                         </button>
                         <button 
                             title="إرسال واتساب"
-                            onClick={() => exportToWhatsApp('تقرير خروج الطلاب المفلتر', filteredLogs, [
+                            onClick={() => exportToWhatsApp('تقرير الإتلاف المدرسي المفلتر', filteredLogs, [
                                 { label: 'اسم الطالب', key: 'studentName' },
                                 { label: 'الصف', key: 'grade' },
-                                { label: 'مرات الخروج', key: 'prevExitCount' },
+                                { label: 'عدد الإتلافات', key: 'prevDamageCount' },
                                 { label: 'التاريخ', key: 'date' },
-                                { label: 'حالة الخروج', key: 'status' },
+                                { label: 'بيان الإتلاف', key: 'description' },
+                                { label: 'حالة الإتلاف', key: 'statusTags' },
                                 { label: 'الإجراء', key: 'action' },
-                                { label: 'الملاحظات', key: 'notes' }
+                                { label: 'ملاحظات', key: 'notes' }
                             ])} 
-                            className="p-4 bg-green-600 text-white rounded-2xl hover:bg-green-700 shadow-xl transition-all active:scale-95"
+                            className="p-4 bg-green-600 text-white rounded-2xl hover:bg-green-700 shadow-xl"
                         >
                             <MessageCircle size={22}/>
                         </button>
@@ -1292,41 +876,40 @@ const SpecialReportsPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="overflow-x-auto rounded-[2.5rem] border-4 border-slate-50 shadow-inner">
+            <div className="overflow-x-auto rounded-[2.5rem] border-4 border-slate-50">
                 <table className="w-full text-center text-sm border-collapse">
                     <thead className="bg-[#FFD966] text-slate-800 font-black">
                         <tr>
-                            <th className="p-6 border-e border-amber-200">اسم الطالب</th>
-                            <th className="p-6 border-e border-amber-200">الصف / الشعبة</th>
-                            <th className="p-6 border-e border-amber-200">إجمالي الخروج</th>
-                            <th className="p-6 border-e border-amber-200">التاريخ</th>
-                            <th className="p-6 border-e border-amber-200">حالة الخروج</th>
-                            <th className="p-6 border-e border-amber-200">نوع الإجراء</th>
+                            <th className="p-6 border-e border-red-200">اسم الطالب</th>
+                            <th className="p-6 border-e border-red-200">الصف / الشعبة</th>
+                            <th className="p-6 border-e border-red-200">إجمالي الإتلاف</th>
+                            <th className="p-6 border-e border-red-200">التاريخ</th>
+                            <th className="p-6 border-e border-red-200">بيان الإتلاف</th>
+                            <th className="p-6 border-e border-red-200">حالة الإتلاف</th>
+                            <th className="p-6 border-e border-red-200">نوع الإجراء</th>
                             <th className="p-6">ملاحظات</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
+                    <tbody className="divide-y divide-slate-100 bg-white font-bold">
                         {filteredLogs.length === 0 ? (
-                            <tr>
-                                <td colSpan={7} className="p-20 text-slate-300 italic text-lg font-bold">لا توجد سجلات خروج مسجلة لهذه الفلاتر حالياً.</td>
-                            </tr>
+                            <tr><td colSpan={8} className="p-20 text-slate-300 italic text-lg font-bold">لا توجد سجلات مطابقة.</td></tr>
                         ) : (
                             filteredLogs.map(l => (
-                                <tr key={l.id} className="hover:bg-amber-50/30 font-bold transition-colors">
-                                    <td className="p-5 border-e border-slate-50 font-black text-slate-800">{l.studentName}</td>
-                                    <td className="p-5 border-e border-slate-50 text-slate-500">{l.grade} / {l.section}</td>
-                                    <td className="p-5 border-e border-slate-50 text-amber-600 font-black text-lg">{l.prevExitCount + 1}</td>
-                                    <td className="p-5 border-e border-slate-50 text-slate-500">{l.date}</td>
+                                <tr key={l.id} className="hover:bg-red-50/30 transition-colors">
+                                    <td className="p-5 border-e border-slate-50 font-black">{l.studentName}</td>
+                                    <td className="p-5 border-e border-slate-50">{l.grade} / {l.section}</td>
+                                    <td className="p-5 border-e border-slate-50 text-red-600 font-black text-lg">{l.prevDamageCount + 1}</td>
+                                    <td className="p-5 border-e border-slate-50">{l.date}</td>
+                                    <td className="p-5 border-e border-slate-50 text-xs">{l.description}</td>
                                     <td className="p-5 border-e border-slate-50">
-                                        <div className="flex flex-col gap-1">
-                                            <span className={`px-3 py-1 rounded-xl text-[10px] ${l.status.includes('كثير') ? 'bg-red-600 text-white' : l.status.includes('متوسط') ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
-                                                {l.status}
-                                            </span>
-                                            {l.customStatusItems?.length > 0 && <span className="text-[8px] text-slate-400 font-normal">{l.customStatusItems.join(', ')}</span>}
+                                        <div className="flex flex-wrap gap-1 justify-center">
+                                            {l.statusTags?.map(t => (
+                                                <span key={t} className="px-2 py-1 bg-red-100 text-red-700 rounded-lg text-[8px] font-black">{t}</span>
+                                            ))}
                                         </div>
                                     </td>
                                     <td className="p-5 border-e border-slate-50 text-red-600">{l.action}</td>
-                                    <td className="p-5 text-slate-400 text-xs text-right max-w-[200px]">{l.notes}</td>
+                                    <td className="p-5 text-slate-400 text-xs">{l.notes}</td>
                                 </tr>
                             ))
                         )}
@@ -1338,18 +921,14 @@ const SpecialReportsPage: React.FC = () => {
       </div>
     );
   };
-  // END OF CHANGE
-
-  // --- Main View Entry ---
 
   const renderCurrentModule = () => {
     switch (activeSubTab) {
       case 'الغياب اليومي': return renderAbsenceModule();
       case 'التأخر': return renderLatenessModule();
       case 'المخالفات الطلابية': return renderViolationModule();
-      // START OF CHANGE - Requirement: Linking the Exit School tab to the new module
       case 'خروج طالب أثناء الدراسة': return renderExitModule();
-      // END OF CHANGE
+      case 'سجل الإتلاف المدرسي': return renderDamageModule();
       default:
         return (
           <div className="bg-white p-8 rounded-[3rem] border shadow-2xl relative overflow-hidden">

@@ -152,6 +152,23 @@ export interface ExitLog {
   prevExitCount: number;
 }
 
+export interface DamageLog {
+  id: string;
+  studentId: string;
+  studentName: string;
+  grade: string;
+  section: string;
+  semester: 'الأول' | 'الثاني' | 'الفصلين';
+  date: string;
+  day: string;
+  description: string;
+  statusTags: string[];
+  action: string;
+  pledge: string;
+  notes: string;
+  prevDamageCount: number;
+}
+
 export interface GenericSpecialReport {
   id: string;
   category: string;
@@ -174,8 +191,11 @@ export interface AppData {
   latenessLogs?: LatenessLog[];
   studentViolationLogs?: StudentViolationLog[];
   exitLogs?: ExitLog[];
+  damageLogs?: DamageLog[];
   customExitItems?: string[];
+  customDamageItems?: string[];
   pinnedExitStudents?: string[];
+  pinnedDamageStudents?: string[];
   genericSpecialReports?: GenericSpecialReport[];
   customViolationElements?: {
     behavior: string[];
