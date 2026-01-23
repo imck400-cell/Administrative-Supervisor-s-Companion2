@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { useGlobal } from '../context/GlobalState';
 import { 
@@ -10,33 +9,27 @@ import {
   FileSearch, Archive, CheckSquare, PencilLine, Zap,
   Sparkles, Database, FileUp, FileDown, MessageCircle,
   Activity, Fingerprint, History, RefreshCw, Upload, LayoutList,
-  Hammer, UserPlus, Edit
+  Hammer, UserPlus, Edit, ArrowUpDown
 } from 'lucide-react';
-import { AbsenceLog, LatenessLog, StudentViolationLog, StudentReport, ExitLog, DamageLog, ParentVisitLog } from '../types';
+import { AbsenceLog, LatenessLog, StudentViolationLog, StudentReport, ExitLog, DamageLog, ParentVisitLog, ExamLog } from '../types';
 import * as XLSX from 'xlsx';
 
 type MainTab = 'supervisor' | 'staff' | 'students' | 'tests';
 type SubTab = string;
 
-// START OF CHANGE - Updated Component Signature for Quick Access Support
 const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id: string) => void }> = ({ initialSubTab, onSubTabOpen }) => {
   const { lang, data, updateData } = useGlobal();
   const [activeTab, setActiveTab] = useState<MainTab>('supervisor');
   const [activeSubTab, setActiveSubTab] = useState<SubTab | null>(null);
   
-  // Handle external navigation (Quick Access)
   useEffect(() => {
     if (initialSubTab) {
       setActiveSubTab(initialSubTab);
     }
   }, [initialSubTab]);
 
-  // END OF CHANGE
-  
-  // View states
   const [showTable, setShowTable] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  
   const [showFrequentNames, setShowFrequentNames] = useState(false);
 
   const today = new Date().toISOString().split('T')[0];
@@ -48,9 +41,22 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
   const [appliedNames, setAppliedNames] = useState<string[]>([]);
   const [nameInput, setNameInput] = useState('');
 
-  const [absenceForm, setAbsenceForm] = useState<Partial<AbsenceLog>>({
-    date: today, semester: 'الأول', status: 'expected', reason: '', commStatus: 'لم يتم التواصل', commType: 'هاتف', replier: 'الأب', result: 'لم يتم الرد', notes: '', prevAbsenceCount: 0
+  // Exam Record Specific States
+  const [examStage, setExamStage] = useState<'basic' | 'secondary'>('basic');
+  const [examFilters, setExamFilters] = useState({
+    semester: '',
+    dateStart: '',
+    dateEnd: '',
+    studentName: '',
+    grade: '',
+    section: '',
+    subject: '',
+    score: '',
+    status: ''
   });
+
+  const absenceFormInitial = { date: today, semester: 'الأول', status: 'expected', reason: '', commStatus: 'لم يتم التواصل', commType: 'هاتف', replier: 'الأب', result: 'لم يتم الرد', notes: '', prevAbsenceCount: 0 };
+  const [absenceForm, setAbsenceForm] = useState<Partial<AbsenceLog>>(absenceFormInitial as any);
 
   const [latenessForm, setLatenessForm] = useState<Partial<LatenessLog>>({
     date: today, semester: 'الأول', status: 'recurring', reason: '', action: 'تنبيه 1', pledge: '', notes: '', prevLatenessCount: 0
@@ -75,7 +81,9 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
   const students = data.studentReports || [];
   const getDayName = (dateStr: string) => {
     if (!dateStr) return '';
-    return new Intl.DateTimeFormat('ar-EG', { weekday: 'long' }).format(new Date(dateStr));
+    try {
+      return new Intl.DateTimeFormat('ar-EG', { weekday: 'long' }).format(new Date(dateStr));
+    } catch { return ''; }
   };
 
   const FrequentNamesPicker = ({ logs, onSelectQuery }: { logs: any[], onSelectQuery: (name: string) => void }) => {
@@ -120,26 +128,10 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
   };
 
   const structure = {
-    supervisor: {
-      title: 'المشرف الإداري',
-      icon: <Briefcase />,
-      items: ['الخطة الفصلية', 'الخلاصة الشهرية', 'المهام اليومية', 'المهام المضافة', 'المهام المرحلة', 'أهم المشكلات اليومية', 'التوصيات العامة', 'احتياجات الدور', 'سجل متابعة الدفاتر والتصحيح', 'الجرد العام للعهد', 'ملاحظات عامة']
-    },
-    staff: {
-      title: 'الكادر التعليمي',
-      icon: <Users />,
-      items: ['سجل الإبداع والتميز', 'كشف الاستلام والتسليم', 'المخالفات', 'التعميمات']
-    },
-    students: {
-      title: 'الطلاب/ الطالبات',
-      icon: <GraduationCap />,
-      items: ['الغياب اليومي', 'التأخر', 'خروج طالب أثناء الدراسة', 'المخالفات الطلابية', 'سجل الإتلاف المدرسي', 'سجل الحالات الخاصة', 'سجل الحالة الصحية', 'سجل زيارة أولياء الأمور والتواصل بهم']
-    },
-    tests: {
-      title: 'تقارير الاختبار',
-      icon: <FileSearch />,
-      items: ['الاختبار الشهري', 'الاختبار الفصلي']
-    }
+    supervisor: { title: 'المشرف الإداري', icon: <Briefcase />, items: ['الخطة الفصلية', 'الخلاصة الشهرية', 'المهام اليومية', 'المهام المضافة', 'المهام المرحلة', 'أهم المشكلات اليومية', 'التوصيات العامة', 'احتياجات الدور', 'سجل متابعة الدفاتر والتصحيح', 'الجرد العام للعهد', 'ملاحظات عامة'] },
+    staff: { title: 'الكادر التعليمي', icon: <Users />, items: ['سجل الإبداع والتميز', 'كشف الاستلام والتسليم', 'المخالفات', 'التعميمات'] },
+    students: { title: 'الطلاب/ الطالبات', icon: <GraduationCap />, items: ['الغياب اليومي', 'التأخر', 'خروج طالب أثناء الدراسة', 'المخالفات الطلابية', 'سجل الإتلاف المدرسي', 'سجل الحالات الخاصة', 'سجل الحالة الصحية', 'سجل زيارة أولياء الأمور والتواصل بهم'] },
+    tests: { title: 'تقارير الاختبار', icon: <FileSearch />, items: ['الاختبار الشهري', 'الاختبار الفصلي'] }
   };
 
   const shareWhatsAppRich = (title: string, tableData: any[], columns: { label: string, key: string }[]) => {
@@ -168,7 +160,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
   const FilterSection = ({ 
     values, setValues, tempNames, setTempNames, appliedNames, setAppliedNames, nameInput, setNameInput, onExportExcel, onExportTxt, onExportWA, suggestions 
   }: any) => (
-    <div className="bg-slate-50 p-4 md:p-6 rounded-[2rem] border-2 border-slate-100 space-y-4 md:space-y-6 shadow-sm mb-6 animate-in slide-in-from-top-4 duration-300">
+    <div className="bg-slate-50 p-4 md:p-6 rounded-[2rem] border-2 border-slate-100 space-y-4 md:space-y-6 shadow-sm mb-6 animate-in slide-in-from-top-4 duration-300 font-arabic">
       <div className="flex flex-wrap gap-4 items-end">
         <div className="flex-1 min-w-full md:min-w-[300px] space-y-2">
           <label className="text-xs font-black text-slate-500 mr-2">فلترة بالأسماء (متعدد)</label>
@@ -201,7 +193,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
             ))}
           </div>
         </div>
-
         <div className="space-y-2 w-full md:w-auto">
           <label className="text-xs font-black text-slate-500 mr-2">نطاق التاريخ</label>
           <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl border-2 shadow-sm w-full">
@@ -211,28 +202,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
             <input type="date" className="text-[10px] font-black outline-none bg-transparent flex-1" value={values.end} onChange={e => setValues({...values, end: e.target.value})} />
           </div>
         </div>
-
-        <div className="grid grid-cols-3 md:flex gap-4 w-full md:w-auto">
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-500 mr-2">الفصل</label>
-            <select className="w-full p-2 bg-white border-2 rounded-xl font-black text-[10px] outline-none shadow-sm" value={values.semester} onChange={e => setValues({...values, semester: e.target.value})}>
-              <option value="">الكل</option><option value="الأول">الأول</option><option value="الثاني">الثاني</option><option value="الفصلين">الفصلين</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-500 mr-2">الصف</label>
-            <select className="w-full p-2 bg-white border-2 rounded-xl font-black text-[10px] outline-none shadow-sm" value={values.grade} onChange={e => setValues({...values, grade: e.target.value})}>
-              <option value="">الكل</option>{gradeOptions.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-500 mr-2">الشعبة</label>
-            <select className="w-full p-2 bg-white border-2 rounded-xl font-black text-[10px] outline-none shadow-sm" value={values.section} onChange={e => setValues({...values, section: e.target.value})}>
-              <option value="">الكل</option>{sectionOptions.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-        </div>
-
         <div className="flex gap-2 w-full md:w-auto">
           <button title="استيراد" className="flex-1 md:flex-none p-3 bg-white border-2 text-blue-600 rounded-xl shadow-sm hover:bg-blue-50 transition-all flex justify-center"><Upload size={18}/></button>
           <button title="تصدير TXT" onClick={onExportTxt} className="flex-1 md:flex-none p-3 bg-white border-2 text-slate-600 rounded-xl shadow-sm hover:bg-slate-50 transition-all flex justify-center"><FileText size={18}/></button>
@@ -242,6 +211,240 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
       </div>
     </div>
   );
+
+  const renderExamModule = () => {
+    const basicSubjects = ["القرآن الكريم", "التربية الإسلامية", "اللغة العربية", "الإنجليزية", "الرياضيات", "العلوم", "الاجتماعيات", "الحاسوب"];
+    const secondarySubjects = ["القرآن الكريم", "التربية الإسلامية", "اللغة العربية", "الإنجليزية", "الرياضيات", "الفيزياء", "الكيمياء", "الأحياء"];
+    const currentSubjects = examStage === 'basic' ? basicSubjects : secondarySubjects;
+
+    const filteredLogs = (data.examLogs || []).filter(log => {
+      if (log.type !== (activeSubTab === 'الاختبار الشهري' ? 'monthly' : 'final')) return false;
+      if (examFilters.semester && log.semester !== examFilters.semester) return false;
+      if (examFilters.dateStart && log.date < examFilters.dateStart) return false;
+      if (examFilters.dateEnd && log.date > examFilters.dateEnd) return false;
+      if (examFilters.studentName && !log.studentName.includes(examFilters.studentName)) return false;
+      
+      if (examFilters.subject || examFilters.status || examFilters.grade || examFilters.section) {
+          return Object.entries(log.subjectsData).some(([subj, details]: [string, any]) => {
+              const subjMatch = examFilters.subject ? subj === examFilters.subject : true;
+              const statusMatch = examFilters.status ? details.status === examFilters.status : true;
+              const gradeMatch = examFilters.grade ? details.class.includes(examFilters.grade) : true;
+              const sectionMatch = examFilters.section ? details.class.includes(examFilters.section) : true;
+              return subjMatch && statusMatch && gradeMatch && sectionMatch;
+          });
+      }
+      return true;
+    });
+
+    const handleAddExamRow = () => {
+      const newLog: ExamLog = {
+        id: Date.now().toString(),
+        studentId: '',
+        studentName: '',
+        date: today,
+        semester: 'الأول',
+        stage: examStage,
+        type: activeSubTab === 'الاختبار الشهري' ? 'monthly' : 'final',
+        subjectsData: currentSubjects.reduce((acc, s) => ({ ...acc, [s]: { class: '', grade: '', status: 'not_tested' } }), {})
+      };
+      updateData({ examLogs: [newLog, ...(data.examLogs || [])] });
+    };
+
+    const updateExamLog = (id: string, field: string, value: any) => {
+      const updated = (data.examLogs || []).map(log => log.id === id ? { ...log, [field]: value } : log);
+      updateData({ examLogs: updated });
+    };
+
+    const updateSubjectData = (id: string, subject: string, field: string, value: any) => {
+      const updated = (data.examLogs || []).map(log => {
+        if (log.id === id) {
+          return {
+            ...log,
+            subjectsData: {
+              ...log.subjectsData,
+              [subject]: { ...log.subjectsData[subject], [field]: value }
+            }
+          };
+        }
+        return log;
+      });
+      updateData({ examLogs: updated });
+    };
+
+    const handleExportWA = () => {
+      let msg = `*📋 كشف غياب ${activeSubTab}*\n`;
+      msg += `*المرحلة:* ${examStage === 'basic' ? 'أساسي' : 'ثانوي'}\n`;
+      msg += `*التاريخ:* ${new Date().toLocaleDateString('ar-EG')}\n`;
+      msg += `----------------------------------\n\n`;
+
+      filteredLogs.forEach((log, idx) => {
+        msg += `*👤 (${idx + 1}) الطالب:* ${log.studentName || '---'}\n`;
+        msg += `📅 *التاريخ:* ${log.date}\n`;
+        Object.entries(log.subjectsData).forEach(([subj, data]: [string, any]) => {
+          if (data.status === 'not_tested') {
+            msg += `📚 *${subj}:* (❌ غائب) ${data.class ? `[${data.class}]` : ''}\n`;
+          } else if (data.grade || data.class) {
+            msg += `📚 *${subj}:* (✅ تم) | 💯 الدرجة: ${data.grade || '---'} | 📍 الصف: ${data.class || '---'}\n`;
+          }
+        });
+        msg += `\n`;
+      });
+
+      msg += `----------------------------------\n`;
+      msg += `*إعداد المستشار الإداري والتربوي إبراهيم دخان*`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    };
+
+    const handleExportExcel = () => {
+        const flatData = filteredLogs.map(log => {
+            const row: any = { 'اسم الطالب': log.studentName, 'التاريخ': log.date, 'الفصل': log.semester };
+            Object.entries(log.subjectsData).forEach(([subj, d]: [string, any]) => {
+                row[`${subj} - الصف`] = d.class;
+                row[`${subj} - الدرجة`] = d.grade;
+            });
+            return row;
+        });
+        const ws = XLSX.utils.json_to_sheet(flatData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Exam_Absentee_Record");
+        XLSX.writeFile(wb, `${activeSubTab}_Report.xlsx`);
+    };
+
+    return (
+      <div className="bg-[#FDF6E3] p-4 md:p-8 rounded-[3rem] border-4 border-[#7030A0] shadow-2xl animate-in fade-in duration-500 font-arabic text-right relative">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-6 border-b-2 border-[#7030A0]/20 pb-6">
+           <div className="flex flex-wrap gap-3">
+              <button onClick={() => setExamStage('basic')} className={`px-8 py-3 rounded-2xl font-black text-sm transition-all shadow-md ${examStage === 'basic' ? 'bg-[#7030A0] text-white' : 'bg-white text-[#7030A0] border border-[#7030A0]'}`}>أساسي</button>
+              <button onClick={() => setExamStage('secondary')} className={`px-8 py-3 rounded-2xl font-black text-sm transition-all shadow-md ${examStage === 'secondary' ? 'bg-[#7030A0] text-white' : 'bg-white text-[#7030A0] border border-[#7030A0]'}`}>ثانوي</button>
+              <button onClick={handleAddExamRow} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-sm hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg"><Plus size={18}/> إضافة غائب</button>
+              <button onClick={() => setActiveSubTab(null)} className="p-3 bg-white border border-slate-200 hover:bg-slate-50 rounded-2xl transition-all shadow-sm"><X size={20}/></button>
+           </div>
+           <div className="flex flex-col items-center md:items-end">
+              <h2 className="text-3xl font-black text-[#7030A0] flex items-center gap-3">كشف غياب {activeSubTab} <FileText size={32}/></h2>
+              <div className="mt-2 text-slate-500 font-bold">سجل متابعة غياب الطلاب في قاعة الاختبار</div>
+           </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-[2.5rem] border-2 border-[#7030A0]/10 mb-8 shadow-sm space-y-4">
+           <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 items-end">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 mr-2">الفصل الدراسي</label>
+                <select className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-black" value={examFilters.semester} onChange={e => setExamFilters({...examFilters, semester: e.target.value})}>
+                    <option value="">الكل</option><option value="الأول">الأول</option><option value="الثاني">الثاني</option>
+                </select>
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-[10px] font-black text-slate-400 mr-2">نطاق التاريخ</label>
+                <div className="flex gap-2 items-center bg-slate-50 p-1 rounded-xl border">
+                    <input type="date" className="bg-transparent text-[10px] w-full font-bold outline-none" value={examFilters.dateStart} onChange={e => setExamFilters({...examFilters, dateStart: e.target.value})} />
+                    <span className="text-slate-300">|</span>
+                    <input type="date" className="bg-transparent text-[10px] w-full font-bold outline-none" value={examFilters.dateEnd} onChange={e => setExamFilters({...examFilters, dateEnd: e.target.value})} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 mr-2">اسم الطالب</label>
+                <input className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold" placeholder="بحث..." value={examFilters.studentName} onChange={e => setExamFilters({...examFilters, studentName: e.target.value})} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 mr-2">المادة</label>
+                <select className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-black" value={examFilters.subject} onChange={e => setExamFilters({...examFilters, subject: e.target.value})}>
+                    <option value="">الكل</option>{currentSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 mr-2">الحالة</label>
+                <select className="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-black" value={examFilters.status} onChange={e => setExamFilters({...examFilters, status: e.target.value})}>
+                    <option value="">الكل</option><option value="tested">تم الاختبار</option><option value="not_tested">لم يختبر</option>
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <button title="واتساب" onClick={handleExportWA} className="p-3 bg-green-600 text-white rounded-xl shadow-md hover:bg-green-700 active:scale-95 transition-all flex-1 flex justify-center"><Share2 size={20}/></button>
+                <button title="إكسل" onClick={handleExportExcel} className="p-3 bg-green-700 text-white rounded-xl shadow-md hover:bg-green-800 active:scale-95 transition-all flex-1 flex justify-center"><FileSpreadsheet size={20}/></button>
+                <button title="مسح الفلاتر" onClick={() => setExamFilters({ semester:'', dateStart:'', dateEnd:'', studentName:'', grade:'', section:'', subject:'', score:'', status:'' })} className="p-3 bg-slate-100 text-slate-400 rounded-xl hover:bg-slate-200 transition-all"><RefreshCw size={20}/></button>
+              </div>
+           </div>
+        </div>
+
+        <div className="overflow-x-auto rounded-[2.5rem] border-[3px] border-[#7030A0] shadow-xl bg-white">
+           <table className="w-full border-collapse text-center min-w-[1400px]">
+              <thead>
+                 <tr className="bg-[#FFD966] text-[#7030A0] font-black text-sm border-b-[2px] border-[#7030A0]">
+                    <th rowSpan={2} className="p-4 border-e-2 border-[#7030A0] w-12">م</th>
+                    <th rowSpan={2} className="p-4 border-e-2 border-[#7030A0] w-64 text-right">اسم الطالب الغائب</th>
+                    <th rowSpan={2} className="p-4 border-e-2 border-[#7030A0] w-32">التاريخ</th>
+                    {currentSubjects.map(subj => (
+                        <th key={subj} colSpan={2} className="p-2 border-e-2 border-[#7030A0] font-black">{subj}</th>
+                    ))}
+                    <th rowSpan={2} className="p-4 w-12"></th>
+                 </tr>
+                 <tr className="bg-slate-50 text-[10px] font-black text-[#7030A0]">
+                    {currentSubjects.map((subj, i) => (
+                        <React.Fragment key={i}>
+                            <th className="p-2 border-e border-[#7030A0] bg-[#FFD966]/40">الصف/الشعبة</th>
+                            <th className="p-2 border-e-2 border-[#7030A0] bg-[#F4CCCC]">الدرجة</th>
+                        </React.Fragment>
+                    ))}
+                 </tr>
+              </thead>
+              <tbody>
+                 {filteredLogs.length === 0 ? (
+                    <tr><td colSpan={currentSubjects.length * 2 + 4} className="p-20 text-slate-300 italic text-xl font-bold">لا توجد بيانات مسجلة مطابقة للبحث حالياً.</td></tr>
+                 ) : (
+                    filteredLogs.map((log, idx) => (
+                        <tr key={log.id} className="border-b-[2px] border-[#7030A0]/10 hover:bg-[#FDF6E3] transition-colors h-14 group">
+                           <td className="border-e-2 border-[#7030A0] bg-slate-50 font-black">{idx + 1}</td>
+                           <td className="border-e-2 border-[#7030A0] p-1">
+                                <div className="relative group/name">
+                                    <input className="w-full p-2 text-right font-black outline-none bg-transparent focus:bg-white rounded-lg" value={log.studentName} onChange={e => updateExamLog(log.id, 'studentName', e.target.value)} placeholder="اكتب اسم الطالب..." />
+                                </div>
+                           </td>
+                           <td className="border-e-2 border-[#7030A0] p-1">
+                                <input type="date" className="w-full p-2 text-center text-[10px] font-bold outline-none bg-transparent" value={log.date} onChange={e => updateExamLog(log.id, 'date', e.target.value)} />
+                           </td>
+                           {currentSubjects.map(subj => (
+                               <React.Fragment key={subj}>
+                                   <td className="border-e border-[#7030A0]/20 p-1">
+                                        <input className="w-full p-1 text-center text-[11px] font-bold outline-none bg-transparent focus:bg-white rounded" value={log.subjectsData[subj]?.class} onChange={e => updateSubjectData(log.id, subj, 'class', e.target.value)} placeholder="مثال: 9-أ" />
+                                   </td>
+                                   <td className="border-e-2 border-[#7030A0] p-1 relative">
+                                        <div className="flex items-center gap-1">
+                                            <input className="w-full p-1 text-center text-[11px] font-black text-red-600 outline-none bg-transparent focus:bg-white rounded" value={log.subjectsData[subj]?.grade} onChange={e => updateSubjectData(log.id, subj, 'grade', e.target.value)} placeholder="0" />
+                                            <button 
+                                                onClick={() => updateSubjectData(log.id, subj, 'status', log.subjectsData[subj].status === 'tested' ? 'not_tested' : 'tested')}
+                                                className={`p-1 rounded-md transition-all ${log.subjectsData[subj].status === 'tested' ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-300'}`}
+                                            >
+                                                <CheckCircle size={10} />
+                                            </button>
+                                        </div>
+                                   </td>
+                               </React.Fragment>
+                           ))}
+                           <td className="p-2">
+                                <button onClick={() => updateData({ examLogs: data.examLogs?.filter(l => l.id !== log.id) })} className="text-red-300 hover:text-red-600 p-2 rounded-xl transition-all hover:bg-red-50"><Trash2 size={18}/></button>
+                           </td>
+                        </tr>
+                    ))
+                 )}
+              </tbody>
+           </table>
+        </div>
+        <div className="mt-8 flex justify-center gap-2">
+            <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border shadow-sm">
+                <div className="w-3 h-3 rounded-full bg-[#FFD966]"></div>
+                <span className="text-[10px] font-black">أصفر: بيانات الصف</span>
+            </div>
+            <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border shadow-sm">
+                <div className="w-3 h-3 rounded-full bg-[#F4CCCC]"></div>
+                <span className="text-[10px] font-black">وردي: درجة الطالب</span>
+            </div>
+            <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border shadow-sm">
+                <div className="w-3 h-3 rounded-full bg-[#7030A0]"></div>
+                <span className="text-[10px] font-black">أرجواني: إطار الجدول الرسمي</span>
+            </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderAbsenceModule = () => {
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
@@ -287,7 +490,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
         day: getDayName(absenceForm.date || today) 
       };
       updateData({ absenceLogs: [newLog, ...(data.absenceLogs || [])] });
-      setAbsenceForm({ ...absenceForm, studentName: '', studentId: '', reason: '', notes: '', result: '' });
+      setAbsenceForm({ ...absenceFormInitial } as any);
       setSearchQuery('');
       alert('تم حفظ البيانات بنجاح');
     };
@@ -376,7 +579,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                   <label className="text-xs font-black text-slate-400 mr-2 block">سبب الغياب</label>
                   <div className="flex flex-wrap gap-2 justify-end">
                     {reasons.map(r => (
-                      <button key={r} onClick={() => setAbsenceForm({...absenceForm, reason: r})} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black transition-all ${absenceForm.reason === r ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>{r}</button>
+                      <button key={r} onClick={() => setAbsenceForm({...absenceForm, reason: r})} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black border transition-all ${absenceForm.reason === r ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>{r}</button>
                     ))}
                     <input className="px-4 py-2 rounded-xl text-[10px] font-black border outline-none bg-slate-50 w-full focus:ring-2 ring-blue-100" placeholder="سبب آخر..." value={absenceForm.reason} onChange={e => setAbsenceForm({...absenceForm, reason: e.target.value})} />
                   </div>
@@ -576,7 +779,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                   <label className="text-xs font-black text-slate-400 mr-2 block">سبب التأخر</label>
                   <div className="flex flex-wrap gap-2 justify-end">
                     {reasons.map(r => (
-                      <button key={r} onClick={() => setLatenessForm({...latenessForm, reason: r})} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black transition-all ${latenessForm.reason === r ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>{r}</button>
+                      <button key={r} onClick={() => setLatenessForm({...latenessForm, reason: r})} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black border transition-all ${latenessForm.reason === r ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>{r}</button>
                     ))}
                     <input className="px-4 py-2 rounded-xl text-[10px] font-black border outline-none bg-slate-50 w-full focus:ring-2 ring-blue-100" placeholder="سبب آخر..." value={latenessForm.reason} onChange={e => setLatenessForm({...latenessForm, reason: e.target.value})} />
                   </div>
@@ -975,7 +1178,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
         />
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
            <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
-              <button onClick={() => setShowTable(!showTable)} className="bg-red-50 text-red-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-red-100 transition-all flex items-center gap-2">
+              <button onClick={() => setShowTable(!showTable)} className="bg-red-50 text-red-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-red-100 transition-all flex items-center gap-2 shadow-sm">
                 {showTable ? <Plus size={18}/> : <LayoutList size={18}/>}
                 {showTable ? 'رصد إتلاف جديد' : 'جدول الإتلاف'}
               </button>
@@ -1093,7 +1296,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
         />
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
            <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
-              <button onClick={() => setShowTable(!showTable)} className="bg-indigo-50 text-indigo-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-indigo-100 transition-all flex items-center gap-2">
+              <button onClick={() => setShowTable(!showTable)} className="bg-indigo-50 text-indigo-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm">
                 {showTable ? <Plus size={18}/> : <LayoutList size={18}/>}
                 {showTable ? 'رصد جديد' : 'جدول السجلات'}
               </button>
@@ -1186,16 +1389,18 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
       case 'خروج طالب أثناء الدراسة': return renderExitModule();
       case 'سجل الإتلاف المدرسي': return renderDamageModule();
       case 'سجل زيارة أولياء الأمور والتواصل بهم': return renderParentVisitModule();
+      case 'الاختبار الشهري': 
+      case 'الاختبار الفصلي': return renderExamModule();
       default:
         return (
-          <div className="bg-white p-4 md:p-8 rounded-[2rem] md:rounded-[3rem] border shadow-2xl relative overflow-hidden font-arabic">
+          <div className="bg-white p-4 md:p-8 rounded-[2rem] md:rounded-[3rem] border shadow-2xl relative overflow-hidden font-arabic text-right">
             <div className="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
             <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl md:text-2xl font-black text-slate-800">{activeSubTab}</h3>
                 <button onClick={() => setActiveSubTab(null)} className="p-2 hover:bg-slate-100 rounded-full transition-all"><X/></button>
             </div>
             <div className="space-y-4">
-                <p className="text-slate-500 font-bold text-right text-sm md:text-base">هذا السجل ({activeSubTab}) قيد التطوير البرمجي ليكون متكاملاً مع باقي أقسام البرنامج.</p>
+                <p className="text-slate-500 font-bold text-sm md:text-base">هذا السجل ({activeSubTab}) قيد التطوير البرمجي ليكون متكاملاً مع باقي أقسام البرنامج.</p>
                 <div className="bg-slate-50 p-10 md:p-12 rounded-[2.5rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-4 text-slate-400">
                     <Database size={64} />
                     <span className="font-black text-base md:text-lg text-center">قاعدة بيانات قيد التجهيز</span>
@@ -1232,16 +1437,14 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
     link.click();
   };
 
-  // START OF CHANGE - Surgical Logic for Menu Item Click Tracking
   const handleSubTabClick = (item: string) => {
     setActiveSubTab(item);
     setShowTable(false);
     onSubTabOpen?.(item);
   };
-  // END OF CHANGE
 
   return (
-    <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 font-arabic pb-20">
+    <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 font-arabic pb-20 text-right">
       {!activeSubTab ? (
         <>
           <header className="flex flex-wrap items-center justify-between gap-4">

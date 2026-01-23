@@ -18,6 +18,17 @@ export interface SchoolProfile {
   managerName?: string;
 }
 
+export interface ExamLog {
+  id: string;
+  studentId: string;
+  studentName: string;
+  date: string;
+  semester: string;
+  stage: 'basic' | 'secondary';
+  type: 'monthly' | 'final';
+  subjectsData: Record<string, { class: string; grade: string; status: 'tested' | 'not_tested' }>;
+}
+
 export interface SubstitutionEntry {
   id: string;
   absentTeacher: string;
@@ -221,6 +232,7 @@ export interface AppData {
   exitLogs?: ExitLog[];
   damageLogs?: DamageLog[];
   parentVisitLogs?: ParentVisitLog[];
+  examLogs?: ExamLog[];
   customExitItems?: string[];
   customDamageItems?: string[];
   customVisitItems?: string[];

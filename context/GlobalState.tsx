@@ -51,6 +51,7 @@ const defaultData: AppData = {
   absenceLogs: [],
   latenessLogs: [],
   studentViolationLogs: [],
+  examLogs: [],
   genericSpecialReports: [],
   customViolationElements: {
     behavior: [],
