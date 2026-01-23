@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { GlobalProvider, useGlobal } from './context/GlobalState';
 import Layout from './components/Layout';
 import Dashboard from './app/Dashboard';
@@ -7,7 +7,7 @@ import SubstitutionPage from './app/SubstitutionPage';
 import { DailyReportsPage, ViolationsPage, StudentsReportsPage } from './app/ReportsPage';
 import SpecialReportsPage from './app/SpecialReportsPage';
 import DataManagementModal from './components/DataManagementModal';
-import { Lock, LayoutDashboard, ClipboardCheck, UserX, UserPlus, Users, Sparkles, UserCircle, Database, Settings, FileSearch } from 'lucide-react';
+import { Lock, LayoutDashboard, ClipboardCheck, UserX, UserPlus, Users, Sparkles, UserCircle, Database, Settings, FileSearch, ArrowUp, ArrowDown } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
   const { login } = useGlobal();
@@ -56,31 +56,79 @@ const MainApp: React.FC = () => {
   const [view, setView] = useState('dashboard');
   const [isDataModalOpen, setIsDataModalOpen] = useState(false);
 
-  if (!isAuthenticated) return <LoginPage />;
-
-  const renderView = () => {
-    switch(view) {
-      case 'dashboard': return <Dashboard setView={setView} />;
-      case 'substitute': return <SubstitutionPage />;
-      case 'daily': return <DailyReportsPage />;
-      case 'violations': return <ViolationsPage />;
-      case 'studentReports': return <StudentsReportsPage />;
-      case 'specialReports': return <SpecialReportsPage />;
-      default: return <Dashboard setView={setView} />;
-    }
-  };
-
-  const navItems = [
+  const navItems = useMemo(() => [
     { id: 'dashboard', label: lang === 'ar' ? 'الرئيسية' : 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
     { id: 'daily', label: lang === 'ar' ? 'متابعة المعلمين' : 'Teachers Log', icon: <ClipboardCheck className="w-4 h-4" /> },
     { id: 'substitute', label: lang === 'ar' ? 'جدول التغطية' : 'Coverage Log', icon: <UserPlus className="w-4 h-4" /> },
     { id: 'violations', label: lang === 'ar' ? 'التعهدات' : 'Violations', icon: <UserX className="w-4 h-4" /> },
     { id: 'studentReports', label: lang === 'ar' ? 'تقارير الطلاب' : 'Student Reports', icon: <Users className="w-4 h-4" /> },
     { id: 'specialReports', label: lang === 'ar' ? 'تقارير خاصة' : 'Special Reports', icon: <FileSearch className="w-4 h-4" /> },
-  ];
+  ], [lang]);
+  
+  // START OF CHANGE - Recent Actions Logic (Fixed for React Error 31)
+  // Store only IDs in localStorage to avoid stringifying JSX icons
+  const [recentActionIds, setRecentActionIds] = useState<string[]>(() => {
+    const saved = localStorage.getItem('recent_nav_ids_v2');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const trackAction = (viewId: string) => {
+    if (viewId === 'dashboard') return;
+    
+    setRecentActionIds(prev => {
+      const filtered = prev.filter(id => id !== viewId);
+      const updated = [viewId, ...filtered].slice(0, 8);
+      localStorage.setItem('recent_nav_ids_v2', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Hydrate IDs back into objects with valid JSX icons
+  const recentActions = useMemo(() => {
+    return recentActionIds
+      .map(id => navItems.find(item => item.id === id))
+      .filter((item): item is typeof navItems[0] => !!item);
+  }, [recentActionIds, navItems]);
+
+  const handleSetView = (v: string) => {
+    setView(v);
+    trackAction(v);
+  };
+  // END OF CHANGE
+
+  if (!isAuthenticated) return <LoginPage />;
+
+  const renderView = () => {
+    switch(view) {
+      case 'dashboard': return <Dashboard setView={handleSetView} recentActions={recentActions} />;
+      case 'substitute': return <SubstitutionPage />;
+      case 'daily': return <DailyReportsPage />;
+      case 'violations': return <ViolationsPage />;
+      case 'studentReports': return <StudentsReportsPage />;
+      case 'specialReports': return <SpecialReportsPage />;
+      default: return <Dashboard setView={handleSetView} recentActions={recentActions} />;
+    }
+  };
 
   return (
     <Layout>
+      <div className="fixed top-20 left-6 z-[60] flex flex-col gap-2 pointer-events-auto">
+        <button 
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="p-2 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-all active:scale-90"
+          title="أعلى الشاشة"
+        >
+          <ArrowUp size={20} />
+        </button>
+        <button 
+          onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
+          className="p-2 bg-orange-500 text-white rounded-full shadow-lg hover:bg-orange-600 transition-all active:scale-90"
+          title="أسفل الشاشة"
+        >
+          <ArrowDown size={20} />
+        </button>
+      </div>
+
       <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800"> رفيق المشرف الإداري </h2>
@@ -100,7 +148,7 @@ const MainApp: React.FC = () => {
         {navItems.map((item) => (
           <button 
             key={item.id}
-            onClick={() => setView(item.id)}
+            onClick={() => handleSetView(item.id)}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-black transition-all ${
               view === item.id 
               ? 'bg-blue-600 text-white shadow-xl shadow-blue-100 scale-105' 

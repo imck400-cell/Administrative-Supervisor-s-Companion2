@@ -21,7 +21,13 @@ interface CardConfig {
   subType: string;
 }
 
-const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => {
+// START OF CHANGE - Updated Dashboard Props to include recentActions
+interface DashboardProps {
+  setView?: (v: string) => void;
+  recentActions?: any[];
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) => {
   const { lang, data } = useGlobal();
 
   const today = new Date().toISOString().split('T')[0];
@@ -383,13 +389,20 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
             <TrendingUp className="text-green-600" />
             الوصول السريع
           </h3>
+          {/* START OF CHANGE - Expanded grid for 12 buttons (4 static + 8 recent) */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
             {[
               { label: 'التقرير اليومي', icon: <FileText />, view: 'daily' },
               { label: 'تغطية الحصص', icon: <UserPlusIcon />, view: 'substitute' },
               { label: 'تعهد طالب', icon: <AlertCircle />, view: 'violations' },
               { label: 'خطة الإشراف', icon: <CalendarDays />, view: 'specialReports' },
-            ].map((btn, i) => (
+              // Map recent actions (last 8)
+              ...recentActions.map(action => ({
+                label: action.label,
+                icon: action.icon,
+                view: action.id
+              }))
+            ].slice(0, 12).map((btn, i) => (
               <button 
                 key={i} 
                 onClick={() => setView?.(btn.view)}
@@ -398,10 +411,11 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
                 <div className={`p-4 rounded-2xl bg-white shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-all text-blue-600`}>
                   {btn.icon}
                 </div>
-                <span className="text-xs font-black text-slate-700">{btn.label}</span>
+                <span className="text-xs font-black text-slate-700 truncate w-full text-center px-1">{btn.label}</span>
               </button>
             ))}
           </div>
+          {/* END OF CHANGE */}
         </div>
       </div>
     </div>
