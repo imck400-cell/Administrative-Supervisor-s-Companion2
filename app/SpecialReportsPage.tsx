@@ -1,7 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useGlobal } from '../context/GlobalState';
-// Add missing LayoutList to imports from lucide-react
 import { 
   Briefcase, Users, FileText, GraduationCap, 
   ChevronRight, Calendar, Plus, Save, Share2, 
@@ -11,7 +10,7 @@ import {
   FileSearch, Archive, CheckSquare, PencilLine, Zap,
   Sparkles, Database, FileUp, FileDown, MessageCircle,
   Activity, Fingerprint, History, RefreshCw, Upload, LayoutList,
-  Hammer, UserPlus
+  Hammer, UserPlus, Edit
 } from 'lucide-react';
 import { AbsenceLog, LatenessLog, StudentViolationLog, StudentReport, ExitLog, DamageLog, ParentVisitLog } from '../types';
 import * as XLSX from 'xlsx';
@@ -28,22 +27,17 @@ const SpecialReportsPage: React.FC = () => {
   const [showTable, setShowTable] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // START OF CHANGE - Frequent Names Modal State
   const [showFrequentNames, setShowFrequentNames] = useState(false);
-  // END OF CHANGE
 
-  // Universal Date Defaults and Multi-Selection States
   const today = new Date().toISOString().split('T')[0];
   const gradeOptions = ["التمهيدي", "الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "الأول الثانوي", "الثاني الثانوي", "الثالث الثانوي"];
   const sectionOptions = ["أ", "ب", "ج", "د", "هـ", "و", "ز", "ح", "ط", "ي"];
 
-  // Filter States
   const [filterValues, setFilterValues] = useState({ semester: '', start: today, end: today, grade: '', section: '' });
   const [tempNames, setTempNames] = useState<string[]>([]);
   const [appliedNames, setAppliedNames] = useState<string[]>([]);
   const [nameInput, setNameInput] = useState('');
 
-  // Form States
   const [absenceForm, setAbsenceForm] = useState<Partial<AbsenceLog>>({
     date: today, semester: 'الأول', status: 'expected', reason: '', commStatus: 'لم يتم التواصل', commType: 'هاتف', replier: 'الأب', result: 'لم يتم الرد', notes: '', prevAbsenceCount: 0
   });
@@ -68,14 +62,14 @@ const SpecialReportsPage: React.FC = () => {
     date: today, semester: 'الفصلين', type: 'visit', status: 'نادر الزيارة', customStatusItems: [], visitorName: '', reason: '', recommendations: '', actions: '', followUpStatus: [], notes: '', prevVisitCount: 0
   });
 
-  // Data helpers
   const students = data.studentReports || [];
   const getDayName = (dateStr: string) => {
+    if (!dateStr) return '';
     return new Intl.DateTimeFormat('ar-EG', { weekday: 'long' }).format(new Date(dateStr));
   };
 
-  // START OF CHANGE - Reusable Frequent Names Picker
-  const FrequentNamesPicker = ({ logs, onSelect }: { logs: any[], onSelect: (name: string) => void }) => {
+  // START OF CHANGE - Requirement: Pick triggers Search Dropdown
+  const FrequentNamesPicker = ({ logs, onSelectQuery }: { logs: any[], onSelectQuery: (name: string) => void }) => {
     const frequentList = useMemo(() => {
       const uniqueMap = new Map();
       [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).forEach(log => {
@@ -89,7 +83,7 @@ const SpecialReportsPage: React.FC = () => {
     if (!showFrequentNames) return null;
 
     return (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 font-arabic">
+      <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 font-arabic">
         <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
           <div className="p-5 border-b bg-slate-50 flex justify-between items-center">
             <h3 className="font-black text-slate-800">الأسماء المتكررة (الأحدث أولاً)</h3>
@@ -102,7 +96,7 @@ const SpecialReportsPage: React.FC = () => {
               frequentList.map((item, idx) => (
                 <button 
                   key={idx} 
-                  onClick={() => { onSelect(item.studentName); setShowFrequentNames(false); }}
+                  onClick={() => { onSelectQuery(item.studentName); setShowFrequentNames(false); }}
                   className="w-full text-right p-3 hover:bg-blue-50 rounded-xl font-bold flex justify-between items-center transition-colors border-b border-slate-50 last:border-none"
                 >
                   <span className="text-xs text-slate-400">{item.date}</span>
@@ -163,16 +157,15 @@ const SpecialReportsPage: React.FC = () => {
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
-  // Shared Reusable Filter Component for all special reports
   const FilterSection = ({ 
     values, setValues, tempNames, setTempNames, appliedNames, setAppliedNames, nameInput, setNameInput, onExportExcel, onExportTxt, onExportWA, suggestions 
   }: any) => (
-    <div className="bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100 space-y-6 shadow-sm mb-6 animate-in slide-in-from-top-4 duration-300">
+    <div className="bg-slate-50 p-4 md:p-6 rounded-[2rem] border-2 border-slate-100 space-y-4 md:space-y-6 shadow-sm mb-6 animate-in slide-in-from-top-4 duration-300">
       <div className="flex flex-wrap gap-4 items-end">
-        <div className="flex-1 min-w-[300px] space-y-2">
+        <div className="flex-1 min-w-full md:min-w-[300px] space-y-2">
           <label className="text-xs font-black text-slate-500 mr-2">فلترة بالأسماء (متعدد)</label>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
+          <div className="flex flex-wrap md:flex-nowrap gap-2">
+            <div className="relative flex-1 min-w-full md:min-w-0">
               <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl border-2 focus-within:border-blue-400 transition-all shadow-sm">
                 <Search size={16} className="text-slate-400"/>
                 <input type="text" className="text-xs font-black outline-none bg-transparent w-full" placeholder="اكتب الاسم..." value={nameInput} onChange={e => setNameInput(e.target.value)} />
@@ -187,8 +180,10 @@ const SpecialReportsPage: React.FC = () => {
                 </div>
               )}
             </div>
-            <button onClick={() => setAppliedNames(tempNames)} className="bg-blue-600 text-white px-6 py-2 rounded-xl font-black text-xs hover:bg-blue-700 transition-all shadow-md active:scale-95">موافق</button>
-            <button onClick={() => { setTempNames([]); setAppliedNames([]); }} className="bg-white border-2 text-slate-400 px-4 py-2 rounded-xl font-black text-xs hover:bg-slate-50 transition-all">تصفير</button>
+            <div className="flex gap-2 w-full md:w-auto">
+              <button onClick={() => setAppliedNames(tempNames)} className="flex-1 md:flex-none bg-blue-600 text-white px-6 py-2 rounded-xl font-black text-xs hover:bg-blue-700 transition-all shadow-md active:scale-95">موافق</button>
+              <button onClick={() => { setTempNames([]); setAppliedNames([]); }} className="flex-1 md:flex-none bg-white border-2 text-slate-400 px-4 py-2 rounded-xl font-black text-xs hover:bg-slate-50 transition-all">تصفير</button>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2 mt-2">
             {tempNames.map((name: string) => (
@@ -199,48 +194,47 @@ const SpecialReportsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 w-full md:w-auto">
           <label className="text-xs font-black text-slate-500 mr-2">نطاق التاريخ</label>
-          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl border-2 shadow-sm">
+          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl border-2 shadow-sm w-full">
             <Calendar size={16} className="text-slate-400"/>
-            <input type="date" className="text-xs font-black outline-none bg-transparent" value={values.start} onChange={e => setValues({...values, start: e.target.value})} />
+            <input type="date" className="text-[10px] font-black outline-none bg-transparent flex-1" value={values.start} onChange={e => setValues({...values, start: e.target.value})} />
             <span className="text-slate-200">|</span>
-            <input type="date" className="text-xs font-black outline-none bg-transparent" value={values.end} onChange={e => setValues({...values, end: e.target.value})} />
+            <input type="date" className="text-[10px] font-black outline-none bg-transparent flex-1" value={values.end} onChange={e => setValues({...values, end: e.target.value})} />
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-xs font-black text-slate-500 mr-2">الفصل</label>
-          <select className="p-2.5 bg-white border-2 rounded-xl font-black text-xs outline-none focus:border-blue-400 shadow-sm appearance-none" value={values.semester} onChange={e => setValues({...values, semester: e.target.value})}>
-            <option value="">الكل</option><option value="الأول">الأول</option><option value="الثاني">الثاني</option><option value="الفصلين">الفصلين</option>
-          </select>
+        <div className="grid grid-cols-3 md:flex gap-4 w-full md:w-auto">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-500 mr-2">الفصل</label>
+            <select className="w-full p-2 bg-white border-2 rounded-xl font-black text-[10px] outline-none shadow-sm" value={values.semester} onChange={e => setValues({...values, semester: e.target.value})}>
+              <option value="">الكل</option><option value="الأول">الأول</option><option value="الثاني">الثاني</option><option value="الفصلين">الفصلين</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-500 mr-2">الصف</label>
+            <select className="w-full p-2 bg-white border-2 rounded-xl font-black text-[10px] outline-none shadow-sm" value={values.grade} onChange={e => setValues({...values, grade: e.target.value})}>
+              <option value="">الكل</option>{gradeOptions.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-500 mr-2">الشعبة</label>
+            <select className="w-full p-2 bg-white border-2 rounded-xl font-black text-[10px] outline-none shadow-sm" value={values.section} onChange={e => setValues({...values, section: e.target.value})}>
+              <option value="">الكل</option>{sectionOptions.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-xs font-black text-slate-500 mr-2">الصف</label>
-          <select className="p-2.5 bg-white border-2 rounded-xl font-black text-xs outline-none focus:border-blue-400 shadow-sm appearance-none" value={values.grade} onChange={e => setValues({...values, grade: e.target.value})}>
-            <option value="">الكل</option>{gradeOptions.map(g => <option key={g} value={g}>{g}</option>)}
-          </select>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-xs font-black text-slate-500 mr-2">الشعبة</label>
-          <select className="p-2.5 bg-white border-2 rounded-xl font-black text-xs outline-none focus:border-blue-400 shadow-sm appearance-none" value={values.section} onChange={e => setValues({...values, section: e.target.value})}>
-            <option value="">الكل</option>{sectionOptions.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
-
-        <div className="flex gap-2 pb-0.5">
-          <button title="استيراد" className="p-3 bg-white border-2 text-blue-600 rounded-xl shadow-sm hover:bg-blue-50 transition-all"><Upload size={20}/></button>
-          <button title="تصدير TXT" onClick={onExportTxt} className="p-3 bg-white border-2 text-slate-600 rounded-xl shadow-sm hover:bg-slate-50 transition-all"><FileText size={20}/></button>
-          <button title="تصدير Excel" onClick={onExportExcel} className="p-3 bg-white border-2 text-green-700 rounded-xl shadow-sm hover:bg-green-50 transition-all"><FileSpreadsheet size={20}/></button>
-          <button title="واتساب" onClick={onExportWA} className="p-3 bg-green-600 text-white rounded-xl shadow-xl hover:bg-green-700 transition-all active:scale-95"><MessageCircle size={20}/></button>
+        <div className="flex gap-2 w-full md:w-auto">
+          <button title="استيراد" className="flex-1 md:flex-none p-3 bg-white border-2 text-blue-600 rounded-xl shadow-sm hover:bg-blue-50 transition-all flex justify-center"><Upload size={18}/></button>
+          <button title="تصدير TXT" onClick={onExportTxt} className="flex-1 md:flex-none p-3 bg-white border-2 text-slate-600 rounded-xl shadow-sm hover:bg-slate-50 transition-all flex justify-center"><FileText size={18}/></button>
+          <button title="تصدير Excel" onClick={onExportExcel} className="flex-1 md:flex-none p-3 bg-white border-2 text-green-700 rounded-xl shadow-sm hover:bg-green-50 transition-all flex justify-center"><FileSpreadsheet size={18}/></button>
+          <button title="واتساب" onClick={onExportWA} className="flex-1 md:flex-none p-3 bg-green-600 text-white rounded-xl shadow-xl hover:bg-green-700 transition-all active:scale-95 flex justify-center"><MessageCircle size={18}/></button>
         </div>
       </div>
     </div>
   );
 
-  // START OF CHANGE - Requirement: Daily Absence (1, 2)
   const renderAbsenceModule = () => {
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
@@ -265,7 +259,6 @@ const SpecialReportsPage: React.FC = () => {
 
     const reasons = ["مرض", "انشغال", "تأخر", "لم يمر له الباص", "سفر"];
 
-    // START OF CHANGE - Selection Logic
     const handleSelectStudent = (s: StudentReport) => {
       setAbsenceForm({ 
         ...absenceForm, 
@@ -277,7 +270,6 @@ const SpecialReportsPage: React.FC = () => {
       });
       setSearchQuery(s.name);
     };
-    // END OF CHANGE
 
     const saveLog = () => {
       if (!absenceForm.studentId) return alert('يرجى اختيار طالب أولاً');
@@ -299,45 +291,45 @@ const SpecialReportsPage: React.FC = () => {
     ];
 
     return (
-      <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
-        {/* START OF CHANGE - Frequent Names Logic */}
+      <div className="bg-white p-4 md:p-8 rounded-[2.5rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
         <FrequentNamesPicker 
           logs={data.absenceLogs || []} 
-          onSelect={(name) => {
-            const s = students.find(x => x.name === name);
-            if (s) handleSelectStudent(s);
-          }}
+          onSelectQuery={(q) => setSearchQuery(q)}
         />
-        {/* END OF CHANGE */}
-        <div className="flex justify-between items-center mb-6 border-b pb-4">
-           <div className="flex gap-2">
-              <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-blue-100 transition-all flex items-center gap-2">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
+           <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
+              <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-blue-100 transition-all flex items-center gap-2">
                 {showTable ? <Plus size={18}/> : <LayoutList size={18}/>}
                 {showTable ? 'تسجيل جديد' : 'جدول الغائبين'}
               </button>
-              {/* START OF CHANGE - Frequent Button */}
               {!showTable && (
-                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
                   <RefreshCw size={18}/> الأسماء المتكررة
                 </button>
               )}
-              {/* END OF CHANGE */}
-              <button onClick={() => setActiveSubTab(null)} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={20}/></button>
+              <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={18}/></button>
            </div>
-           <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
-              غياب يوم {getDayName(absenceForm.date || today)} بتاريخ {absenceForm.date} <Clock className="text-blue-600" size={24}/>
-           </h2>
+           <div className="flex flex-col items-center md:items-end w-full md:w-auto">
+              <h2 className="text-xl md:text-2xl font-black text-slate-800 flex items-center gap-3">
+                 تقرير الغياب اليومي <Clock className="text-blue-600" size={24}/>
+              </h2>
+              <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                <Calendar size={14} className="text-slate-400" />
+                <input type="date" className="text-[10px] md:text-xs font-black bg-transparent outline-none" value={absenceForm.date} onChange={e => setAbsenceForm({...absenceForm, date: e.target.value})} />
+                <span className="text-[10px] font-bold text-slate-400">{getDayName(absenceForm.date || today)}</span>
+              </div>
+           </div>
         </div>
 
         {!showTable ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
             <div className="space-y-6">
-               <div className="flex flex-wrap gap-2 justify-end">
+               <div className="flex flex-wrap gap-1.5 md:gap-2 justify-end">
                   {statusOptions.map(opt => (
                     <button 
                       key={opt.id} 
                       onClick={() => setAbsenceForm({...absenceForm, status: opt.id as any})}
-                      className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all border ${absenceForm.status === opt.id ? 'bg-red-600 text-white border-red-600 shadow-lg scale-105' : 'bg-slate-50 text-slate-500 border-slate-100'}`}
+                      className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black transition-all border ${absenceForm.status === opt.id ? 'bg-red-600 text-white border-red-600 shadow-lg scale-105' : 'bg-slate-50 text-slate-500 border-slate-100'}`}
                     >
                       {opt.label}
                     </button>
@@ -345,101 +337,98 @@ const SpecialReportsPage: React.FC = () => {
                </div>
                <div className="relative">
                   <label className="text-xs font-black text-slate-400 mb-2 block mr-2">اسم الطالب</label>
-                  <div className="flex items-center gap-3 bg-white border-2 rounded-2xl p-4 focus-within:border-blue-500 shadow-sm transition-all">
+                  <div className="flex items-center gap-3 bg-white border-2 rounded-2xl p-3 md:p-4 focus-within:border-blue-500 shadow-sm transition-all">
                     <Search className="text-slate-400" size={20}/>
-                    <input type="text" className="bg-transparent w-full outline-none font-black text-lg" placeholder="ابحث عن الاسم..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                    <input type="text" className="bg-transparent w-full outline-none font-black text-base md:text-lg" placeholder="ابحث عن الاسم..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                   </div>
                   {suggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 z-[100] bg-white border-2 rounded-2xl shadow-2xl mt-2 max-h-48 overflow-y-auto">
                       {suggestions.map(s => (
-                        <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-4 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center transition-colors">
-                          <span>{s.name}</span>
-                          <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span>
+                        <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-3 md:p-4 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center transition-colors">
+                          <span className="text-xs md:text-sm">{s.name}</span>
+                          <span className="text-[9px] md:text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span>
                         </button>
                       ))}
                     </div>
                   )}
                </div>
-               <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-[#FFF2CC]/30 p-5 rounded-3xl border-2 border-[#FFF2CC] text-center shadow-sm">
-                    <label className="text-[10px] font-black text-orange-600 mb-1 block">غياب سابق</label>
-                    <span className="text-3xl font-black text-slate-800">{absenceForm.prevAbsenceCount || 0}</span>
+               <div className="grid grid-cols-2 gap-3 md:gap-4">
+                  <div className="bg-[#FFF2CC]/30 p-4 md:p-5 rounded-3xl border-2 border-[#FFF2CC] text-center shadow-sm">
+                    <label className="text-[9px] md:text-[10px] font-black text-orange-600 mb-1 block">غياب سابق</label>
+                    <span className="text-2xl md:text-3xl font-black text-slate-800">{absenceForm.prevAbsenceCount || 0}</span>
                   </div>
-                  <div className="bg-purple-50 p-5 rounded-3xl border-2 border-purple-100 relative shadow-sm">
-                     <label className="text-[10px] font-black text-purple-600 mb-1 block">الصف/الشعبة</label>
-                     <span className="text-xl font-black text-slate-700">{absenceForm.studentName ? `${absenceForm.grade} - ${absenceForm.section}` : '---'}</span>
-                     <div className="absolute left-4 bottom-4">
-                       <select className="bg-white border text-[10px] font-black p-1 rounded-lg outline-none cursor-pointer" value={absenceForm.semester} onChange={e => setAbsenceForm({...absenceForm, semester: e.target.value as any})}>
-                          <option value="الأول">الأول</option><option value="الثاني">الثاني</option>
-                       </select>
-                     </div>
+                  <div className="bg-purple-50 p-4 md:p-5 rounded-3xl border-2 border-purple-100 relative shadow-sm text-center">
+                     <label className="text-[9px] md:text-[10px] font-black text-purple-600 mb-1 block">الفصل</label>
+                     <select className="bg-white border text-[10px] md:text-xs font-black p-1 md:p-2 rounded-lg outline-none cursor-pointer w-full text-center" value={absenceForm.semester} onChange={e => setAbsenceForm({...absenceForm, semester: e.target.value as any})}>
+                        <option value="الأول">الأول</option><option value="الثاني">الثاني</option>
+                     </select>
                   </div>
                </div>
                <div className="space-y-3">
                   <label className="text-xs font-black text-slate-400 mr-2 block">سبب الغياب</label>
                   <div className="flex flex-wrap gap-2 justify-end">
                     {reasons.map(r => (
-                      <button key={r} onClick={() => setAbsenceForm({...absenceForm, reason: r})} className={`px-4 py-2 rounded-xl text-[10px] font-black border transition-all ${absenceForm.reason === r ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>{r}</button>
+                      <button key={r} onClick={() => setAbsenceForm({...absenceForm, reason: r})} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black border transition-all ${absenceForm.reason === r ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>{r}</button>
                     ))}
                     <input className="px-4 py-2 rounded-xl text-[10px] font-black border outline-none bg-slate-50 w-full focus:ring-2 ring-blue-100" placeholder="سبب آخر..." value={absenceForm.reason} onChange={e => setAbsenceForm({...absenceForm, reason: e.target.value})} />
                   </div>
                </div>
             </div>
             <div className="space-y-6">
-               <div className="grid grid-cols-2 gap-4">
+               <div className="grid grid-cols-2 gap-3 md:gap-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 mr-2">نوع التواصل</label>
-                    <select className="w-full p-4 bg-white border-2 rounded-2xl font-black text-sm outline-none focus:border-blue-500 shadow-sm appearance-none" value={absenceForm.commType} onChange={e => setAbsenceForm({...absenceForm, commType: e.target.value as any})}>
+                    <label className="text-[9px] md:text-[10px] font-black text-slate-400 mr-2">نوع التواصل</label>
+                    <select className="w-full p-3 md:p-4 bg-white border-2 rounded-2xl font-black text-xs md:text-sm outline-none focus:border-blue-500 shadow-sm appearance-none" value={absenceForm.commType} onChange={e => setAbsenceForm({...absenceForm, commType: e.target.value as any})}>
                       {["هاتف", "واتساب", "رسالة", "أخرى"].map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 mr-2">حالة التواصل</label>
-                    <select className="w-full p-4 bg-white border-2 rounded-2xl font-black text-sm outline-none focus:border-blue-500 shadow-sm appearance-none" value={absenceForm.commStatus} onChange={e => setAbsenceForm({...absenceForm, commStatus: e.target.value as any})}>
+                    <label className="text-[9px] md:text-[10px] font-black text-slate-400 mr-2">حالة التواصل</label>
+                    <select className="w-full p-3 md:p-4 bg-white border-2 rounded-2xl font-black text-xs md:text-sm outline-none focus:border-blue-500 shadow-sm appearance-none" value={absenceForm.commStatus} onChange={e => setAbsenceForm({...absenceForm, commStatus: e.target.value as any})}>
                       {["تم التواصل", "لم يتم التواصل", "قيد المتابعة"].map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 mr-2">نتيجة التواصل</label>
-                    <select className="w-full p-4 bg-white border-2 rounded-2xl font-black text-sm outline-none focus:border-blue-500 shadow-sm appearance-none" value={absenceForm.result} onChange={e => setAbsenceForm({...absenceForm, result: e.target.value as any})}>
+                    <label className="text-[9px] md:text-[10px] font-black text-slate-400 mr-2">نتيجة التواصل</label>
+                    <select className="w-full p-3 md:p-4 bg-white border-2 rounded-2xl font-black text-xs md:text-sm outline-none focus:border-blue-500 shadow-sm appearance-none" value={absenceForm.result} onChange={e => setAbsenceForm({...absenceForm, result: e.target.value as any})}>
                       {["تم الرد", "لم يتم الرد", "الرقم مغلق", "سيحضر غداً"].map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 mr-2">صفة المجيب</label>
-                    <select className="w-full p-4 bg-white border-2 rounded-2xl font-black text-sm outline-none focus:border-blue-500 shadow-sm appearance-none" value={absenceForm.replier} onChange={e => setAbsenceForm({...absenceForm, replier: e.target.value as any})}>
+                    <label className="text-[9px] md:text-[10px] font-black text-slate-400 mr-2">صفة المجيب</label>
+                    <select className="w-full p-3 md:p-4 bg-white border-2 rounded-2xl font-black text-xs md:text-sm outline-none focus:border-blue-500 shadow-sm appearance-none" value={absenceForm.replier} onChange={e => setAbsenceForm({...absenceForm, replier: e.target.value as any})}>
                       {["الأب", "الأم", "الأخ", "الأخت", "العم", "الخال", "غيرهم"].map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </div>
                </div>
                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 mr-2">ملاحظات أخرى...</label>
-                  <textarea className="w-full p-4 border-2 rounded-2xl outline-none font-black text-sm bg-slate-50 min-h-[120px] focus:border-blue-400 shadow-inner" placeholder="ملاحظات إضافية..." value={absenceForm.notes} onChange={e => setAbsenceForm({...absenceForm, notes: e.target.value})} />
+                  <label className="text-[9px] md:text-[10px] font-black text-slate-400 mr-2">ملاحظات أخرى...</label>
+                  <textarea className="w-full p-3 md:p-4 border-2 rounded-2xl outline-none font-black text-xs md:text-sm bg-slate-50 min-h-[100px] md:min-h-[120px] focus:border-blue-400 shadow-inner" placeholder="ملاحظات إضافية..." value={absenceForm.notes} onChange={e => setAbsenceForm({...absenceForm, notes: e.target.value})} />
                </div>
-               <button onClick={saveLog} className="w-full bg-blue-600 text-white p-6 rounded-[2rem] font-black text-xl hover:bg-blue-700 shadow-2xl flex items-center justify-center gap-4 active:scale-[0.98] transition-all mt-4">
-                 <Save size={28}/> حفظ بيانات الغياب
+               <button onClick={saveLog} className="w-full bg-blue-600 text-white p-5 md:p-6 rounded-[2rem] font-black text-lg md:text-xl hover:bg-blue-700 shadow-2xl flex items-center justify-center gap-4 active:scale-[0.98] transition-all mt-4">
+                 <Save size={24}/> حفظ بيانات الغياب
                </button>
             </div>
           </div>
         ) : (
           <div className="space-y-6">
             <FilterSection suggestions={nameSugg} values={filterValues} setValues={setFilterValues} tempNames={tempNames} setTempNames={setTempNames} appliedNames={appliedNames} setAppliedNames={setAppliedNames} nameInput={nameInput} setNameInput={setNameInput} onExportExcel={() => exportExcelFiltered('غياب_الطلاب', filtered, cols)} onExportTxt={() => exportTxtFiltered('غياب_الطلاب', filtered, cols)} onExportWA={() => shareWhatsAppRich('سجل غياب الطلاب المفلتر', filtered, cols)} />
-            <div className="overflow-x-auto rounded-[2.5rem] border shadow-inner">
-               <table className="w-full text-center text-sm border-collapse min-w-[1200px]">
+            <div className="overflow-x-auto rounded-[1.5rem] border shadow-inner">
+               <table className="w-full text-center text-[10px] md:text-sm border-collapse min-w-[1000px]">
                   <thead className="bg-[#FFD966] text-slate-800 font-black">
-                     <tr>{cols.map(c => <th key={c.key} className="p-5 border-e">{c.label}</th>)}</tr>
+                     <tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e">{c.label}</th>)}</tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white font-bold">
-                     {filtered.length === 0 ? (<tr><td colSpan={8} className="p-20 text-slate-300 italic text-lg font-bold">لا توجد بيانات غياب مسجلة لهذه الاختيارات حالياً.</td></tr>) : filtered.map(l => (
-                       <tr key={l.id} className="hover:bg-blue-50/20 transition-colors h-12">
-                          <td className="p-4 border-e">{l.studentName}</td>
-                          <td className="p-4 border-e">{l.grade} / {l.section}</td>
-                          <td className="p-4 border-e text-red-600 font-black text-lg">{l.prevAbsenceCount + 1}</td>
-                          <td className="p-4 border-e text-xs text-slate-400">{l.date}</td>
-                          <td className="p-4 border-e">{l.reason}</td>
-                          <td className="p-4 border-e">{l.commStatus}</td>
-                          <td className="p-4 border-e">{l.replier}</td>
-                          <td className="p-4 text-xs text-slate-400">{l.notes}</td>
+                     {filtered.length === 0 ? (<tr><td colSpan={8} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد بيانات غياب مسجلة.</td></tr>) : filtered.map(l => (
+                       <tr key={l.id} className="hover:bg-blue-50/20 transition-colors h-10 md:h-12">
+                          <td className="p-2 md:p-4 border-e">{l.studentName}</td>
+                          <td className="p-2 md:p-4 border-e">{l.grade} / {l.section}</td>
+                          <td className="p-2 md:p-4 border-e text-red-600 font-black text-base">{l.prevAbsenceCount + 1}</td>
+                          <td className="p-2 md:p-4 border-e text-[10px] text-slate-400">{l.date}</td>
+                          <td className="p-2 md:p-4 border-e">{l.reason}</td>
+                          <td className="p-2 md:p-4 border-e">{l.commStatus}</td>
+                          <td className="p-2 md:p-4 border-e">{l.replier}</td>
+                          <td className="p-2 md:p-4 text-[10px] text-slate-400">{l.notes}</td>
                        </tr>
                      ))}
                   </tbody>
@@ -451,7 +440,6 @@ const SpecialReportsPage: React.FC = () => {
     );
   };
 
-  // START OF CHANGE - Requirement: Lateness Log (3, 4)
   const renderLatenessModule = () => {
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
@@ -472,7 +460,6 @@ const SpecialReportsPage: React.FC = () => {
       { id: 'permanent', label: 'دائم التأخر', color: 'bg-slate-100' }
     ];
 
-    // START OF CHANGE - Selection Logic
     const handleSelectStudent = (s: StudentReport) => {
       setLatenessForm({ 
         ...latenessForm, 
@@ -484,7 +471,6 @@ const SpecialReportsPage: React.FC = () => {
       });
       setSearchQuery(s.name);
     };
-    // END OF CHANGE
 
     const saveLog = () => {
       if (!latenessForm.studentId) return alert('يرجى اختيار طالب أولاً');
@@ -505,45 +491,45 @@ const SpecialReportsPage: React.FC = () => {
     ];
 
     return (
-      <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
-        {/* START OF CHANGE - Frequent Names Picker */}
+      <div className="bg-white p-4 md:p-8 rounded-[2.5rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
         <FrequentNamesPicker 
           logs={data.latenessLogs || []} 
-          onSelect={(name) => {
-            const s = students.find(x => x.name === name);
-            if (s) handleSelectStudent(s);
-          }}
+          onSelectQuery={(q) => setSearchQuery(q)}
         />
-        {/* END OF CHANGE */}
-        <div className="flex justify-between items-center mb-6 border-b pb-4">
-           <div className="flex gap-2">
-              <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-blue-100 transition-all flex items-center gap-2">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
+           <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
+              <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-blue-100 transition-all flex items-center gap-2">
                 {showTable ? <Plus size={18}/> : <History size={18}/>}
                 {showTable ? 'رصد جديد' : 'أرشيف التأخر'}
               </button>
-              {/* START OF CHANGE - Frequent Button */}
               {!showTable && (
-                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
                   <RefreshCw size={18}/> الأسماء المتكررة
                 </button>
               )}
-              {/* END OF CHANGE */}
-              <button onClick={() => setActiveSubTab(null)} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={20}/></button>
+              <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={18}/></button>
            </div>
-           <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
-              تأخر يوم {getDayName(latenessForm.date || today)} بتاريخ {latenessForm.date} <Clock className="text-orange-500" size={24}/>
-           </h2>
+           <div className="flex flex-col items-center md:items-end w-full md:w-auto">
+              <h2 className="text-xl md:text-2xl font-black text-slate-800 flex items-center gap-3">
+                 تقرير التأخر اليومي <Clock className="text-orange-500" size={24}/>
+              </h2>
+              <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                <Calendar size={14} className="text-slate-400" />
+                <input type="date" className="text-[10px] md:text-xs font-black bg-transparent outline-none" value={latenessForm.date} onChange={e => setLatenessForm({...latenessForm, date: e.target.value})} />
+                <span className="text-[10px] font-bold text-slate-400">{getDayName(latenessForm.date || today)}</span>
+              </div>
+           </div>
         </div>
 
         {!showTable ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
             <div className="space-y-6">
-               <div className="flex flex-wrap gap-2 justify-end">
+               <div className="flex flex-wrap gap-1.5 md:gap-2 justify-end">
                   {statusOptions.map(opt => (
                     <button 
                       key={opt.id} 
                       onClick={() => setLatenessForm({...latenessForm, status: opt.id as any})}
-                      className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all border ${latenessForm.status === opt.id ? 'bg-orange-500 text-white border-orange-500 shadow-lg scale-105' : 'bg-slate-50 text-slate-500 border-slate-100'}`}
+                      className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black transition-all border ${latenessForm.status === opt.id ? 'bg-orange-500 text-white border-orange-500 shadow-lg scale-105' : 'bg-slate-50 text-slate-500 border-slate-100'}`}
                     >
                       {opt.label}
                     </button>
@@ -551,29 +537,29 @@ const SpecialReportsPage: React.FC = () => {
                </div>
                <div className="relative">
                   <label className="text-xs font-black text-slate-400 mb-2 block mr-2">اسم الطالب</label>
-                  <div className="flex items-center gap-3 bg-white border-2 rounded-2xl p-4 focus-within:border-orange-500 shadow-sm transition-all">
+                  <div className="flex items-center gap-3 bg-white border-2 rounded-2xl p-3 md:p-4 focus-within:border-orange-500 shadow-sm transition-all">
                     <UserCircle className="text-slate-400" size={20}/>
-                    <input type="text" className="bg-transparent w-full outline-none font-black text-lg" placeholder="ابحث عن الاسم..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                    <input type="text" className="bg-transparent w-full outline-none font-black text-base md:text-lg" placeholder="ابحث عن الاسم..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                   </div>
                   {suggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 z-[100] bg-white border-2 rounded-2xl shadow-2xl mt-2 max-h-48 overflow-y-auto">
                       {suggestions.map(s => (
-                        <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-4 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center">
-                          <span>{s.name}</span>
-                          <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span>
+                        <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-3 md:p-4 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center transition-colors">
+                          <span className="text-xs md:text-sm">{s.name}</span>
+                          <span className="text-[9px] md:text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span>
                         </button>
                       ))}
                     </div>
                   )}
                </div>
-               <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-[#FFF2CC]/30 p-5 rounded-3xl border-2 border-[#FFF2CC] text-center shadow-sm">
-                    <label className="text-[10px] font-black text-orange-600 mb-1 block">تأخر سابق</label>
-                    <span className="text-3xl font-black text-slate-800">{latenessForm.prevLatenessCount || 0}</span>
+               <div className="grid grid-cols-2 gap-3 md:gap-4">
+                  <div className="bg-[#FFF2CC]/30 p-4 md:p-5 rounded-3xl border-2 border-[#FFF2CC] text-center shadow-sm">
+                    <label className="text-[9px] md:text-[10px] font-black text-orange-600 mb-1 block">تأخر سابق</label>
+                    <span className="text-2xl md:text-3xl font-black text-slate-800">{latenessForm.prevLatenessCount || 0}</span>
                   </div>
-                  <div className="bg-blue-50 p-5 rounded-3xl border-2 border-blue-100 relative shadow-sm">
-                     <label className="text-[10px] font-black text-blue-600 mb-1 block">الفصل</label>
-                     <select className="w-full bg-transparent text-xl font-black outline-none cursor-pointer" value={latenessForm.semester} onChange={e => setLatenessForm({...latenessForm, semester: e.target.value as any})}>
+                  <div className="bg-blue-50 p-4 md:p-5 rounded-3xl border-2 border-blue-100 relative shadow-sm text-center">
+                     <label className="text-[9px] md:text-[10px] font-black text-blue-600 mb-1 block">الفصل</label>
+                     <select className="bg-white border text-[10px] md:text-xs font-black p-1 md:p-2 rounded-lg outline-none cursor-pointer w-full text-center" value={latenessForm.semester} onChange={e => setLatenessForm({...latenessForm, semester: e.target.value as any})}>
                         <option value="الأول">الأول</option><option value="الثاني">الثاني</option>
                      </select>
                   </div>
@@ -582,7 +568,7 @@ const SpecialReportsPage: React.FC = () => {
                   <label className="text-xs font-black text-slate-400 mr-2 block">سبب التأخر</label>
                   <div className="flex flex-wrap gap-2 justify-end">
                     {reasons.map(r => (
-                      <button key={r} onClick={() => setLatenessForm({...latenessForm, reason: r})} className={`px-4 py-2 rounded-xl text-[10px] font-black border transition-all ${latenessForm.reason === r ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>{r}</button>
+                      <button key={r} onClick={() => setLatenessForm({...latenessForm, reason: r})} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black border transition-all ${latenessForm.reason === r ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>{r}</button>
                     ))}
                     <input className="px-4 py-2 rounded-xl text-[10px] font-black border outline-none bg-slate-50 w-full focus:ring-2 ring-blue-100" placeholder="سبب آخر..." value={latenessForm.reason} onChange={e => setLatenessForm({...latenessForm, reason: e.target.value})} />
                   </div>
@@ -590,39 +576,39 @@ const SpecialReportsPage: React.FC = () => {
             </div>
             <div className="space-y-6">
                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 mr-2">الإجراء المتخذ</label>
-                  <select className="w-full p-5 bg-white border-2 rounded-3xl font-black text-lg outline-none focus:border-orange-500 shadow-sm appearance-none" value={latenessForm.action} onChange={e => setLatenessForm({...latenessForm, action: e.target.value})}>
+                  <label className="text-[9px] md:text-[10px] font-black text-slate-400 mr-2">الإجراء المتخذ</label>
+                  <select className="w-full p-4 md:p-5 bg-white border-2 rounded-2xl md:rounded-3xl font-black text-base md:text-lg outline-none focus:border-orange-500 shadow-sm appearance-none" value={latenessForm.action} onChange={e => setLatenessForm({...latenessForm, action: e.target.value})}>
                     {["تنبيه 1", "تنبيه 2", "تعهد خطي", "اتصال بولي الأمر", "استدعاء ولي الأمر"].map(a => <option key={a} value={a}>{a}</option>)}
                   </select>
                </div>
-               <div className="p-8 bg-[#0f172a] text-white rounded-[2.5rem] shadow-2xl space-y-4 border-4 border-slate-800 relative group overflow-hidden">
+               <div className="p-6 md:p-8 bg-[#0f172a] text-white rounded-[2.5rem] shadow-2xl space-y-4 border-4 border-slate-800 relative group overflow-hidden">
                   <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-500/10 rounded-full group-hover:scale-150 transition-all duration-700"></div>
-                  <h4 className="flex items-center gap-2 font-black text-lg"><Fingerprint className="text-orange-500"/> بصمة الطالب (تعهد)</h4>
-                  <p className="text-[10px] font-bold text-slate-400 leading-relaxed">أتعهد بعدم تكرار التأخر وفي حالة التكرار فللإدارة الحق في اتخاذ اللازم.</p>
-                  <button onClick={() => setLatenessForm({...latenessForm, pledge: 'تم التوقيع'})} className={`w-full p-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 shadow-lg ${latenessForm.pledge ? 'bg-green-600 border-none' : 'bg-white text-slate-800 hover:scale-[1.02] active:scale-95'}`}>
+                  <h4 className="flex items-center gap-2 font-black text-base md:text-lg"><Fingerprint className="text-orange-500"/> بصمة الطالب (تعهد)</h4>
+                  <p className="text-[9px] md:text-[10px] font-bold text-slate-400 leading-relaxed">أتعهد بعدم تكرار التأخر وفي حالة التكرار فللإدارة الحق في اتخاذ اللازم.</p>
+                  <button onClick={() => setLatenessForm({...latenessForm, pledge: 'تم التوقيع'})} className={`w-full p-3 md:p-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 shadow-lg text-xs md:text-base ${latenessForm.pledge ? 'bg-green-600 border-none' : 'bg-white text-slate-800 hover:scale-[1.02] active:scale-95'}`}>
                     {latenessForm.pledge ? <CheckCircle size={20}/> : <Zap size={18} className="text-orange-500"/>}
                     {latenessForm.pledge || 'توقيع البصمة'}
                   </button>
                </div>
-               <button onClick={saveLog} className="w-full bg-[#1e293b] text-white p-6 rounded-[2rem] font-black text-xl hover:bg-black shadow-2xl flex items-center justify-center gap-4 active:scale-[0.98] transition-all mt-4">حفظ البيانات</button>
+               <button onClick={saveLog} className="w-full bg-[#1e293b] text-white p-5 md:p-6 rounded-[2rem] font-black text-lg md:text-xl hover:bg-black shadow-2xl flex items-center justify-center gap-4 active:scale-[0.98] transition-all mt-4">حفظ البيانات</button>
             </div>
           </div>
         ) : (
           <div className="space-y-6">
             <FilterSection suggestions={nameSugg} values={filterValues} setValues={setFilterValues} tempNames={tempNames} setTempNames={setTempNames} appliedNames={appliedNames} setAppliedNames={setAppliedNames} nameInput={nameInput} setNameInput={setNameInput} onExportExcel={() => exportExcelFiltered('تأخر_الطلاب', filtered, cols)} onExportTxt={() => exportTxtFiltered('تأخر_الطلاب', filtered, cols)} onExportWA={() => shareWhatsAppRich('سجل تأخر الطلاب المفلتر', filtered, cols)} />
-            <div className="overflow-x-auto rounded-[2.5rem] border shadow-inner">
-               <table className="w-full text-center text-sm border-collapse min-w-[1000px]">
+            <div className="overflow-x-auto rounded-[1.5rem] border shadow-inner">
+               <table className="w-full text-center text-[10px] md:text-sm border-collapse min-w-[1000px]">
                   <thead className="bg-[#FFD966] text-slate-800 font-black">
-                     <tr>{cols.map(c => <th key={c.key} className="p-5 border-e">{c.label}</th>)}</tr>
+                     <tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e">{c.label}</th>)}</tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white font-bold">
-                     {filtered.length === 0 ? (<tr><td colSpan={5} className="p-20 text-slate-300 italic text-lg font-bold">لا توجد سجلات تأخر لهذه الفترة حالياً.</td></tr>) : filtered.map(l => (
-                       <tr key={l.id} className="hover:bg-orange-50/20 transition-colors h-12">
-                          <td className="p-4 border-e">{l.studentName}</td>
-                          <td className="p-4 border-e text-xs text-slate-400">{l.date}</td>
-                          <td className="p-4 border-e">{l.reason}</td>
-                          <td className="p-4 border-e text-red-600">{l.action}</td>
-                          <td className="p-4 text-[10px] text-green-600">{l.pledge || '---'}</td>
+                     {filtered.length === 0 ? (<tr><td colSpan={5} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد سجلات تأخر.</td></tr>) : filtered.map(l => (
+                       <tr key={l.id} className="hover:bg-orange-50/20 transition-colors h-10 md:h-12">
+                          <td className="p-2 md:p-4 border-e">{l.studentName}</td>
+                          <td className="p-2 md:p-4 border-e text-[10px] text-slate-400">{l.date}</td>
+                          <td className="p-2 md:p-4 border-e">{l.reason}</td>
+                          <td className="p-2 md:p-4 border-e text-red-600">{l.action}</td>
+                          <td className="p-2 md:p-4 text-[10px] text-green-600">{l.pledge || '---'}</td>
                        </tr>
                      ))}
                   </tbody>
@@ -634,7 +620,6 @@ const SpecialReportsPage: React.FC = () => {
     );
   };
 
-  // START OF CHANGE - Requirement: Student Violation (5, 6, 7)
   const renderViolationModule = () => {
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
@@ -661,12 +646,10 @@ const SpecialReportsPage: React.FC = () => {
       setViolationForm({ ...violationForm, [field]: updated });
     };
 
-    // START OF CHANGE - Selection Logic
     const handleSelectStudent = (s: StudentReport) => {
       setViolationForm({ ...violationForm, studentId: s.id, studentName: s.name, grade: s.grade, section: s.section });
       setSearchQuery(s.name);
     };
-    // END OF CHANGE
 
     const saveLog = () => {
       if (!violationForm.studentId) return alert('يرجى اختيار طالب أولاً');
@@ -684,47 +667,47 @@ const SpecialReportsPage: React.FC = () => {
     ];
 
     return (
-      <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
-        {/* START OF CHANGE - Frequent Names Picker */}
+      <div className="bg-white p-4 md:p-8 rounded-[2.5rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
         <FrequentNamesPicker 
           logs={data.studentViolationLogs || []} 
-          onSelect={(name) => {
-            const s = students.find(x => x.name === name);
-            if (s) handleSelectStudent(s);
-          }}
+          onSelectQuery={(q) => setSearchQuery(q)}
         />
-        {/* END OF CHANGE */}
-        <div className="flex justify-between items-center mb-6 border-b pb-4">
-           <div className="flex gap-2">
-              <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-blue-100 transition-all flex items-center gap-2">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
+           <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
+              <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-blue-100 transition-all flex items-center gap-2">
                 {showTable ? <Plus size={18}/> : <ShieldAlert size={18}/>}
                 {showTable ? 'رصد جديد' : 'جدول المخالفات'}
               </button>
-              {/* START OF CHANGE - Frequent Button */}
               {!showTable && (
-                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
                   <RefreshCw size={18}/> الأسماء المتكررة
                 </button>
               )}
-              {/* END OF CHANGE */}
-              <button onClick={() => setActiveSubTab(null)} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={20}/></button>
+              <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={18}/></button>
            </div>
-           <h2 className="text-2xl font-black text-red-600 flex items-center gap-3">سجل المخالفات الطلابية <AlertCircle size={24}/></h2>
+           <div className="flex flex-col items-center md:items-end w-full md:w-auto">
+              <h2 className="text-xl md:text-2xl font-black text-red-600 flex items-center gap-3">سجل المخالفات الطلابية <AlertCircle size={24}/></h2>
+              <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                <Calendar size={14} className="text-slate-400" />
+                <input type="date" className="text-[10px] md:text-xs font-black bg-transparent outline-none" value={violationForm.date} onChange={e => setViolationForm({...violationForm, date: e.target.value})} />
+                <span className="text-[10px] font-bold text-slate-400">{getDayName(violationForm.date || today)}</span>
+              </div>
+           </div>
         </div>
 
         {!showTable ? (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+          <div className="space-y-6 md:space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 bg-slate-50/50 p-4 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm">
                <div className="relative md:col-span-1">
-                  <label className="text-[10px] font-black text-slate-400 mb-1 block mr-2">اسم الطالب</label>
-                  <div className="flex items-center gap-3 bg-white border-2 rounded-2xl p-4 focus-within:border-blue-500 shadow-sm transition-all">
-                    <input type="text" className="bg-transparent w-full outline-none font-black text-sm" placeholder="ابحث عن الاسم..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                  <label className="text-[9px] md:text-[10px] font-black text-slate-400 mb-1 block mr-2">اسم الطالب</label>
+                  <div className="flex items-center gap-3 bg-white border-2 rounded-2xl p-3 md:p-4 focus-within:border-blue-500 shadow-sm transition-all">
+                    <input type="text" className="bg-transparent w-full outline-none font-black text-sm md:text-base" placeholder="ابحث عن الاسم..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                   </div>
                   {suggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 z-[100] bg-white border-2 rounded-2xl shadow-2xl mt-2 max-h-40 overflow-y-auto">
                       {suggestions.map(s => (
-                        <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-3 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center text-[11px] transition-colors">
-                          <span>{s.name}</span><span className="text-[9px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade}</span>
+                        <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-3 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center text-[10px] md:text-[11px] transition-colors">
+                          <span>{s.name}</span><span className="text-[8px] md:text-[9px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade}</span>
                         </button>
                       ))}
                     </div>
@@ -732,84 +715,85 @@ const SpecialReportsPage: React.FC = () => {
                </div>
                <div className="grid grid-cols-2 gap-4 md:col-span-1">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 mr-2">الفصل</label>
-                    <select className="w-full p-4 bg-white border-2 rounded-2xl font-black text-xs outline-none focus:border-blue-500 appearance-none shadow-sm cursor-pointer" value={violationForm.semester} onChange={e => setViolationForm({...violationForm, semester: e.target.value as any})}>
+                    <label className="text-[9px] md:text-[10px] font-black text-slate-400 mr-2">الفصل</label>
+                    <select className="w-full p-3 md:p-4 bg-white border-2 rounded-2xl font-black text-[10px] md:text-xs outline-none focus:border-blue-500 appearance-none shadow-sm cursor-pointer" value={violationForm.semester} onChange={e => setViolationForm({...violationForm, semester: e.target.value as any})}>
                       <option value="الأول">الأول</option><option value="الثاني">الثاني</option>
                     </select>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 mr-2">التاريخ</label>
-                    <input type="date" className="w-full p-4 bg-white border-2 rounded-2xl font-black text-xs outline-none focus:border-blue-500 shadow-sm" value={violationForm.date} onChange={e => setViolationForm({...violationForm, date: e.target.value})} />
+                  <div className="flex items-end justify-center bg-white border-2 rounded-2xl p-2 h-[52px] md:h-[60px] shadow-sm">
+                    <div className="text-center w-full">
+                       <label className="text-[8px] block text-red-400">إجمالي السوابق</label>
+                       <span className="font-black text-red-600 text-xs md:text-sm">{(data.studentViolationLogs || []).filter(l => l.studentId === violationForm.studentId).length}</span>
+                    </div>
                   </div>
                </div>
-               <div className="grid grid-cols-3 gap-2 md:col-span-1">
-                  <div className="bg-white p-3 rounded-2xl border text-center shadow-sm"><label className="text-[8px] block text-slate-400">الصف</label><span className="font-black text-xs">{violationForm.grade || '---'}</span></div>
-                  <div className="bg-white p-3 rounded-2xl border text-center shadow-sm"><label className="text-[8px] block text-slate-400">الشعبة</label><span className="font-black text-xs">{violationForm.section || '---'}</span></div>
-                  <div className="bg-white p-3 rounded-2xl border border-red-100 text-center shadow-sm"><label className="text-[8px] block text-red-400">إجمالي السوابق</label><span className="font-black text-red-600 text-xs">{(data.studentViolationLogs || []).filter(l => l.studentId === violationForm.studentId).length}</span></div>
+               <div className="grid grid-cols-2 gap-2 md:col-span-1">
+                  <div className="bg-white p-2 rounded-2xl border text-center shadow-sm flex flex-col justify-center"><label className="text-[8px] block text-slate-400">الصف</label><span className="font-black text-[10px] md:text-xs">{violationForm.grade || '---'}</span></div>
+                  <div className="bg-white p-2 rounded-2xl border text-center shadow-sm flex flex-col justify-center"><label className="text-[8px] block text-slate-400">الشعبة</label><span className="font-black text-[10px] md:text-xs">{violationForm.section || '---'}</span></div>
                </div>
             </div>
-            <div className="flex flex-wrap gap-2 justify-center">
+            <div className="flex flex-wrap gap-1.5 md:gap-2 justify-center">
                {[{id: 'blacklist', label: 'القائمة السوداء'}, {id: 'high', label: 'كثير المخالفة'}, {id: 'medium', label: 'متوسط'}, {id: 'rare', label: 'نادر'}].map(opt => (
-                 <button key={opt.id} onClick={() => setViolationForm({...violationForm, status: opt.id as any})} className={`px-8 py-3 rounded-2xl font-black text-xs border-2 transition-all ${violationForm.status === opt.id ? 'bg-red-600 border-red-600 text-white shadow-xl scale-105' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>{opt.label}</button>
+                 <button key={opt.id} onClick={() => setViolationForm({...violationForm, status: opt.id as any})} className={`flex-1 md:flex-none px-4 md:px-8 py-2 md:py-3 rounded-2xl font-black text-[10px] md:text-xs border-2 transition-all ${violationForm.status === opt.id ? 'bg-red-600 border-red-600 text-white shadow-xl scale-105' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>{opt.label}</button>
                ))}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                {categories.map(cat => (
-                 <div key={cat.id} className="bg-white p-6 rounded-[2.5rem] border-2 shadow-sm space-y-4 hover:border-slate-300 transition-colors">
+                 <div key={cat.id} className="bg-white p-4 md:p-6 rounded-[2rem] border-2 shadow-sm space-y-3 md:space-y-4 hover:border-slate-300 transition-colors">
                     <div className="flex items-center justify-between border-r-4 pr-3 py-1 mb-2" style={{ borderColor: cat.color.split('-')[1] }}>
-                       <h3 className="font-black text-sm text-slate-800">{cat.label}</h3>
-                       <button className={`p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 transition-all ${cat.iconColor}`}><Plus size={16}/></button>
+                       <h3 className="font-black text-xs md:text-sm text-slate-800">{cat.label}</h3>
+                       <button className={`p-1 rounded-lg bg-slate-50 hover:bg-slate-100 transition-all ${cat.iconColor}`}><Plus size={14}/></button>
                     </div>
-                    <div className="space-y-2">
+                    <div className="grid grid-cols-2 md:grid-cols-1 gap-1.5 md:space-y-2">
                        {cat.items.map(item => (
-                         <button key={item} onClick={() => toggleItem(cat.id, item)} className={`w-full text-right p-3 rounded-xl text-[10px] font-black border transition-all ${ (violationForm[cat.id === 'behavior' ? 'behaviorViolations' : cat.id === 'duties' ? 'dutiesViolations' : 'achievementViolations'] || []).includes(item) ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-slate-50 text-slate-500 border-slate-50 hover:bg-slate-100' }`}>{item}</button>
+                         <button key={item} onClick={() => toggleItem(cat.id, item)} className={`text-right p-2 md:p-3 rounded-xl text-[9px] md:text-[10px] font-black border transition-all ${ (violationForm[cat.id === 'behavior' ? 'behaviorViolations' : cat.id === 'duties' ? 'dutiesViolations' : 'achievementViolations'] || []).includes(item) ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-slate-50 text-slate-500 border-slate-50 hover:bg-slate-100' }`}>{item}</button>
                        ))}
                     </div>
                  </div>
                ))}
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 border-t pt-10">
-               <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10 border-t pt-8 md:pt-10">
+               <div className="space-y-4 md:space-y-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 mr-2">الإجراء المتخذ</label>
-                    <select className="w-full p-5 bg-white border-2 rounded-3xl font-black text-lg outline-none focus:border-red-500 shadow-sm appearance-none appearance-none cursor-pointer" value={violationForm.action} onChange={e => setViolationForm({...violationForm, action: e.target.value})}>
+                    <label className="text-[9px] md:text-[10px] font-black text-slate-400 mr-2">الإجراء المتخذ</label>
+                    <select className="w-full p-4 md:p-5 bg-white border-2 rounded-2xl md:rounded-3xl font-black text-base md:text-lg outline-none focus:border-red-500 shadow-sm appearance-none cursor-pointer" value={violationForm.action} onChange={e => setViolationForm({...violationForm, action: e.target.value})}>
                       {["تنبيه 1", "تنبيه 2", "تعهد خطي", "استدعاء ولي الأمر", "فصل مؤقت"].map(a => <option key={a} value={a}>{a}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 mr-2">ملاحظات إضافية...</label>
-                    <textarea className="w-full p-4 border-2 rounded-2xl outline-none font-black text-xs bg-slate-50 min-h-[100px] focus:border-red-400 shadow-inner" placeholder="..." value={violationForm.notes} onChange={e => setViolationForm({...violationForm, notes: e.target.value})} />
+                    <label className="text-[9px] md:text-[10px] font-black text-slate-400 mr-2">ملاحظات إضافية...</label>
+                    <textarea className="w-full p-4 border-2 rounded-2xl outline-none font-black text-[10px] md:text-xs bg-slate-50 min-h-[80px] md:min-h-[100px] focus:border-red-400 shadow-inner" placeholder="..." value={violationForm.notes} onChange={e => setViolationForm({...violationForm, notes: e.target.value})} />
                   </div>
                </div>
-               <div className="p-10 bg-red-600 text-white rounded-[3rem] shadow-2xl space-y-6 relative group overflow-hidden border-4 border-red-700">
+               <div className="p-6 md:p-10 bg-red-600 text-white rounded-[2.5rem] md:rounded-[3rem] shadow-2xl space-y-4 md:space-y-6 relative group overflow-hidden border-4 border-red-700">
                   <div className="absolute -top-12 -right-12 w-48 h-48 bg-white/10 rounded-full group-hover:scale-150 transition-all duration-1000"></div>
-                  <h4 className="flex items-center gap-3 font-black text-2xl"><Fingerprint size={32}/> بصمة الطالب (تعهد)</h4>
-                  <p className="text-xs font-bold leading-relaxed opacity-90">أتعهد بعدم تكرار المخالفة وفي حالة التكرار فللإدارة الحق في اتخاذ اللازم.</p>
-                  <button onClick={() => setViolationForm({...violationForm, pledge: 'تم التبصيم بنجاح'})} className={`w-full p-5 rounded-2xl font-black text-xl transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${violationForm.pledge ? 'bg-green-500 border-none' : 'bg-white/10 border-2 border-white/20 backdrop-blur-md hover:bg-white/20'}`}>
+                  <h4 className="flex items-center gap-3 font-black text-xl md:text-2xl"><Fingerprint size={32}/> بصمة الطالب (تعهد)</h4>
+                  <p className="text-[10px] md:text-xs font-bold leading-relaxed opacity-90">أتعهد بعدم تكرار المخالفة وفي حالة التكرار فللإدارة الحق في اتخاذ اللازم.</p>
+                  <button onClick={() => setViolationForm({...violationForm, pledge: 'تم التبصيم بنجاح'})} className={`w-full p-4 md:p-5 rounded-2xl font-black text-base md:text-xl transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${violationForm.pledge ? 'bg-green-500 border-none' : 'bg-white/10 border-2 border-white/20 backdrop-blur-md hover:bg-white/20'}`}>
                     {violationForm.pledge ? <CheckCircle size={24}/> : <Zap size={22}/>}
                     {violationForm.pledge || 'اعتماد التبصيم'}
                   </button>
                </div>
             </div>
-            <button onClick={saveLog} className="w-full bg-red-600 text-white p-7 rounded-[2.5rem] font-black text-2xl hover:bg-red-700 shadow-2xl active:scale-[0.98] transition-all">حفظ السجل</button>
+            <button onClick={saveLog} className="w-full bg-red-600 text-white p-5 md:p-7 rounded-[2rem] md:rounded-[2.5rem] font-black text-xl md:text-2xl hover:bg-red-700 shadow-2xl active:scale-[0.98] transition-all">حفظ السجل</button>
           </div>
         ) : (
           <div className="space-y-6">
             <FilterSection suggestions={nameSugg} values={filterValues} setValues={setFilterValues} tempNames={tempNames} setTempNames={setTempNames} appliedNames={appliedNames} setAppliedNames={setAppliedNames} nameInput={nameInput} setNameInput={setNameInput} onExportExcel={() => exportExcelFiltered('مخالفات_الطلاب', filtered, cols)} onExportTxt={() => exportTxtFiltered('مخالفات_الطلاب', filtered, cols)} onExportWA={() => shareWhatsAppRich('سجل مخالفات الطلاب المفلتر', filtered, cols)} />
-            <div className="overflow-x-auto rounded-[3rem] border-4 border-slate-50 shadow-inner">
-               <table className="w-full text-center text-sm border-collapse min-w-[1200px]">
+            <div className="overflow-x-auto rounded-[1.5rem] md:rounded-[3rem] border shadow-inner">
+               <table className="w-full text-center text-[10px] md:text-sm border-collapse min-w-[1000px]">
                   <thead className="bg-[#FFD966] text-slate-800 font-black sticky top-0">
-                     <tr>{cols.map(c => <th key={c.key} className="p-6 border-e border-slate-200">{c.label}</th>)}</tr>
+                     <tr>{cols.map(c => <th key={c.key} className="p-4 md:p-6 border-e border-slate-200">{c.label}</th>)}</tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white font-bold">
-                     {filtered.length === 0 ? (<tr><td colSpan={6} className="p-24 text-slate-300 italic text-xl font-bold">لا توجد مخالفات مسجلة في هذه الفترة حالياً.</td></tr>) : filtered.map(l => (
-                       <tr key={l.id} className="hover:bg-red-50/20 transition-colors h-14">
-                          <td className="p-5 border-e">{l.studentName}</td>
-                          <td className="p-5 border-e">{l.grade} / {l.section}</td>
-                          <td className="p-5 border-e text-red-600 font-black text-xl">{l.totalViolations}</td>
-                          <td className="p-5 border-e text-xs text-slate-400">{l.date}</td>
-                          <td className="p-5 border-e"><span className="px-3 py-1 bg-slate-100 rounded-lg text-[10px] font-black uppercase">{l.status}</span></td>
-                          <td className="p-5 text-red-700 font-black">{l.action}</td>
+                     {filtered.length === 0 ? (<tr><td colSpan={6} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد مخالفات مسجلة.</td></tr>) : filtered.map(l => (
+                       <tr key={l.id} className="hover:bg-red-50/20 transition-colors h-12 md:h-14">
+                          <td className="p-3 md:p-5 border-e">{l.studentName}</td>
+                          <td className="p-3 md:p-5 border-e">{l.grade} / {l.section}</td>
+                          <td className="p-3 md:p-5 border-e text-red-600 font-black text-lg">{l.totalViolations}</td>
+                          <td className="p-3 md:p-5 border-e text-[10px] text-slate-400">{l.date}</td>
+                          <td className="p-3 md:p-5 border-e"><span className="px-3 py-1 bg-slate-100 rounded-lg text-[8px] md:text-[10px] font-black uppercase">{l.status}</span></td>
+                          <td className="p-3 md:p-5 text-red-700 font-black">{l.action}</td>
                        </tr>
                      ))}
                   </tbody>
@@ -821,7 +805,6 @@ const SpecialReportsPage: React.FC = () => {
     );
   };
 
-  // START OF CHANGE - Requirement: Student Exit (8, 9)
   const renderExitModule = () => {
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
@@ -835,7 +818,6 @@ const SpecialReportsPage: React.FC = () => {
       return true;
     });
 
-    // START OF CHANGE - Selection Logic
     const handleSelectStudent = (s: StudentReport) => {
       setExitForm({ 
         ...exitForm, 
@@ -847,7 +829,6 @@ const SpecialReportsPage: React.FC = () => {
       });
       setSearchQuery(s.name);
     };
-    // END OF CHANGE
 
     const saveLog = () => {
       if (!exitForm.studentId) return alert('يرجى اختيار طالب أولاً');
@@ -865,67 +846,72 @@ const SpecialReportsPage: React.FC = () => {
     ];
 
     return (
-      <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
-        {/* START OF CHANGE - Frequent Names Picker */}
+      <div className="bg-white p-4 md:p-8 rounded-[2.5rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
         <FrequentNamesPicker 
           logs={data.exitLogs || []} 
-          onSelect={(name) => {
-            const s = students.find(x => x.name === name);
-            if (s) handleSelectStudent(s);
-          }}
+          onSelectQuery={(q) => setSearchQuery(q)}
         />
-        {/* END OF CHANGE */}
-        <div className="flex justify-between items-center mb-6 border-b pb-4">
-           <div className="flex gap-2">
-              <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-blue-100 transition-all flex items-center gap-2 shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
+           <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
+              <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-blue-100 transition-all flex items-center gap-2">
                 {showTable ? <Plus size={18}/> : <LayoutList size={18}/>}
                 {showTable ? 'رصد خروج جديد' : 'جدول الخروج'}
               </button>
-              {/* START OF CHANGE - Frequent Button */}
               {!showTable && (
-                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
                   <RefreshCw size={18}/> الأسماء المتكررة
                 </button>
               )}
-              {/* END OF CHANGE */}
-              <button onClick={() => setActiveSubTab(null)} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={20}/></button>
+              <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={18}/></button>
            </div>
-           <h2 className="text-2xl font-black text-blue-600 flex items-center gap-3">خروج طالب أثناء الدراسة <UserPlus size={24}/></h2>
+           <div className="flex flex-col items-center md:items-end w-full md:w-auto">
+              <h2 className="text-xl md:text-2xl font-black text-blue-600 flex items-center gap-3">خروج طالب أثناء الدراسة <UserPlus size={24}/></h2>
+              <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                <Calendar size={14} className="text-slate-400" />
+                <input type="date" className="text-[10px] md:text-xs font-black bg-transparent outline-none" value={exitForm.date} onChange={e => setExitForm({...exitForm, date: e.target.value})} />
+                <span className="text-[10px] font-bold text-slate-400">{getDayName(exitForm.date || today)}</span>
+              </div>
+           </div>
         </div>
 
         {!showTable ? (
           <div className="space-y-6">
             <div className="relative">
               <label className="text-xs font-black text-slate-400 mb-2 block mr-2">ابحث عن الطالب</label>
-              <div className="flex items-center gap-3 bg-white border-2 rounded-2xl p-4 focus-within:border-blue-500 shadow-sm transition-all">
-                <Search size={20} className="text-slate-400"/><input type="text" className="bg-transparent w-full outline-none font-black text-lg" placeholder="اكتب الاسم هنا..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+              <div className="flex items-center gap-3 bg-white border-2 rounded-2xl p-3 md:p-4 focus-within:border-blue-500 shadow-sm transition-all">
+                <Search size={20} className="text-slate-400"/><input type="text" className="bg-transparent w-full outline-none font-black text-base md:text-lg" placeholder="اكتب الاسم هنا..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
               </div>
               {suggestions.length > 0 && (
                 <div className="absolute top-full left-0 right-0 z-[100] bg-white border-2 rounded-2xl shadow-2xl mt-2 max-h-64 overflow-y-auto">
                   {suggestions.map(s => (
-                    <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-4 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center transition-colors"><span>{s.name}</span> <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span></button>
+                    <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-3 md:p-4 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center transition-colors"><span className="text-xs md:text-sm">{s.name}</span> <span className="text-[9px] md:text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span></button>
                   ))}
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-2xl border-2 shadow-sm text-center"><label className="text-[10px] block text-slate-400 mb-1">الصف</label><span className="font-black text-lg text-slate-700">{exitForm.grade || '---'}</span></div>
-              <div className="bg-white p-4 rounded-2xl border-2 shadow-sm text-center"><label className="text-[10px] block text-slate-400 mb-1">الشعبة</label><span className="font-black text-lg text-slate-700">{exitForm.section || '---'}</span></div>
-              <div className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg text-center"><label className="text-[10px] block opacity-80 mb-1">مرات الخروج</label><span className="font-black text-2xl">{exitForm.prevExitCount ?? 0}</span></div>
-              <div className="bg-white p-2 rounded-2xl border-2 shadow-sm"><label className="text-[10px] block text-slate-400 mr-2 mb-1">التاريخ</label><input type="date" className="w-full p-2 text-xs font-black outline-none bg-transparent" value={exitForm.date} onChange={e => setExitForm({...exitForm, date: e.target.value})} /></div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+              <div className="bg-white p-3 md:p-4 rounded-2xl border-2 shadow-sm text-center"><label className="text-[9px] md:text-[10px] block text-slate-400 mb-1">الصف</label><span className="font-black text-base md:text-lg text-slate-700">{exitForm.grade || '---'}</span></div>
+              <div className="bg-white p-3 md:p-4 rounded-2xl border-2 shadow-sm text-center"><label className="text-[9px] md:text-[10px] block text-slate-400 mb-1">الشعبة</label><span className="font-black text-base md:text-lg text-slate-700">{exitForm.section || '---'}</span></div>
+              <div className="bg-blue-600 text-white p-3 md:p-4 rounded-2xl shadow-lg text-center"><label className="text-[9px] md:text-[10px] block opacity-80 mb-1">مرات الخروج</label><span className="font-black text-xl md:text-2xl">{exitForm.prevExitCount ?? 0}</span></div>
+              <div className="bg-white p-2 rounded-2xl border-2 shadow-sm flex flex-col justify-center text-center">
+                 <label className="text-[9px] md:text-[10px] block text-slate-400 mb-1">الفصل</label>
+                 <select className="bg-transparent font-black text-[10px] md:text-xs outline-none" value={exitForm.semester} onChange={e => setExitForm({...exitForm, semester: e.target.value as any})}>
+                   <option value="الأول">الأول</option><option value="الثاني">الثاني</option><option value="الفصلين">الفصلين</option>
+                 </select>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">حالة الخروج</label><input className="w-full p-4 border-2 rounded-2xl outline-none font-black text-sm bg-slate-50 focus:border-blue-400" value={exitForm.status} onChange={e => setExitForm({...exitForm, status: e.target.value})} placeholder="مثال: نادر الخروج" /></div>
-              <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">الإجراء المتخذ</label><input className="w-full p-4 border-2 rounded-2xl outline-none font-black text-sm bg-slate-50 focus:border-blue-400" value={exitForm.action} onChange={e => setExitForm({...exitForm, action: e.target.value})} placeholder="تنبيه 1" /></div>
+              <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">حالة الخروج</label><input className="w-full p-4 border-2 rounded-2xl outline-none font-black text-xs md:text-sm bg-slate-50 focus:border-blue-400" value={exitForm.status} onChange={e => setExitForm({...exitForm, status: e.target.value})} placeholder="مثال: نادر الخروج" /></div>
+              <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">الإجراء المتخذ</label><input className="w-full p-4 border-2 rounded-2xl outline-none font-black text-xs md:text-sm bg-slate-50 focus:border-blue-400" value={exitForm.action} onChange={e => setExitForm({...exitForm, action: e.target.value})} placeholder="تنبيه 1" /></div>
             </div>
-            <button onClick={saveLog} className="w-full bg-[#0f172a] text-white p-6 rounded-3xl font-black text-xl hover:bg-black shadow-xl flex items-center justify-center gap-4 active:scale-95 transition-all mt-4"><Save size={24}/> حفظ بيانات الخروج</button>
+            <button onClick={saveLog} className="w-full bg-[#0f172a] text-white p-5 md:p-6 rounded-3xl font-black text-lg md:text-xl hover:bg-black shadow-xl flex items-center justify-center gap-4 active:scale-95 transition-all mt-4"><Save size={24}/> حفظ بيانات الخروج</button>
           </div>
         ) : (
           <div className="space-y-8">
             <FilterSection suggestions={nameSugg} values={filterValues} setValues={setFilterValues} tempNames={tempNames} setTempNames={setTempNames} appliedNames={appliedNames} setAppliedNames={setAppliedNames} nameInput={nameInput} setNameInput={setNameInput} onExportExcel={() => exportExcelFiltered('خروج_الطلاب', filtered, cols)} onExportTxt={() => exportTxtFiltered('خروج_الطلاب', filtered, cols)} onExportWA={() => shareWhatsAppRich('سجل خروج الطلاب المفلتر', filtered, cols)} />
-            <div className="overflow-x-auto rounded-[2.5rem] border shadow-inner">
-              <table className="w-full text-center text-sm border-collapse min-w-[1200px]"><thead className="bg-[#FFD966] text-slate-800 font-black"><tr>{cols.map(c => <th key={c.key} className="p-5 border-e border-blue-200">{c.label}</th>)}</tr></thead>
-              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-lg font-bold">لا توجد بيانات تطابق الفلتر.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-blue-50/30 transition-colors h-12"><td className="p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-5 border-e border-slate-50">{l.grade}</td><td className="p-5 border-e border-slate-50">{l.section}</td><td className="p-5 border-e border-slate-50 text-blue-600 text-lg">{l.prevExitCount + 1}</td><td className="p-5 border-e border-slate-50 text-slate-400 text-xs">{l.date}</td><td className="p-5 border-e border-slate-50">{l.status}</td><td className="p-5 border-e border-slate-50">{l.action}</td><td className="p-5 text-slate-400 text-xs">{l.notes}</td></tr>)}</tbody></table>
+            <div className="overflow-x-auto rounded-[1.5rem] border shadow-inner">
+              <table className="w-full text-center text-[10px] md:text-sm border-collapse min-w-[1000px]"><thead className="bg-[#FFD966] text-slate-800 font-black"><tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e border-blue-200">{c.label}</th>)}</tr></thead>
+              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد بيانات خروج.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-blue-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-50 text-blue-600 text-lg">{l.prevExitCount + 1}</td><td className="p-3 md:p-5 border-e border-slate-50 text-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.status}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.action}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
             </div>
           </div>
         )}
@@ -933,7 +919,6 @@ const SpecialReportsPage: React.FC = () => {
     );
   };
 
-  // START OF CHANGE - Requirement: School Damage Log (10, 11)
   const renderDamageModule = () => {
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
@@ -947,7 +932,6 @@ const SpecialReportsPage: React.FC = () => {
       return true;
     });
 
-    // START OF CHANGE - Selection Logic
     const handleSelectStudent = (s: StudentReport) => {
       setDamageForm({ 
         ...damageForm, 
@@ -959,7 +943,6 @@ const SpecialReportsPage: React.FC = () => {
       });
       setSearchQuery(s.name);
     };
-    // END OF CHANGE
 
     const saveLog = () => {
       if (!damageForm.studentId) return alert('يرجى اختيار طالب أولاً');
@@ -977,67 +960,72 @@ const SpecialReportsPage: React.FC = () => {
     ];
 
     return (
-      <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
-        {/* START OF CHANGE - Frequent Names Picker */}
+      <div className="bg-white p-4 md:p-8 rounded-[2.5rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
         <FrequentNamesPicker 
           logs={data.damageLogs || []} 
-          onSelect={(name) => {
-            const s = students.find(x => x.name === name);
-            if (s) handleSelectStudent(s);
-          }}
+          onSelectQuery={(q) => setSearchQuery(q)}
         />
-        {/* END OF CHANGE */}
-        <div className="flex justify-between items-center mb-6 border-b pb-4">
-           <div className="flex gap-2">
-              <button onClick={() => setShowTable(!showTable)} className="bg-red-50 text-red-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-red-100 transition-all flex items-center gap-2 shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
+           <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
+              <button onClick={() => setShowTable(!showTable)} className="bg-red-50 text-red-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-red-100 transition-all flex items-center gap-2">
                 {showTable ? <Plus size={18}/> : <LayoutList size={18}/>}
                 {showTable ? 'رصد إتلاف جديد' : 'جدول الإتلاف'}
               </button>
-              {/* START OF CHANGE - Frequent Button */}
               {!showTable && (
-                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
                   <RefreshCw size={18}/> الأسماء المتكررة
                 </button>
               )}
-              {/* END OF CHANGE */}
-              <button onClick={() => setActiveSubTab(null)} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={20}/></button>
+              <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={18}/></button>
            </div>
-           <h2 className="text-2xl font-black text-red-600 flex items-center gap-3">سجل الإتلاف المدرسي <Hammer size={24}/></h2>
+           <div className="flex flex-col items-center md:items-end w-full md:w-auto">
+              <h2 className="text-xl md:text-2xl font-black text-red-600 flex items-center gap-3">سجل الإتلاف المدرسي <Hammer size={24}/></h2>
+              <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                <Calendar size={14} className="text-slate-400" />
+                <input type="date" className="text-[10px] md:text-xs font-black bg-transparent outline-none" value={damageForm.date} onChange={e => setDamageForm({...damageForm, date: e.target.value})} />
+                <span className="text-[10px] font-bold text-slate-400">{getDayName(damageForm.date || today)}</span>
+              </div>
+           </div>
         </div>
 
         {!showTable ? (
           <div className="space-y-6">
             <div className="relative">
               <label className="text-xs font-black text-slate-400 mb-2 block mr-2">ابحث عن الطالب</label>
-              <div className="flex items-center gap-3 bg-white border-2 rounded-2xl p-4 focus-within:border-red-500 shadow-sm transition-all">
-                <Search size={20} className="text-slate-400"/><input type="text" className="bg-transparent w-full outline-none font-black text-lg" placeholder="اكتب الاسم هنا..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+              <div className="flex items-center gap-3 bg-white border-2 rounded-2xl p-3 md:p-4 focus-within:border-red-500 shadow-sm transition-all">
+                <Search size={20} className="text-slate-400"/><input type="text" className="bg-transparent w-full outline-none font-black text-base md:text-lg" placeholder="اكتب الاسم هنا..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
               </div>
               {suggestions.length > 0 && (
                 <div className="absolute top-full left-0 right-0 z-[100] bg-white border-2 rounded-2xl shadow-2xl mt-2 max-h-64 overflow-y-auto">
                   {suggestions.map(s => (
-                    <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-4 hover:bg-red-50 font-black border-b last:border-none flex justify-between items-center transition-colors"><span>{s.name}</span> <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span></button>
+                    <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-3 md:p-4 hover:bg-red-50 font-black border-b last:border-none flex justify-between items-center transition-colors"><span className="text-xs md:text-sm">{s.name}</span> <span className="text-[9px] md:text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span></button>
                   ))}
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-2xl border-2 shadow-sm text-center"><label className="text-[10px] block text-slate-400 mb-1">الصف</label><span className="font-black text-lg text-slate-700">{damageForm.grade || '---'}</span></div>
-              <div className="bg-white p-4 rounded-2xl border-2 shadow-sm text-center"><label className="text-[10px] block text-slate-400 mb-1">الشعبة</label><span className="font-black text-lg text-slate-700">{damageForm.section || '---'}</span></div>
-              <div className="bg-red-600 text-white p-4 rounded-2xl shadow-lg text-center"><label className="text-[10px] block opacity-80 mb-1">مرات الإتلاف</label><span className="font-black text-2xl">{damageForm.prevDamageCount ?? 0}</span></div>
-              <div className="bg-white p-2 rounded-2xl border-2 shadow-sm"><label className="text-[10px] block text-slate-400 mr-2 mb-1">التاريخ</label><input type="date" className="w-full p-2 text-xs font-black outline-none bg-transparent" value={damageForm.date} onChange={e => setDamageForm({...damageForm, date: e.target.value})} /></div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+              <div className="bg-white p-3 md:p-4 rounded-2xl border-2 shadow-sm text-center"><label className="text-[9px] md:text-[10px] block text-slate-400 mb-1">الصف</label><span className="font-black text-base md:text-lg text-slate-700">{damageForm.grade || '---'}</span></div>
+              <div className="bg-white p-3 md:p-4 rounded-2xl border-2 shadow-sm text-center"><label className="text-[9px] md:text-[10px] block text-slate-400 mb-1">الشعبة</label><span className="font-black text-base md:text-lg text-slate-700">{damageForm.section || '---'}</span></div>
+              <div className="bg-red-600 text-white p-3 md:p-4 rounded-2xl shadow-lg text-center"><label className="text-[9px] md:text-[10px] block opacity-80 mb-1">مرات الإتلاف</label><span className="font-black text-xl md:text-2xl">{damageForm.prevDamageCount ?? 0}</span></div>
+              <div className="bg-white p-2 rounded-2xl border-2 shadow-sm flex flex-col justify-center text-center">
+                 <label className="text-[9px] md:text-[10px] block text-slate-400 mb-1">الفصل</label>
+                 <select className="bg-transparent font-black text-[10px] md:text-xs outline-none" value={damageForm.semester} onChange={e => setDamageForm({...damageForm, semester: e.target.value as any})}>
+                   <option value="الأول">الأول</option><option value="الثاني">الثاني</option><option value="الفصلين">الفصلين</option>
+                 </select>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">بيان الإتلاف</label><input className="w-full p-4 border-2 rounded-2xl outline-none font-black text-sm bg-slate-50 focus:border-red-400" value={damageForm.description} onChange={e => setDamageForm({...damageForm, description: e.target.value})} placeholder="ماذا تم إتلافه؟" /></div>
-              <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">الإجراء المتخذ</label><input className="w-full p-4 border-2 rounded-2xl outline-none font-black text-sm bg-slate-50 focus:border-red-400" value={damageForm.action} onChange={e => setDamageForm({...damageForm, action: e.target.value})} placeholder="تنبيه" /></div>
+              <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">بيان الإتلاف</label><input className="w-full p-4 border-2 rounded-2xl outline-none font-black text-xs md:text-sm bg-slate-50 focus:border-red-400" value={damageForm.description} onChange={e => setDamageForm({...damageForm, description: e.target.value})} placeholder="ماذا تم إتلافه؟" /></div>
+              <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">الإجراء المتخذ</label><input className="w-full p-4 border-2 rounded-2xl outline-none font-black text-xs md:text-sm bg-slate-50 focus:border-red-400" value={damageForm.action} onChange={e => setDamageForm({...damageForm, action: e.target.value})} placeholder="تنبيه" /></div>
             </div>
-            <button onClick={saveLog} className="w-full bg-[#0f172a] text-white p-6 rounded-3xl font-black text-xl hover:bg-black shadow-xl flex items-center justify-center gap-4 active:scale-95 transition-all mt-4"><Save size={24}/> حفظ بيانات الإتلاف</button>
+            <button onClick={saveLog} className="w-full bg-[#0f172a] text-white p-5 md:p-6 rounded-3xl font-black text-lg md:text-xl hover:bg-black shadow-xl flex items-center justify-center gap-4 active:scale-95 transition-all mt-4"><Save size={24}/> حفظ بيانات الإتلاف</button>
           </div>
         ) : (
           <div className="space-y-8">
             <FilterSection suggestions={nameSugg} values={filterValues} setValues={setFilterValues} tempNames={tempNames} setTempNames={setTempNames} appliedNames={appliedNames} setAppliedNames={setAppliedNames} nameInput={nameInput} setNameInput={setNameInput} onExportExcel={() => exportExcelFiltered('إتلاف_المدرسة', filtered, cols)} onExportTxt={() => exportTxtFiltered('إتلاف_المدرسة', filtered, cols)} onExportWA={() => shareWhatsAppRich('سجل إتلاف المدرسة المفلتر', filtered, cols)} />
-            <div className="overflow-x-auto rounded-[2.5rem] border shadow-inner">
-              <table className="w-full text-center text-sm border-collapse min-w-[1200px]"><thead className="bg-[#FFD966] text-slate-800 font-black"><tr>{cols.map(c => <th key={c.key} className="p-5 border-e border-red-200">{c.label}</th>)}</tr></thead>
-              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-lg font-bold">لا توجد بيانات تطابق الفلتر.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-red-50/30 transition-colors h-12"><td className="p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-5 border-e border-slate-50">{l.grade}</td><td className="p-5 border-e border-slate-50">{l.section}</td><td className="p-5 border-e border-slate-50 text-red-600 text-lg">{l.prevDamageCount + 1}</td><td className="p-5 border-e border-slate-50 text-slate-400 text-xs">{l.date}</td><td className="p-5 border-e border-slate-50">{l.description}</td><td className="p-5 border-e border-slate-50">{l.action}</td><td className="p-5 text-slate-400 text-xs">{l.notes}</td></tr>)}</tbody></table>
+            <div className="overflow-x-auto rounded-[1.5rem] border shadow-inner">
+              <table className="w-full text-center text-[10px] md:text-sm border-collapse min-w-[1000px]"><thead className="bg-[#FFD966] text-slate-800 font-black"><tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e border-red-200">{c.label}</th>)}</tr></thead>
+              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد بيانات إتلاف.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-red-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-50 text-red-600 text-lg">{l.prevDamageCount + 1}</td><td className="p-3 md:p-5 border-e border-slate-50 text-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.description}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.action}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
             </div>
           </div>
         )}
@@ -1045,7 +1033,6 @@ const SpecialReportsPage: React.FC = () => {
     );
   };
 
-  // START OF CHANGE - Requirement: Parent Visit & Comm Log (12, 13, 14)
   const renderParentVisitModule = () => {
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
@@ -1059,7 +1046,6 @@ const SpecialReportsPage: React.FC = () => {
       return true;
     });
 
-    // START OF CHANGE - Selection Logic
     const handleSelectStudent = (s: StudentReport) => {
       setVisitForm({ 
         ...visitForm, 
@@ -1071,7 +1057,6 @@ const SpecialReportsPage: React.FC = () => {
       });
       setSearchQuery(s.name);
     };
-    // END OF CHANGE
 
     const saveLog = () => {
       if (!visitForm.studentId) return alert('يرجى اختيار طالب أولاً');
@@ -1093,86 +1078,91 @@ const SpecialReportsPage: React.FC = () => {
     ];
 
     return (
-      <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
-        {/* START OF CHANGE - Frequent Names Picker */}
+      <div className="bg-white p-4 md:p-8 rounded-[2.5rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
         <FrequentNamesPicker 
           logs={data.parentVisitLogs || []} 
-          onSelect={(name) => {
-            const s = students.find(x => x.name === name);
-            if (s) handleSelectStudent(s);
-          }}
+          onSelectQuery={(q) => setSearchQuery(q)}
         />
-        {/* END OF CHANGE */}
-        <div className="flex justify-between items-center mb-6 border-b pb-4">
-           <div className="flex gap-2">
-              <button onClick={() => setShowTable(!showTable)} className="bg-indigo-50 text-indigo-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
+           <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
+              <button onClick={() => setShowTable(!showTable)} className="bg-indigo-50 text-indigo-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-indigo-100 transition-all flex items-center gap-2">
                 {showTable ? <Plus size={18}/> : <LayoutList size={18}/>}
                 {showTable ? 'رصد جديد' : 'جدول السجلات'}
               </button>
-              {/* START OF CHANGE - Frequent Button */}
               {!showTable && (
-                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
                   <RefreshCw size={18}/> الأسماء المتكررة
                 </button>
               )}
-              {/* END OF CHANGE */}
-              <button onClick={() => setActiveSubTab(null)} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={20}/></button>
+              <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={18}/></button>
            </div>
-           <h2 className="text-2xl font-black text-indigo-600 flex items-center gap-3">سجل زيارات أولياء الأمور <UserPlus size={24}/></h2>
+           <div className="flex flex-col items-center md:items-end w-full md:w-auto">
+              <h2 className="text-xl md:text-2xl font-black text-indigo-600 flex items-center gap-3">سجل زيارات أولياء الأمور <UserPlus size={24}/></h2>
+              <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                <Calendar size={14} className="text-slate-400" />
+                <input type="date" className="text-[10px] md:text-xs font-black bg-transparent outline-none" value={visitForm.date} onChange={e => setVisitForm({...visitForm, date: e.target.value})} />
+                <span className="text-[10px] font-bold text-slate-400">{getDayName(visitForm.date || today)}</span>
+              </div>
+           </div>
         </div>
 
         {!showTable ? (
-          <div className="space-y-10">
+          <div className="space-y-6 md:space-y-10">
             <div className="flex gap-4 p-2 bg-slate-100 rounded-3xl w-fit mx-auto shadow-inner border border-white">
-              <button onClick={() => setVisitForm({...visitForm, type: 'visit'})} className={`flex items-center gap-2 px-8 py-3 rounded-2xl font-black text-sm transition-all ${visitForm.type === 'visit' ? 'bg-indigo-600 text-white shadow-lg scale-105' : 'text-slate-400 hover:bg-white'}`}>
-                <Users size={18}/> زيارة ولي أمر
+              <button onClick={() => setVisitForm({...visitForm, type: 'visit'})} className={`flex items-center gap-2 px-6 md:px-8 py-2 md:py-3 rounded-2xl font-black text-[10px] md:text-sm transition-all ${visitForm.type === 'visit' ? 'bg-indigo-600 text-white shadow-lg scale-105' : 'text-slate-400 hover:bg-white'}`}>
+                <Users size={16}/> زيارة ولي أمر
               </button>
-              <button onClick={() => setVisitForm({...visitForm, type: 'communication'})} className={`flex items-center gap-2 px-8 py-3 rounded-2xl font-black text-sm transition-all ${visitForm.type === 'communication' ? 'bg-blue-600 text-white shadow-lg scale-105' : 'text-slate-400 hover:bg-white'}`}>
-                <Phone size={18}/> التواصل بولي الأمر
+              <button onClick={() => setVisitForm({...visitForm, type: 'communication'})} className={`flex items-center gap-2 px-6 md:px-8 py-2 md:py-3 rounded-2xl font-black text-[10px] md:text-sm transition-all ${visitForm.type === 'communication' ? 'bg-blue-600 text-white shadow-lg scale-105' : 'text-slate-400 hover:bg-white'}`}>
+                <Phone size={16}/> التواصل بولي الأمر
               </button>
             </div>
             
             <div className="space-y-6">
                 <div className="relative">
                   <label className="text-xs font-black text-slate-400 mb-2 block mr-2">ابحث عن الطالب</label>
-                  <div className="flex items-center gap-3 bg-white border-2 rounded-2xl p-4 focus-within:border-indigo-500 shadow-sm transition-all">
-                    <Search size={20} className="text-slate-400"/><input type="text" className="bg-transparent w-full outline-none font-black text-lg" placeholder="اكتب اسم الطالب هنا..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                  <div className="flex items-center gap-3 bg-white border-2 rounded-2xl p-3 md:p-4 focus-within:border-indigo-500 shadow-sm transition-all">
+                    <Search size={20} className="text-slate-400"/><input type="text" className="bg-transparent w-full outline-none font-black text-base md:text-lg" placeholder="اكتب اسم الطالب هنا..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                   </div>
                   {suggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 z-[100] bg-white border-2 rounded-2xl shadow-2xl mt-2 max-h-64 overflow-y-auto">
                       {suggestions.map(s => (
-                        <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-4 hover:bg-indigo-50 font-black border-b last:border-none flex justify-between items-center transition-colors"><span>{s.name}</span> <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span></button>
+                        <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-3 md:p-4 hover:bg-indigo-50 font-black border-b last:border-none flex justify-between items-center transition-colors"><span className="text-xs md:text-sm">{s.name}</span> <span className="text-[9px] md:text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span></button>
                       ))}
                     </div>
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white p-4 rounded-2xl border-2 shadow-sm text-center"><label className="text-[10px] block text-slate-400 mb-1">الصف</label><span className="font-black text-lg text-slate-700">{visitForm.grade || '---'}</span></div>
-                  <div className="bg-white p-4 rounded-2xl border-2 shadow-sm text-center"><label className="text-[10px] block text-slate-400 mb-1">الشعبة</label><span className="font-black text-lg text-slate-700">{visitForm.section || '---'}</span></div>
-                  <div className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg text-center"><label className="text-[10px] block opacity-80 mb-1">مرات التواصل</label><span className="font-black text-2xl">{visitForm.prevVisitCount ?? 0}</span></div>
-                  <div className="bg-white p-2 rounded-2xl border-2 shadow-sm"><label className="text-[10px] block text-slate-400 mr-2 mb-1">التاريخ</label><input type="date" className="w-full p-2 text-xs font-black outline-none bg-transparent" value={visitForm.date} onChange={e => setVisitForm({...visitForm, date: e.target.value})} /></div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                  <div className="bg-white p-3 md:p-4 rounded-2xl border-2 shadow-sm text-center"><label className="text-[9px] md:text-[10px] block text-slate-400 mb-1">الصف</label><span className="font-black text-base md:text-lg text-slate-700">{visitForm.grade || '---'}</span></div>
+                  <div className="bg-white p-3 md:p-4 rounded-2xl border-2 shadow-sm text-center"><label className="text-[9px] md:text-[10px] block text-slate-400 mb-1">الشعبة</label><span className="font-black text-base md:text-lg text-slate-700">{visitForm.section || '---'}</span></div>
+                  <div className="bg-blue-600 text-white p-3 md:p-4 rounded-2xl shadow-lg text-center"><label className="text-[9px] md:text-[10px] block opacity-80 mb-1">مرات التواصل</label><span className="font-black text-xl md:text-2xl">{visitForm.prevVisitCount ?? 0}</span></div>
+                  <div className="bg-white p-2 rounded-2xl border-2 shadow-sm flex flex-col justify-center text-center">
+                    <label className="text-[9px] md:text-[10px] block text-slate-400 mb-1">الفصل</label>
+                    <select className="bg-transparent font-black text-[10px] md:text-xs outline-none" value={visitForm.semester} onChange={e => setVisitForm({...visitForm, semester: e.target.value as any})}>
+                      <option value="الأول">الأول</option><option value="الثاني">الثاني</option><option value="الفصلين">الفصلين</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">السبب</label><textarea className="w-full p-4 border-2 rounded-2xl outline-none font-black text-sm bg-slate-50 focus:border-indigo-400 min-h-[80px]" value={visitForm.reason} onChange={e => setVisitForm({...visitForm, reason: e.target.value})} placeholder="..." /></div>
-                  <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">اسم الزائر/المتواصل</label><textarea className="w-full p-4 border-2 rounded-2xl outline-none font-black text-sm bg-slate-50 focus:border-indigo-400 min-h-[80px]" value={visitForm.visitorName} onChange={e => setVisitForm({...visitForm, visitorName: e.target.value})} placeholder="..." /></div>
+                  <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">السبب</label><textarea className="w-full p-3 md:p-4 border-2 rounded-2xl outline-none font-black text-xs md:text-sm bg-slate-50 focus:border-indigo-400 min-h-[60px] md:min-h-[80px]" value={visitForm.reason} onChange={e => setVisitForm({...visitForm, reason: e.target.value})} placeholder="..." /></div>
+                  <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">اسم الزائر/المتواصل</label><textarea className="w-full p-3 md:p-4 border-2 rounded-2xl outline-none font-black text-xs md:text-sm bg-slate-50 focus:border-indigo-400 min-h-[60px] md:min-h-[80px]" value={visitForm.visitorName} onChange={e => setVisitForm({...visitForm, visitorName: e.target.value})} placeholder="..." /></div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">ملاحظات</label><textarea className="w-full p-4 border-2 rounded-2xl outline-none font-black text-sm bg-slate-50 focus:border-indigo-400 min-h-[80px]" value={visitForm.notes} onChange={e => setVisitForm({...visitForm, notes: e.target.value})} placeholder="..." /></div>
-                  <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">الإجراءات</label><textarea className="w-full p-4 border-2 rounded-2xl outline-none font-black text-sm bg-slate-50 focus:border-indigo-400 min-h-[80px]" value={visitForm.actions} onChange={e => setVisitForm({...visitForm, actions: e.target.value})} placeholder="..." /></div>
+                  <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">ملاحظات</label><textarea className="w-full p-3 md:p-4 border-2 rounded-2xl outline-none font-black text-xs md:text-sm bg-slate-50 focus:border-indigo-400 min-h-[60px] md:min-h-[80px]" value={visitForm.notes} onChange={e => setVisitForm({...visitForm, notes: e.target.value})} placeholder="..." /></div>
+                  <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">الإجراءات</label><textarea className="w-full p-3 md:p-4 border-2 rounded-2xl outline-none font-black text-xs md:text-sm bg-slate-50 focus:border-indigo-400 min-h-[60px] md:min-h-[80px]" value={visitForm.actions} onChange={e => setVisitForm({...visitForm, actions: e.target.value})} placeholder="..." /></div>
                 </div>
 
-                <button onClick={saveLog} className="w-full bg-[#0f172a] text-white p-7 rounded-[2.5rem] font-black text-2xl hover:bg-black shadow-2xl flex items-center justify-center gap-4 transition-all active:scale-[0.98] mt-4"><Save size={32}/> حفظ السجل</button>
+                <button onClick={saveLog} className="w-full bg-[#0f172a] text-white p-5 md:p-7 rounded-[2rem] md:rounded-[2.5rem] font-black text-xl md:text-2xl hover:bg-black shadow-2xl flex items-center justify-center gap-4 transition-all active:scale-[0.98] mt-4"><Save size={32}/> حفظ السجل</button>
             </div>
           </div>
         ) : (
           <div className="space-y-8">
             <FilterSection suggestions={nameSugg} values={filterValues} setValues={setFilterValues} tempNames={tempNames} setTempNames={setTempNames} appliedNames={appliedNames} setAppliedNames={setAppliedNames} nameInput={nameInput} setNameInput={setNameInput} onExportExcel={() => exportExcelFiltered('زيارات_أولياء_الأمور', filtered, cols)} onExportTxt={() => exportTxtFiltered('زيارات_أولياء_الأمور', filtered, cols)} onExportWA={() => shareWhatsAppRich('سجل زيارات وتواصل أولياء الأمور المفلتر', filtered, cols)} />
-            <div className="overflow-x-auto rounded-[2.5rem] border shadow-inner">
-              <table className="w-full text-center text-sm border-collapse min-w-[1500px]"><thead className="bg-[#FFD966] text-slate-800 font-black"><tr>{cols.map(c => <th key={c.key} className="p-5 border-e border-indigo-200">{c.label}</th>)}</tr></thead>
-              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-lg font-bold">لا توجد بيانات تطابق الفلتر.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-indigo-50/30 transition-colors h-12"><td className="p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-5 border-e border-slate-50">{l.visitorName}</td><td className="p-5 border-e border-slate-50">{l.grade}</td><td className="p-5 border-e border-slate-50">{l.section}</td><td className="p-5 border-e border-slate-50 text-slate-400 text-xs">{l.date}</td><td className="p-5 border-e border-slate-50">{l.type === 'visit' ? 'زيارة' : 'تواصل'}</td><td className="p-5 border-e border-slate-50 text-xs">{l.reason}</td><td className="p-5 border-e border-slate-50 text-xs">{l.actions}</td><td className="p-5 text-slate-400 text-xs">{l.notes}</td></tr>)}</tbody></table>
+            <div className="overflow-x-auto rounded-[1.5rem] border shadow-inner">
+              <table className="w-full text-center text-[10px] md:text-sm border-collapse min-w-[1200px]"><thead className="bg-[#FFD966] text-slate-800 font-black"><tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e border-indigo-200">{c.label}</th>)}</tr></thead>
+              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد سجلات.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-indigo-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.visitorName}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-50 text-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.type === 'visit' ? 'زيارة' : 'تواصل'}</td><td className="p-3 md:p-5 border-e border-slate-50 text-[10px]">{l.reason}</td><td className="p-3 md:p-5 border-e border-slate-50 text-[10px]">{l.actions}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
             </div>
           </div>
         )}
@@ -1190,17 +1180,17 @@ const SpecialReportsPage: React.FC = () => {
       case 'سجل زيارة أولياء الأمور والتواصل بهم': return renderParentVisitModule();
       default:
         return (
-          <div className="bg-white p-8 rounded-[3rem] border shadow-2xl relative overflow-hidden font-arabic">
+          <div className="bg-white p-4 md:p-8 rounded-[2rem] md:rounded-[3rem] border shadow-2xl relative overflow-hidden font-arabic">
             <div className="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
             <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-black text-slate-800">{activeSubTab}</h3>
+                <h3 className="text-xl md:text-2xl font-black text-slate-800">{activeSubTab}</h3>
                 <button onClick={() => setActiveSubTab(null)} className="p-2 hover:bg-slate-100 rounded-full transition-all"><X/></button>
             </div>
             <div className="space-y-4">
-                <p className="text-slate-500 font-bold text-right">هذا السجل ({activeSubTab}) قيد التطوير البرمجي ليكون متكاملاً مع باقي أقسام البرنامج.</p>
-                <div className="bg-slate-50 p-12 rounded-[2.5rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-4 text-slate-400">
+                <p className="text-slate-500 font-bold text-right text-sm md:text-base">هذا السجل ({activeSubTab}) قيد التطوير البرمجي ليكون متكاملاً مع باقي أقسام البرنامج.</p>
+                <div className="bg-slate-50 p-10 md:p-12 rounded-[2.5rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-4 text-slate-400">
                     <Database size={64} />
-                    <span className="font-black text-lg">قاعدة بيانات قيد التجهيز</span>
+                    <span className="font-black text-base md:text-lg text-center">قاعدة بيانات قيد التجهيز</span>
                 </div>
             </div>
           </div>
@@ -1208,7 +1198,6 @@ const SpecialReportsPage: React.FC = () => {
     }
   };
 
-  // Rest of the main component render
   const exportExcelFiltered = (title: string, tableData: any[], columns: { label: string, key: string }[]) => {
     const worksheet = XLSX.utils.json_to_sheet(tableData.map(row => {
       const formatted: any = {};
@@ -1236,37 +1225,37 @@ const SpecialReportsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 font-arabic pb-20">
+    <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 font-arabic pb-20">
       {!activeSubTab ? (
         <>
           <header className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h2 className="text-3xl font-black text-slate-800 flex items-center gap-3">
+              <h2 className="text-2xl md:text-3xl font-black text-slate-800 flex items-center gap-3">
                 <Sparkles className="text-blue-600 animate-pulse" />
                 التقارير الخاصة والمتقدمة
               </h2>
-              <p className="text-slate-500 font-bold mt-1">إدارة شاملة لجميع السجلات الإدارية والتربوية</p>
+              <p className="text-slate-500 font-bold mt-1 text-sm md:text-base">إدارة شاملة لجميع السجلات الإدارية والتربوية</p>
             </div>
           </header>
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-2 md:gap-4 justify-center md:justify-start">
             {Object.entries(structure).map(([key, cat]) => (
-              <button key={key} onClick={() => setActiveTab(key as MainTab)} className={`flex items-center gap-3 px-8 py-5 rounded-[2rem] font-black text-lg transition-all shadow-sm ${activeTab === key ? 'bg-blue-600 text-white shadow-xl scale-105' : 'bg-white text-slate-600 border border-slate-100 hover:bg-blue-50'}`}>
-                {React.cloneElement(cat.icon as React.ReactElement, { size: 24 })} {cat.title}
+              <button key={key} onClick={() => setActiveTab(key as MainTab)} className={`flex items-center gap-2 md:gap-3 px-4 md:px-8 py-3 md:py-5 rounded-[1.5rem] md:rounded-[2rem] font-black text-sm md:text-lg transition-all shadow-sm ${activeTab === key ? 'bg-blue-600 text-white shadow-xl scale-105' : 'bg-white text-slate-600 border border-slate-100 hover:bg-blue-50'}`}>
+                {React.cloneElement(cat.icon as React.ReactElement, { size: 20 })} {cat.title}
               </button>
             ))}
           </div>
-          <div className="bg-white p-8 rounded-[3rem] border shadow-2xl relative overflow-hidden">
+          <div className="bg-white p-4 md:p-8 rounded-[2rem] md:rounded-[3rem] border shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
               {structure[activeTab].items.map((item, idx) => (
-                <button key={idx} onClick={() => { setActiveSubTab(item); setShowTable(false); }} className="group flex items-center justify-between p-6 rounded-[1.5rem] bg-slate-50 border-2 border-slate-50 hover:border-blue-500 hover:bg-white transition-all text-right shadow-sm hover:shadow-xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
-                      <FileText size={18} />
+                <button key={idx} onClick={() => { setActiveSubTab(item); setShowTable(false); }} className="group flex items-center justify-between p-4 md:p-6 rounded-[1.2rem] md:rounded-[1.5rem] bg-slate-50 border-2 border-slate-50 hover:border-blue-500 hover:bg-white transition-all text-right shadow-sm hover:shadow-xl">
+                  <div className="flex items-center gap-2 md:gap-3 overflow-hidden">
+                    <div className="w-8 md:w-10 h-8 md:h-10 rounded-xl bg-white flex-shrink-0 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
+                      <FileText size={16} />
                     </div>
-                    <span className="font-black text-slate-700 group-hover:text-blue-600 transition-colors text-xs">{item}</span>
+                    <span className="font-black text-slate-700 group-hover:text-blue-600 transition-colors text-[10px] md:text-xs truncate">{item}</span>
                   </div>
-                  <ChevronRight className="text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" size={20} />
+                  <ChevronRight className="text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all flex-shrink-0" size={18} />
                 </button>
               ))}
             </div>
