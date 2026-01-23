@@ -17,6 +17,41 @@ import * as XLSX from 'xlsx';
 type MainTab = 'supervisor' | 'staff' | 'students' | 'tests';
 type SubTab = string;
 
+// Helper functions for exporting filtered data used across modules
+const exportExcelFiltered = (title: string, list: any[], columns: { label: string, key: string }[]) => {
+  const worksheet = XLSX.utils.json_to_sheet(list.map(row => {
+    const formatted: any = {};
+    columns.forEach(col => {
+      formatted[col.label] = Array.isArray(row[col.key]) ? row[col.key].join('، ') : row[col.key];
+    });
+    return formatted;
+  }));
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
+  XLSX.writeFile(workbook, `${title}_${new Date().getTime()}.xlsx`);
+};
+
+const exportTxtFiltered = (title: string, list: any[], columns: { label: string, key: string }[]) => {
+  let text = `*📋 تقرير: ${title}*\n`;
+  text += `*التاريخ:* ${new Date().toLocaleDateString('ar-EG')}\n`;
+  text += `----------------------------------\n\n`;
+
+  list.forEach((row, idx) => {
+    text += `*🔹 البند (${idx + 1}):*\n`;
+    columns.forEach(col => {
+      const val = Array.isArray(row[col.key]) ? row[col.key].join('، ') : row[col.key];
+      text += `▪️ *${col.label}:* ${val || '---'}\n`;
+    });
+    text += `\n`;
+  });
+
+  const blob = new Blob([text.replace(/\*/g, '')], { type: 'text/plain;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `${title}_${new Date().getTime()}.txt`;
+  link.click();
+};
+
 const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id: string) => void }> = ({ initialSubTab, onSubTabOpen }) => {
   const { lang, data, updateData } = useGlobal();
   const [activeTab, setActiveTab] = useState<MainTab>('supervisor');
@@ -33,7 +68,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
   const [showFrequentNames, setShowFrequentNames] = useState(false);
 
   const today = new Date().toISOString().split('T')[0];
-  const gradeOptions = ["التمهيدي", "الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "الأول الثانوي", "الثاني الثانوي", "الثالث الثانوي"];
+  const gradeOptions = ["تمهيدي", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
   const sectionOptions = ["أ", "ب", "ج", "د", "هـ", "و", "ز", "ح", "ط", "ي"];
 
   const [filterValues, setFilterValues] = useState({ semester: '', start: today, end: today, grade: '', section: '' });
@@ -55,11 +90,9 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
     status: ''
   });
 
-  // START OF CHANGE
   const [isAddAbsentModalOpen, setIsAddAbsentModalOpen] = useState(false);
   const [absentEntries, setAbsentEntries] = useState<{name: string, subject: string, studentData?: StudentReport}[]>([{ name: '', subject: '' }]);
   const [activeSearchIdx, setActiveSearchIdx] = useState<number | null>(null);
-  // END OF CHANGE
 
   const absenceFormInitial = { date: today, semester: 'الأول', status: 'expected', reason: '', commStatus: 'لم يتم التواصل', commType: 'هاتف', replier: 'الأب', result: 'لم يتم الرد', notes: '', prevAbsenceCount: 0 };
   const [absenceForm, setAbsenceForm] = useState<Partial<AbsenceLog>>(absenceFormInitial as any);
@@ -242,7 +275,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
       return true;
     });
 
-    // START OF CHANGE
     const handleAddExamRow = () => {
       setAbsentEntries([{ name: '', subject: '' }]);
       setIsAddAbsentModalOpen(true);
@@ -296,7 +328,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
       setAbsentEntries(updated);
       setActiveSearchIdx(null);
     };
-    // END OF CHANGE
 
     const updateExamLog = (id: string, field: string, value: any) => {
       const updated = (data.examLogs || []).map(log => log.id === id ? { ...log, [field]: value } : log);
@@ -366,11 +397,9 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
               <button onClick={() => setExamStage('basic')} className={`px-8 py-3 rounded-2xl font-black text-sm transition-all shadow-md ${examStage === 'basic' ? 'bg-[#7030A0] text-white' : 'bg-white text-[#7030A0] border border-[#7030A0]'}`}>أساسي</button>
               <button onClick={() => setExamStage('secondary')} className={`px-8 py-3 rounded-2xl font-black text-sm transition-all shadow-md ${examStage === 'secondary' ? 'bg-[#7030A0] text-white' : 'bg-white text-[#7030A0] border border-[#7030A0]'}`}>ثانوي</button>
               <button onClick={handleAddExamRow} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-sm hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg"><Plus size={18}/> إضافة غائب</button>
-              {/* START OF CHANGE */}
               <button onClick={() => setActiveSubTab(null)} className="flex items-center gap-2 bg-slate-800 text-white px-8 py-3 rounded-2xl font-black text-sm hover:bg-black transition-all shadow-md">
                 <FileSearch size={18}/> التقارير الخاصة
               </button>
-              {/* END OF CHANGE */}
               <button onClick={() => setActiveSubTab(null)} className="p-3 bg-white border border-slate-200 hover:bg-slate-50 rounded-2xl transition-all shadow-sm"><X size={20}/></button>
            </div>
            <div className="flex flex-col items-center md:items-end">
@@ -379,7 +408,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
            </div>
         </div>
 
-        {/* START OF CHANGE - Add Absentee Modal */}
         {isAddAbsentModalOpen && (
           <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 font-arabic">
              <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border-4 border-blue-600 flex flex-col max-h-[85vh]">
@@ -459,7 +487,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
              </div>
           </div>
         )}
-        {/* END OF CHANGE */}
 
         <div className="bg-white p-6 rounded-[2.5rem] border-2 border-[#7030A0]/10 mb-8 shadow-sm space-y-4">
            <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 items-end">
@@ -1545,32 +1572,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
           </div>
         );
     }
-  };
-
-  const exportExcelFiltered = (title: string, tableData: any[], columns: { label: string, key: string }[]) => {
-    const worksheet = XLSX.utils.json_to_sheet(tableData.map(row => {
-      const formatted: any = {};
-      columns.forEach(col => { formatted[col.label] = Array.isArray(row[col.key]) ? row[col.key].join(', ') : row[col.key]; });
-      return formatted;
-    }));
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, title);
-    XLSX.writeFile(workbook, `${title}_Report.xlsx`);
-  };
-
-  const exportTxtFiltered = (title: string, tableData: any[], columns: { label: string, key: string }[]) => {
-    let text = `${title}\n`;
-    text += `التاريخ: ${new Date().toLocaleDateString('ar-EG')}\n\n`;
-    tableData.forEach((row, idx) => {
-      text += `بند ${idx + 1}:\n`;
-      columns.forEach(col => { text += `${col.label}: ${row[col.key]}\n`; });
-      text += `\n`;
-    });
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${title}.txt`;
-    link.click();
   };
 
   const handleSubTabClick = (item: string) => {
