@@ -7,7 +7,12 @@ import SubstitutionPage from './app/SubstitutionPage';
 import { DailyReportsPage, ViolationsPage, StudentsReportsPage } from './app/ReportsPage';
 import SpecialReportsPage from './app/SpecialReportsPage';
 import DataManagementModal from './components/DataManagementModal';
-import { Lock, LayoutDashboard, ClipboardCheck, UserX, UserPlus, Users, Sparkles, UserCircle, Database, Settings, FileSearch, ArrowUp, ArrowDown } from 'lucide-react';
+import { 
+  Lock, LayoutDashboard, ClipboardCheck, UserX, UserPlus, 
+  Users, Sparkles, UserCircle, Database, Settings, 
+  FileSearch, ArrowUp, ArrowDown, Clock, ShieldAlert, 
+  Hammer, FileText, Calendar, Star, AlertCircle 
+} from 'lucide-react';
 
 const LoginPage: React.FC = () => {
   const { login } = useGlobal();
@@ -65,8 +70,7 @@ const MainApp: React.FC = () => {
     { id: 'specialReports', label: lang === 'ar' ? 'تقارير خاصة' : 'Special Reports', icon: <FileSearch className="w-4 h-4" /> },
   ], [lang]);
   
-  // START OF CHANGE - Recent Actions Logic (Fixed for React Error 31)
-  // Store only IDs in localStorage to avoid stringifying JSX icons
+  // START OF CHANGE - Recent Actions Logic
   const [recentActionIds, setRecentActionIds] = useState<string[]>(() => {
     const saved = localStorage.getItem('recent_nav_ids_v2');
     return saved ? JSON.parse(saved) : [];
@@ -77,17 +81,38 @@ const MainApp: React.FC = () => {
     
     setRecentActionIds(prev => {
       const filtered = prev.filter(id => id !== viewId);
-      const updated = [viewId, ...filtered].slice(0, 8);
+      const updated = [viewId, ...filtered].slice(0, 12);
       localStorage.setItem('recent_nav_ids_v2', JSON.stringify(updated));
       return updated;
     });
   };
 
-  // Hydrate IDs back into objects with valid JSX icons
+  // Hydrate IDs back into objects with valid JSX icons (Support for sub-views)
   const recentActions = useMemo(() => {
     return recentActionIds
-      .map(id => navItems.find(item => item.id === id))
-      .filter((item): item is typeof navItems[0] => !!item);
+      .map(id => {
+        if (id.includes(':')) {
+          const [mainId, subLabel] = id.split(':');
+          const mainItem = navItems.find(item => item.id === mainId);
+          if (!mainItem) return null;
+
+          // Define specific icons for sub-tabs to make Quick Access comprehensive
+          let subIcon = <FileText className="w-4 h-4" />;
+          if (subLabel.includes('الغياب')) subIcon = <Clock className="w-4 h-4" />;
+          if (subLabel.includes('التأخر')) subIcon = <Clock className="w-4 h-4 text-orange-500" />;
+          if (subLabel.includes('خروج')) subIcon = <UserPlus className="w-4 h-4" />;
+          if (subLabel.includes('المخالفات')) subIcon = <ShieldAlert className="w-4 h-4 text-red-500" />;
+          if (subLabel.includes('إتلاف')) subIcon = <Hammer className="w-4 h-4" />;
+          if (subLabel.includes('زيارة')) subIcon = <UserPlus className="w-4 h-4 text-indigo-600" />;
+          if (subLabel.includes('الخطة')) subIcon = <Calendar className="w-4 h-4 text-blue-500" />;
+          if (subLabel.includes('إبداع')) subIcon = <Star className="w-4 h-4 text-yellow-500" />;
+          if (subLabel.includes('اختبار')) subIcon = <FileSearch className="w-4 h-4 text-purple-500" />;
+
+          return { id, label: subLabel, icon: subIcon };
+        }
+        return navItems.find(item => item.id === id);
+      })
+      .filter((item): item is { id: string; label: string; icon: React.ReactNode } => !!item);
   }, [recentActionIds, navItems]);
 
   const handleSetView = (v: string) => {
@@ -99,15 +124,18 @@ const MainApp: React.FC = () => {
   if (!isAuthenticated) return <LoginPage />;
 
   const renderView = () => {
-    switch(view) {
+    // START OF CHANGE - Surgical extraction of sub-views
+    const [mainView, subView] = view.split(':');
+    switch(mainView) {
       case 'dashboard': return <Dashboard setView={handleSetView} recentActions={recentActions} />;
       case 'substitute': return <SubstitutionPage />;
       case 'daily': return <DailyReportsPage />;
       case 'violations': return <ViolationsPage />;
       case 'studentReports': return <StudentsReportsPage />;
-      case 'specialReports': return <SpecialReportsPage />;
+      case 'specialReports': return <SpecialReportsPage initialSubTab={subView} onSubTabOpen={(subId) => trackAction(`specialReports:${subId}`)} />;
       default: return <Dashboard setView={handleSetView} recentActions={recentActions} />;
     }
+    // END OF CHANGE
   };
 
   return (
@@ -150,7 +178,7 @@ const MainApp: React.FC = () => {
             key={item.id}
             onClick={() => handleSetView(item.id)}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-black transition-all ${
-              view === item.id 
+              view.startsWith(item.id) 
               ? 'bg-blue-600 text-white shadow-xl shadow-blue-100 scale-105' 
               : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'
             }`}

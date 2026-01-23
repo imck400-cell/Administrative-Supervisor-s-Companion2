@@ -18,10 +18,20 @@ import * as XLSX from 'xlsx';
 type MainTab = 'supervisor' | 'staff' | 'students' | 'tests';
 type SubTab = string;
 
-const SpecialReportsPage: React.FC = () => {
+// START OF CHANGE - Updated Component Signature for Quick Access Support
+const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id: string) => void }> = ({ initialSubTab, onSubTabOpen }) => {
   const { lang, data, updateData } = useGlobal();
   const [activeTab, setActiveTab] = useState<MainTab>('supervisor');
   const [activeSubTab, setActiveSubTab] = useState<SubTab | null>(null);
+  
+  // Handle external navigation (Quick Access)
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
+
+  // END OF CHANGE
   
   // View states
   const [showTable, setShowTable] = useState(false);
@@ -68,7 +78,6 @@ const SpecialReportsPage: React.FC = () => {
     return new Intl.DateTimeFormat('ar-EG', { weekday: 'long' }).format(new Date(dateStr));
   };
 
-  // START OF CHANGE - Requirement: Pick triggers Search Dropdown
   const FrequentNamesPicker = ({ logs, onSelectQuery }: { logs: any[], onSelectQuery: (name: string) => void }) => {
     const frequentList = useMemo(() => {
       const uniqueMap = new Map();
@@ -109,7 +118,6 @@ const SpecialReportsPage: React.FC = () => {
       </div>
     );
   };
-  // END OF CHANGE
 
   const structure = {
     supervisor: {
@@ -368,7 +376,7 @@ const SpecialReportsPage: React.FC = () => {
                   <label className="text-xs font-black text-slate-400 mr-2 block">سبب الغياب</label>
                   <div className="flex flex-wrap gap-2 justify-end">
                     {reasons.map(r => (
-                      <button key={r} onClick={() => setAbsenceForm({...absenceForm, reason: r})} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black border transition-all ${absenceForm.reason === r ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>{r}</button>
+                      <button key={r} onClick={() => setAbsenceForm({...absenceForm, reason: r})} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black transition-all ${absenceForm.reason === r ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>{r}</button>
                     ))}
                     <input className="px-4 py-2 rounded-xl text-[10px] font-black border outline-none bg-slate-50 w-full focus:ring-2 ring-blue-100" placeholder="سبب آخر..." value={absenceForm.reason} onChange={e => setAbsenceForm({...absenceForm, reason: e.target.value})} />
                   </div>
@@ -568,7 +576,7 @@ const SpecialReportsPage: React.FC = () => {
                   <label className="text-xs font-black text-slate-400 mr-2 block">سبب التأخر</label>
                   <div className="flex flex-wrap gap-2 justify-end">
                     {reasons.map(r => (
-                      <button key={r} onClick={() => setLatenessForm({...latenessForm, reason: r})} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black border transition-all ${latenessForm.reason === r ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>{r}</button>
+                      <button key={r} onClick={() => setLatenessForm({...latenessForm, reason: r})} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black transition-all ${latenessForm.reason === r ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>{r}</button>
                     ))}
                     <input className="px-4 py-2 rounded-xl text-[10px] font-black border outline-none bg-slate-50 w-full focus:ring-2 ring-blue-100" placeholder="سبب آخر..." value={latenessForm.reason} onChange={e => setLatenessForm({...latenessForm, reason: e.target.value})} />
                   </div>
@@ -1224,6 +1232,14 @@ const SpecialReportsPage: React.FC = () => {
     link.click();
   };
 
+  // START OF CHANGE - Surgical Logic for Menu Item Click Tracking
+  const handleSubTabClick = (item: string) => {
+    setActiveSubTab(item);
+    setShowTable(false);
+    onSubTabOpen?.(item);
+  };
+  // END OF CHANGE
+
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 font-arabic pb-20">
       {!activeSubTab ? (
@@ -1248,7 +1264,7 @@ const SpecialReportsPage: React.FC = () => {
             <div className="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
               {structure[activeTab].items.map((item, idx) => (
-                <button key={idx} onClick={() => { setActiveSubTab(item); setShowTable(false); }} className="group flex items-center justify-between p-4 md:p-6 rounded-[1.2rem] md:rounded-[1.5rem] bg-slate-50 border-2 border-slate-50 hover:border-blue-500 hover:bg-white transition-all text-right shadow-sm hover:shadow-xl">
+                <button key={idx} onClick={() => handleSubTabClick(item)} className="group flex items-center justify-between p-4 md:p-6 rounded-[1.2rem] md:rounded-[1.5rem] bg-slate-50 border-2 border-slate-50 hover:border-blue-500 hover:bg-white transition-all text-right shadow-sm hover:shadow-xl">
                   <div className="flex items-center gap-2 md:gap-3 overflow-hidden">
                     <div className="w-8 md:w-10 h-8 md:h-10 rounded-xl bg-white flex-shrink-0 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
                       <FileText size={16} />
