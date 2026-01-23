@@ -29,9 +29,18 @@ const defaultMaxGrades = {
   zero_period: 5
 };
 
-// Fix: renamed customCategoryItems to customViolationElements and removed violation_status to match AppData interface in types.ts
 const defaultData: AppData = {
-  profile: { schoolName: '', supervisorName: '', classes: '', qualityOfficer: '', managerName: '', year: '2024-2025' },
+  profile: { 
+    ministry: '', 
+    district: '', 
+    schoolName: '', 
+    branch: '', 
+    year: '2024-2025', 
+    semester: '', 
+    branchManager: '', 
+    generalManager: '', 
+    customFields: [] 
+  },
   substitutions: [],
   dailyReports: [],
   violations: [],

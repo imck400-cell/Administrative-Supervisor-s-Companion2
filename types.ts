@@ -2,12 +2,20 @@
 export type Language = 'ar' | 'en';
 
 export interface SchoolProfile {
+  ministry: string;
+  district: string;
   schoolName: string;
-  supervisorName: string;
-  classes: string;
-  qualityOfficer: string;
-  managerName: string;
+  branch: string;
   year: string;
+  semester: string;
+  branchManager: string;
+  generalManager: string;
+  customFields?: { label: string, value: string }[];
+  // Legacy fields preserved for compatibility
+  supervisorName?: string;
+  classes?: string;
+  qualityOfficer?: string;
+  managerName?: string;
 }
 
 export interface SubstitutionEntry {

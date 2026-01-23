@@ -6,6 +6,7 @@ import Dashboard from './app/Dashboard';
 import SubstitutionPage from './app/SubstitutionPage';
 import { DailyReportsPage, ViolationsPage, StudentsReportsPage } from './app/ReportsPage';
 import SpecialReportsPage from './app/SpecialReportsPage';
+import ProfilePage from './app/ProfilePage';
 import DataManagementModal from './components/DataManagementModal';
 import { 
   Lock, LayoutDashboard, ClipboardCheck, UserX, UserPlus, 
@@ -70,7 +71,6 @@ const MainApp: React.FC = () => {
     { id: 'specialReports', label: lang === 'ar' ? 'تقارير خاصة' : 'Special Reports', icon: <FileSearch className="w-4 h-4" /> },
   ], [lang]);
   
-  // START OF CHANGE - Recent Actions Logic
   const [recentActionIds, setRecentActionIds] = useState<string[]>(() => {
     const saved = localStorage.getItem('recent_nav_ids_v2');
     return saved ? JSON.parse(saved) : [];
@@ -87,7 +87,6 @@ const MainApp: React.FC = () => {
     });
   };
 
-  // Hydrate IDs back into objects with valid JSX icons (Support for sub-views)
   const recentActions = useMemo(() => {
     return recentActionIds
       .map(id => {
@@ -96,7 +95,6 @@ const MainApp: React.FC = () => {
           const mainItem = navItems.find(item => item.id === mainId);
           if (!mainItem) return null;
 
-          // Define specific icons for sub-tabs to make Quick Access comprehensive
           let subIcon = <FileText className="w-4 h-4" />;
           if (subLabel.includes('الغياب')) subIcon = <Clock className="w-4 h-4" />;
           if (subLabel.includes('التأخر')) subIcon = <Clock className="w-4 h-4 text-orange-500" />;
@@ -119,12 +117,10 @@ const MainApp: React.FC = () => {
     setView(v);
     trackAction(v);
   };
-  // END OF CHANGE
 
   if (!isAuthenticated) return <LoginPage />;
 
   const renderView = () => {
-    // START OF CHANGE - Surgical extraction of sub-views
     const [mainView, subView] = view.split(':');
     switch(mainView) {
       case 'dashboard': return <Dashboard setView={handleSetView} recentActions={recentActions} />;
@@ -133,13 +129,13 @@ const MainApp: React.FC = () => {
       case 'violations': return <ViolationsPage />;
       case 'studentReports': return <StudentsReportsPage />;
       case 'specialReports': return <SpecialReportsPage initialSubTab={subView} onSubTabOpen={(subId) => trackAction(`specialReports:${subId}`)} />;
+      case 'profile': return <ProfilePage />;
       default: return <Dashboard setView={handleSetView} recentActions={recentActions} />;
     }
-    // END OF CHANGE
   };
 
   return (
-    <Layout>
+    <Layout onNavigate={handleSetView} onOpenSettings={() => setIsDataModalOpen(true)}>
       <div className="fixed top-20 left-6 z-[60] flex flex-col gap-2 pointer-events-auto">
         <button 
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
@@ -150,7 +146,7 @@ const MainApp: React.FC = () => {
         </button>
         <button 
           onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
-          className="p-2 bg-orange-500 text-white rounded-full shadow-lg hover:bg-orange-600 transition-all active:scale-90"
+          className="p-2 bg-orange-50 text-white rounded-full shadow-lg hover:bg-orange-600 transition-all active:scale-90"
           title="أسفل الشاشة"
         >
           <ArrowDown size={20} />
