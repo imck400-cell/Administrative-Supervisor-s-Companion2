@@ -27,6 +27,10 @@ const SpecialReportsPage: React.FC = () => {
   // View states
   const [showTable, setShowTable] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // START OF CHANGE - Frequent Names Modal State
+  const [showFrequentNames, setShowFrequentNames] = useState(false);
+  // END OF CHANGE
 
   // Universal Date Defaults and Multi-Selection States
   const today = new Date().toISOString().split('T')[0];
@@ -69,6 +73,49 @@ const SpecialReportsPage: React.FC = () => {
   const getDayName = (dateStr: string) => {
     return new Intl.DateTimeFormat('ar-EG', { weekday: 'long' }).format(new Date(dateStr));
   };
+
+  // START OF CHANGE - Reusable Frequent Names Picker
+  const FrequentNamesPicker = ({ logs, onSelect }: { logs: any[], onSelect: (name: string) => void }) => {
+    const frequentList = useMemo(() => {
+      const uniqueMap = new Map();
+      [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).forEach(log => {
+        if (!uniqueMap.has(log.studentName)) {
+          uniqueMap.set(log.studentName, log);
+        }
+      });
+      return Array.from(uniqueMap.values());
+    }, [logs]);
+
+    if (!showFrequentNames) return null;
+
+    return (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 font-arabic">
+        <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="p-5 border-b bg-slate-50 flex justify-between items-center">
+            <h3 className="font-black text-slate-800">الأسماء المتكررة (الأحدث أولاً)</h3>
+            <button onClick={() => setShowFrequentNames(false)}><X size={20} className="text-slate-400"/></button>
+          </div>
+          <div className="max-h-80 overflow-y-auto p-2 space-y-1">
+            {frequentList.length === 0 ? (
+              <p className="text-center p-8 text-slate-400 italic">لا توجد بيانات سابقة</p>
+            ) : (
+              frequentList.map((item, idx) => (
+                <button 
+                  key={idx} 
+                  onClick={() => { onSelect(item.studentName); setShowFrequentNames(false); }}
+                  className="w-full text-right p-3 hover:bg-blue-50 rounded-xl font-bold flex justify-between items-center transition-colors border-b border-slate-50 last:border-none"
+                >
+                  <span className="text-xs text-slate-400">{item.date}</span>
+                  <span className="text-slate-700">{item.studentName}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  // END OF CHANGE
 
   const structure = {
     supervisor: {
@@ -218,6 +265,20 @@ const SpecialReportsPage: React.FC = () => {
 
     const reasons = ["مرض", "انشغال", "تأخر", "لم يمر له الباص", "سفر"];
 
+    // START OF CHANGE - Selection Logic
+    const handleSelectStudent = (s: StudentReport) => {
+      setAbsenceForm({ 
+        ...absenceForm, 
+        studentId: s.id, 
+        studentName: s.name, 
+        grade: s.grade, 
+        section: s.section, 
+        prevAbsenceCount: (data.absenceLogs || []).filter(l => l.studentId === s.id).length 
+      });
+      setSearchQuery(s.name);
+    };
+    // END OF CHANGE
+
     const saveLog = () => {
       if (!absenceForm.studentId) return alert('يرجى اختيار طالب أولاً');
       const newLog: AbsenceLog = { 
@@ -227,6 +288,7 @@ const SpecialReportsPage: React.FC = () => {
       };
       updateData({ absenceLogs: [newLog, ...(data.absenceLogs || [])] });
       setAbsenceForm({ ...absenceForm, studentName: '', studentId: '', reason: '', notes: '', result: '' });
+      setSearchQuery('');
       alert('تم حفظ البيانات بنجاح');
     };
 
@@ -238,12 +300,28 @@ const SpecialReportsPage: React.FC = () => {
 
     return (
       <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        {/* START OF CHANGE - Frequent Names Logic */}
+        <FrequentNamesPicker 
+          logs={data.absenceLogs || []} 
+          onSelect={(name) => {
+            const s = students.find(x => x.name === name);
+            if (s) handleSelectStudent(s);
+          }}
+        />
+        {/* END OF CHANGE */}
         <div className="flex justify-between items-center mb-6 border-b pb-4">
            <div className="flex gap-2">
               <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-blue-100 transition-all flex items-center gap-2">
                 {showTable ? <Plus size={18}/> : <LayoutList size={18}/>}
                 {showTable ? 'تسجيل جديد' : 'جدول الغائبين'}
               </button>
+              {/* START OF CHANGE - Frequent Button */}
+              {!showTable && (
+                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                  <RefreshCw size={18}/> الأسماء المتكررة
+                </button>
+              )}
+              {/* END OF CHANGE */}
               <button onClick={() => setActiveSubTab(null)} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={20}/></button>
            </div>
            <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
@@ -274,10 +352,7 @@ const SpecialReportsPage: React.FC = () => {
                   {suggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 z-[100] bg-white border-2 rounded-2xl shadow-2xl mt-2 max-h-48 overflow-y-auto">
                       {suggestions.map(s => (
-                        <button key={s.id} onClick={() => { 
-                          setAbsenceForm({ ...absenceForm, studentId: s.id, studentName: s.name, grade: s.grade, section: s.section, prevAbsenceCount: (data.absenceLogs || []).filter(l => l.studentId === s.id).length });
-                          setSearchQuery('');
-                        }} className="w-full text-right p-4 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center transition-colors">
+                        <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-4 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center transition-colors">
                           <span>{s.name}</span>
                           <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span>
                         </button>
@@ -397,6 +472,20 @@ const SpecialReportsPage: React.FC = () => {
       { id: 'permanent', label: 'دائم التأخر', color: 'bg-slate-100' }
     ];
 
+    // START OF CHANGE - Selection Logic
+    const handleSelectStudent = (s: StudentReport) => {
+      setLatenessForm({ 
+        ...latenessForm, 
+        studentId: s.id, 
+        studentName: s.name, 
+        grade: s.grade, 
+        section: s.section, 
+        prevLatenessCount: (data.latenessLogs || []).filter(l => l.studentId === s.id).length 
+      });
+      setSearchQuery(s.name);
+    };
+    // END OF CHANGE
+
     const saveLog = () => {
       if (!latenessForm.studentId) return alert('يرجى اختيار طالب أولاً');
       const newLog: LatenessLog = { 
@@ -406,6 +495,7 @@ const SpecialReportsPage: React.FC = () => {
       };
       updateData({ latenessLogs: [newLog, ...(data.latenessLogs || [])] });
       setLatenessForm({ ...latenessForm, studentName: '', studentId: '', reason: '', pledge: '', notes: '' });
+      setSearchQuery('');
       alert('تم حفظ البيانات بنجاح');
     };
 
@@ -416,12 +506,28 @@ const SpecialReportsPage: React.FC = () => {
 
     return (
       <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        {/* START OF CHANGE - Frequent Names Picker */}
+        <FrequentNamesPicker 
+          logs={data.latenessLogs || []} 
+          onSelect={(name) => {
+            const s = students.find(x => x.name === name);
+            if (s) handleSelectStudent(s);
+          }}
+        />
+        {/* END OF CHANGE */}
         <div className="flex justify-between items-center mb-6 border-b pb-4">
            <div className="flex gap-2">
               <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-blue-100 transition-all flex items-center gap-2">
                 {showTable ? <Plus size={18}/> : <History size={18}/>}
                 {showTable ? 'رصد جديد' : 'أرشيف التأخر'}
               </button>
+              {/* START OF CHANGE - Frequent Button */}
+              {!showTable && (
+                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                  <RefreshCw size={18}/> الأسماء المتكررة
+                </button>
+              )}
+              {/* END OF CHANGE */}
               <button onClick={() => setActiveSubTab(null)} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={20}/></button>
            </div>
            <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
@@ -452,10 +558,7 @@ const SpecialReportsPage: React.FC = () => {
                   {suggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 z-[100] bg-white border-2 rounded-2xl shadow-2xl mt-2 max-h-48 overflow-y-auto">
                       {suggestions.map(s => (
-                        <button key={s.id} onClick={() => { 
-                          setLatenessForm({ ...latenessForm, studentId: s.id, studentName: s.name, grade: s.grade, section: s.section, prevLatenessCount: (data.latenessLogs || []).filter(l => l.studentId === s.id).length });
-                          setSearchQuery('');
-                        }} className="w-full text-right p-4 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center">
+                        <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-4 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center">
                           <span>{s.name}</span>
                           <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span>
                         </button>
@@ -558,12 +661,20 @@ const SpecialReportsPage: React.FC = () => {
       setViolationForm({ ...violationForm, [field]: updated });
     };
 
+    // START OF CHANGE - Selection Logic
+    const handleSelectStudent = (s: StudentReport) => {
+      setViolationForm({ ...violationForm, studentId: s.id, studentName: s.name, grade: s.grade, section: s.section });
+      setSearchQuery(s.name);
+    };
+    // END OF CHANGE
+
     const saveLog = () => {
       if (!violationForm.studentId) return alert('يرجى اختيار طالب أولاً');
       const total = (violationForm.behaviorViolations?.length || 0) + (violationForm.dutiesViolations?.length || 0) + (violationForm.achievementViolations?.length || 0);
       const newLog: StudentViolationLog = { ...violationForm as StudentViolationLog, id: Date.now().toString(), totalViolations: total };
       updateData({ studentViolationLogs: [newLog, ...(data.studentViolationLogs || [])] });
       setViolationForm({ ...violationForm, studentName: '', studentId: '', behaviorViolations: [], dutiesViolations: [], achievementViolations: [], notes: '', pledge: '' });
+      setSearchQuery('');
       alert('تم تسجيل المخالفة بنجاح');
     };
 
@@ -574,12 +685,28 @@ const SpecialReportsPage: React.FC = () => {
 
     return (
       <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        {/* START OF CHANGE - Frequent Names Picker */}
+        <FrequentNamesPicker 
+          logs={data.studentViolationLogs || []} 
+          onSelect={(name) => {
+            const s = students.find(x => x.name === name);
+            if (s) handleSelectStudent(s);
+          }}
+        />
+        {/* END OF CHANGE */}
         <div className="flex justify-between items-center mb-6 border-b pb-4">
            <div className="flex gap-2">
               <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-blue-100 transition-all flex items-center gap-2">
                 {showTable ? <Plus size={18}/> : <ShieldAlert size={18}/>}
                 {showTable ? 'رصد جديد' : 'جدول المخالفات'}
               </button>
+              {/* START OF CHANGE - Frequent Button */}
+              {!showTable && (
+                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                  <RefreshCw size={18}/> الأسماء المتكررة
+                </button>
+              )}
+              {/* END OF CHANGE */}
               <button onClick={() => setActiveSubTab(null)} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={20}/></button>
            </div>
            <h2 className="text-2xl font-black text-red-600 flex items-center gap-3">سجل المخالفات الطلابية <AlertCircle size={24}/></h2>
@@ -596,10 +723,7 @@ const SpecialReportsPage: React.FC = () => {
                   {suggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 z-[100] bg-white border-2 rounded-2xl shadow-2xl mt-2 max-h-40 overflow-y-auto">
                       {suggestions.map(s => (
-                        <button key={s.id} onClick={() => { 
-                          setViolationForm({ ...violationForm, studentId: s.id, studentName: s.name, grade: s.grade, section: s.section });
-                          setSearchQuery('');
-                        }} className="w-full text-right p-3 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center text-[11px] transition-colors">
+                        <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-3 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center text-[11px] transition-colors">
                           <span>{s.name}</span><span className="text-[9px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade}</span>
                         </button>
                       ))}
@@ -711,11 +835,26 @@ const SpecialReportsPage: React.FC = () => {
       return true;
     });
 
+    // START OF CHANGE - Selection Logic
+    const handleSelectStudent = (s: StudentReport) => {
+      setExitForm({ 
+        ...exitForm, 
+        studentId: s.id, 
+        studentName: s.name, 
+        grade: s.grade, 
+        section: s.section, 
+        prevExitCount: (data.exitLogs || []).filter(l => l.studentId === s.id).length 
+      });
+      setSearchQuery(s.name);
+    };
+    // END OF CHANGE
+
     const saveLog = () => {
       if (!exitForm.studentId) return alert('يرجى اختيار طالب أولاً');
       const newLog: ExitLog = { ...exitForm as ExitLog, id: Date.now().toString(), day: getDayName(exitForm.date || today) };
       updateData({ exitLogs: [newLog, ...(data.exitLogs || [])] });
       setExitForm({ ...exitForm, studentName: '', studentId: '', notes: '', status: 'نادر الخروج', action: 'تنبيه 1' });
+      setSearchQuery('');
       alert('تم حفظ بيانات الخروج');
     };
 
@@ -727,12 +866,28 @@ const SpecialReportsPage: React.FC = () => {
 
     return (
       <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        {/* START OF CHANGE - Frequent Names Picker */}
+        <FrequentNamesPicker 
+          logs={data.exitLogs || []} 
+          onSelect={(name) => {
+            const s = students.find(x => x.name === name);
+            if (s) handleSelectStudent(s);
+          }}
+        />
+        {/* END OF CHANGE */}
         <div className="flex justify-between items-center mb-6 border-b pb-4">
            <div className="flex gap-2">
               <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-blue-100 transition-all flex items-center gap-2 shadow-sm">
                 {showTable ? <Plus size={18}/> : <LayoutList size={18}/>}
                 {showTable ? 'رصد خروج جديد' : 'جدول الخروج'}
               </button>
+              {/* START OF CHANGE - Frequent Button */}
+              {!showTable && (
+                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                  <RefreshCw size={18}/> الأسماء المتكررة
+                </button>
+              )}
+              {/* END OF CHANGE */}
               <button onClick={() => setActiveSubTab(null)} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={20}/></button>
            </div>
            <h2 className="text-2xl font-black text-blue-600 flex items-center gap-3">خروج طالب أثناء الدراسة <UserPlus size={24}/></h2>
@@ -748,7 +903,7 @@ const SpecialReportsPage: React.FC = () => {
               {suggestions.length > 0 && (
                 <div className="absolute top-full left-0 right-0 z-[100] bg-white border-2 rounded-2xl shadow-2xl mt-2 max-h-64 overflow-y-auto">
                   {suggestions.map(s => (
-                    <button key={s.id} onClick={() => { setExitForm({ ...exitForm, studentId: s.id, studentName: s.name, grade: s.grade, section: s.section, prevExitCount: (data.exitLogs || []).filter(l => l.studentId === s.id).length }); setSearchQuery(''); }} className="w-full text-right p-4 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center transition-colors"><span>{s.name}</span> <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span></button>
+                    <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-4 hover:bg-blue-50 font-black border-b last:border-none flex justify-between items-center transition-colors"><span>{s.name}</span> <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span></button>
                   ))}
                 </div>
               )}
@@ -792,11 +947,26 @@ const SpecialReportsPage: React.FC = () => {
       return true;
     });
 
+    // START OF CHANGE - Selection Logic
+    const handleSelectStudent = (s: StudentReport) => {
+      setDamageForm({ 
+        ...damageForm, 
+        studentId: s.id, 
+        studentName: s.name, 
+        grade: s.grade, 
+        section: s.section, 
+        prevDamageCount: (data.damageLogs || []).filter(l => l.studentId === s.id).length 
+      });
+      setSearchQuery(s.name);
+    };
+    // END OF CHANGE
+
     const saveLog = () => {
       if (!damageForm.studentId) return alert('يرجى اختيار طالب أولاً');
       const newLog: DamageLog = { ...damageForm as DamageLog, id: Date.now().toString(), day: getDayName(damageForm.date || today) };
       updateData({ damageLogs: [newLog, ...(data.damageLogs || [])] });
       setDamageForm({ ...damageForm, studentName: '', studentId: '', notes: '', description: '', action: 'تنبيه' });
+      setSearchQuery('');
       alert('تم حفظ بيانات الإتلاف');
     };
 
@@ -808,12 +978,28 @@ const SpecialReportsPage: React.FC = () => {
 
     return (
       <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        {/* START OF CHANGE - Frequent Names Picker */}
+        <FrequentNamesPicker 
+          logs={data.damageLogs || []} 
+          onSelect={(name) => {
+            const s = students.find(x => x.name === name);
+            if (s) handleSelectStudent(s);
+          }}
+        />
+        {/* END OF CHANGE */}
         <div className="flex justify-between items-center mb-6 border-b pb-4">
            <div className="flex gap-2">
               <button onClick={() => setShowTable(!showTable)} className="bg-red-50 text-red-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-red-100 transition-all flex items-center gap-2 shadow-sm">
                 {showTable ? <Plus size={18}/> : <LayoutList size={18}/>}
                 {showTable ? 'رصد إتلاف جديد' : 'جدول الإتلاف'}
               </button>
+              {/* START OF CHANGE - Frequent Button */}
+              {!showTable && (
+                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                  <RefreshCw size={18}/> الأسماء المتكررة
+                </button>
+              )}
+              {/* END OF CHANGE */}
               <button onClick={() => setActiveSubTab(null)} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={20}/></button>
            </div>
            <h2 className="text-2xl font-black text-red-600 flex items-center gap-3">سجل الإتلاف المدرسي <Hammer size={24}/></h2>
@@ -829,7 +1015,7 @@ const SpecialReportsPage: React.FC = () => {
               {suggestions.length > 0 && (
                 <div className="absolute top-full left-0 right-0 z-[100] bg-white border-2 rounded-2xl shadow-2xl mt-2 max-h-64 overflow-y-auto">
                   {suggestions.map(s => (
-                    <button key={s.id} onClick={() => { setDamageForm({ ...damageForm, studentId: s.id, studentName: s.name, grade: s.grade, section: s.section, prevDamageCount: (data.damageLogs || []).filter(l => l.studentId === s.id).length }); setSearchQuery(''); }} className="w-full text-right p-4 hover:bg-red-50 font-black border-b last:border-none flex justify-between items-center transition-colors"><span>{s.name}</span> <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span></button>
+                    <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-4 hover:bg-red-50 font-black border-b last:border-none flex justify-between items-center transition-colors"><span>{s.name}</span> <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span></button>
                   ))}
                 </div>
               )}
@@ -873,6 +1059,20 @@ const SpecialReportsPage: React.FC = () => {
       return true;
     });
 
+    // START OF CHANGE - Selection Logic
+    const handleSelectStudent = (s: StudentReport) => {
+      setVisitForm({ 
+        ...visitForm, 
+        studentId: s.id, 
+        studentName: s.name, 
+        grade: s.grade, 
+        section: s.section, 
+        prevVisitCount: (data.parentVisitLogs || []).filter(l => l.studentId === s.id).length 
+      });
+      setSearchQuery(s.name);
+    };
+    // END OF CHANGE
+
     const saveLog = () => {
       if (!visitForm.studentId) return alert('يرجى اختيار طالب أولاً');
       const newLog: ParentVisitLog = { 
@@ -882,6 +1082,7 @@ const SpecialReportsPage: React.FC = () => {
       };
       updateData({ parentVisitLogs: [newLog, ...(data.parentVisitLogs || [])] });
       setVisitForm({ ...visitForm, studentName: '', studentId: '', visitorName: '', reason: '', actions: '', notes: '' });
+      setSearchQuery('');
       alert('تم حفظ سجل التواصل/الزيارة');
     };
 
@@ -893,12 +1094,28 @@ const SpecialReportsPage: React.FC = () => {
 
     return (
       <div className="bg-white p-8 rounded-[3rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        {/* START OF CHANGE - Frequent Names Picker */}
+        <FrequentNamesPicker 
+          logs={data.parentVisitLogs || []} 
+          onSelect={(name) => {
+            const s = students.find(x => x.name === name);
+            if (s) handleSelectStudent(s);
+          }}
+        />
+        {/* END OF CHANGE */}
         <div className="flex justify-between items-center mb-6 border-b pb-4">
            <div className="flex gap-2">
               <button onClick={() => setShowTable(!showTable)} className="bg-indigo-50 text-indigo-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm">
                 {showTable ? <Plus size={18}/> : <LayoutList size={18}/>}
                 {showTable ? 'رصد جديد' : 'جدول السجلات'}
               </button>
+              {/* START OF CHANGE - Frequent Button */}
+              {!showTable && (
+                <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                  <RefreshCw size={18}/> الأسماء المتكررة
+                </button>
+              )}
+              {/* END OF CHANGE */}
               <button onClick={() => setActiveSubTab(null)} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={20}/></button>
            </div>
            <h2 className="text-2xl font-black text-indigo-600 flex items-center gap-3">سجل زيارات أولياء الأمور <UserPlus size={24}/></h2>
@@ -924,7 +1141,7 @@ const SpecialReportsPage: React.FC = () => {
                   {suggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 z-[100] bg-white border-2 rounded-2xl shadow-2xl mt-2 max-h-64 overflow-y-auto">
                       {suggestions.map(s => (
-                        <button key={s.id} onClick={() => { setVisitForm({ ...visitForm, studentId: s.id, studentName: s.name, grade: s.grade, section: s.section, prevVisitCount: (data.parentVisitLogs || []).filter(l => l.studentId === s.id).length }); setSearchQuery(''); }} className="w-full text-right p-4 hover:bg-indigo-50 font-black border-b last:border-none flex justify-between items-center transition-colors"><span>{s.name}</span> <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span></button>
+                        <button key={s.id} onClick={() => handleSelectStudent(s)} className="w-full text-right p-4 hover:bg-indigo-50 font-black border-b last:border-none flex justify-between items-center transition-colors"><span>{s.name}</span> <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span></button>
                       ))}
                     </div>
                   )}
