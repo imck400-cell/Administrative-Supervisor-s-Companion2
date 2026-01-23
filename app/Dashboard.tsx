@@ -6,7 +6,7 @@ import {
   TrendingUp, Calendar, Clock, Filter, ChevronDown, 
   UserCheck, UserX, BookOpen, Star, AlertTriangle, Search,
   ClipboardCheck, Sparkles, GraduationCap, ShieldAlert, 
-  UserPlus, CalendarDays, Activity, Medal, School, User,
+  UserCheck as UserPlusIcon, CalendarDays, Activity, Medal, School, User,
   FileSpreadsheet, Share2, ChevronLeft, ChevronRight, Triangle,
   ArrowLeftRight, History
 } from 'lucide-react';
@@ -63,6 +63,8 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
           if (globalTimeRange === 'custom') {
             const start = new Date(dateRange.start);
             const end = new Date(dateRange.end);
+            // Set end date to end of day
+            end.setHours(23, 59, 59, 999);
             return itemDate >= start && itemDate <= end;
           }
           return true;
@@ -116,7 +118,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
     { id: 'students', label: 'تقارير الطلاب', icon: <GraduationCap className="text-blue-500" />, view: 'studentReports' },
     { id: 'teachers', label: 'متابعة المعلمين', icon: <UserCheck className="text-emerald-500" />, view: 'daily' },
     { id: 'violations', label: 'التعهدات والمخالفات', icon: <ShieldAlert className="text-red-500" />, view: 'violations' },
-    { id: 'substitutions', label: 'تغطية الحصص', icon: <UserPlus className="text-purple-500" />, view: 'substitute' },
+    { id: 'substitutions', label: 'تغطية الحصص', icon: <UserCheck className="text-purple-500" />, view: 'substitute' },
     { id: 'absences', label: 'غياب الطلاب', icon: <UserX className="text-orange-500" />, view: 'specialReports' },
     { id: 'lateness', label: 'تأخر الطلاب', icon: <Clock className="text-amber-500" />, view: 'specialReports' },
     { id: 'student_violations', label: 'المخالفات الطلابية', icon: <AlertTriangle className="text-rose-500" />, view: 'specialReports' },
@@ -234,6 +236,24 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
                 </button>
              ))}
            </div>
+
+           {globalTimeRange === 'custom' && (
+             <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-2xl border shadow-sm animate-in slide-in-from-right-2">
+               <input 
+                 type="date" 
+                 value={dateRange.start} 
+                 onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
+                 className="text-[9px] font-black outline-none bg-transparent"
+               />
+               <span className="text-slate-200">|</span>
+               <input 
+                 type="date" 
+                 value={dateRange.end} 
+                 onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
+                 className="text-[9px] font-black outline-none bg-transparent"
+               />
+             </div>
+           )}
         </div>
       </header>
 
@@ -252,7 +272,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
           return (
             <div 
                 key={card.id} 
-                className={`rounded-[2.5rem] border-2 ${design.border} p-4 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group flex flex-col gap-1.5 relative overflow-visible h-[240px] mt-6`}
+                className={`rounded-[2.5rem] border-2 ${design.border} p-4 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group flex flex-col gap-1.5 relative overflow-visible h-[260px] mt-6`}
                 style={{ background: design.gradient }}
             >
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-30">
@@ -344,7 +364,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
                      onClick={() => shiftCardData(card.id, 'prev', count)}
                      className={`p-1.5 rounded-full bg-white/80 hover:bg-white ${design.text} transition-all shadow-md active:scale-90`}
                    >
-                     <Triangle size={12} className="rotate-90 fill-current" />
+                     <ChevronRight size={14} />
                    </button>
                    <div className="flex gap-1">
                       {Array.from({ length: Math.min(Math.ceil(count / 3), 4) }).map((_, dotIdx) => (
@@ -355,7 +375,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
                      onClick={() => shiftCardData(card.id, 'next', count)}
                      className={`p-1.5 rounded-full bg-white/80 hover:bg-white ${design.text} transition-all shadow-md active:scale-90`}
                    >
-                     <Triangle size={12} className="rotate-270 fill-current" />
+                     <ChevronLeft size={14} />
                    </button>
                 </div>
               )}
@@ -402,7 +422,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
             {[
               { label: 'التقرير اليومي', icon: <FileText />, view: 'daily' },
-              { label: 'تغطية الحصص', icon: <UserPlus />, view: 'substitute' },
+              { label: 'تغطية الحصص', icon: <UserPlusIcon />, view: 'substitute' },
               { label: 'تعهد طالب', icon: <AlertCircle />, view: 'violations' },
               { label: 'خطة الإشراف', icon: <CalendarDays />, view: 'specialReports' },
             ].map((btn, i) => (
