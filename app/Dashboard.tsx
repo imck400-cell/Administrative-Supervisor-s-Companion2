@@ -8,7 +8,8 @@ import {
   ClipboardCheck, Sparkles, GraduationCap, ShieldAlert, 
   UserCheck as UserPlusIcon, CalendarDays, Activity, Medal, School, User,
   FileSpreadsheet, Share2, ChevronLeft, ChevronRight, Triangle,
-  ArrowLeftRight, History, Home, MapPin, Briefcase, HeartPulse, UserPlus, Hammer, MessageSquare
+  ArrowLeftRight, History, Home, MapPin, Briefcase, HeartPulse, UserPlus, Hammer, MessageSquare,
+  FileSearch
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -19,15 +20,10 @@ interface CardConfig {
   id: number;
   category: DataCategory;
   subType: string;
+  subSubType: string; // START OF CHANGE - Support for 3rd level hierarchy
 }
 
-// START OF CHANGE - Updated Dashboard Props to include recentActions
-interface DashboardProps {
-  setView?: (v: string) => void;
-  recentActions?: any[];
-}
-
-const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) => {
+const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[] }> = ({ setView, recentActions = [] }) => {
   const { lang, data } = useGlobal();
 
   const today = new Date().toISOString().split('T')[0];
@@ -38,7 +34,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) =>
   const [cycleDuration, setCycleDuration] = useState(5000);
   const [cardOffsets, setCardOffsets] = useState<Record<number, number>>({});
 
-  // Main Categories defined by user request
   const mainCategories = [
     { id: 'students', label: 'تقارير الطلاب', icon: <GraduationCap className="text-blue-500" />, view: 'studentReports' },
     { id: 'teachers', label: 'متابعة المعلمين', icon: <UserCheck className="text-emerald-500" />, view: 'daily' },
@@ -47,7 +42,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) =>
     { id: 'substitutions', label: 'جدول التغطية', icon: <UserPlusIcon className="text-purple-500" />, view: 'substitute' },
   ];
 
-  // Logic to fetch subtypes for each main category as requested (Surgical Detail)
   const getSubTypes = (category: DataCategory) => {
     switch (category) {
       case 'students':
@@ -72,13 +66,13 @@ const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) =>
           { id: 'violations', label: 'المخالفات', icon: <AlertCircle size={12} /> },
         ];
       case 'special_reports':
+        // START OF CHANGE - Updated Hierarchy for Special Reports
         return [
-          { id: 'all', label: 'جميع السجلات', icon: <History size={12} /> },
-          { id: 'absences', label: 'غياب الطلاب', icon: <UserX size={12} /> },
-          { id: 'lateness', label: 'تأخر الطلاب', icon: <Clock size={12} /> },
-          { id: 'exits', label: 'خروج الطلاب', icon: <UserPlusIcon size={12} /> },
-          { id: 'damages', label: 'إتلافات المدرسة', icon: <Hammer size={12} /> },
-          { id: 'visits', label: 'زيارات أولياء الأمور', icon: <Users size={12} /> },
+          { id: 'all', label: 'جميع التقارير', icon: <History size={12} /> },
+          { id: 'supervisor', label: 'المشرف الإداري', icon: <Briefcase size={12} /> },
+          { id: 'staff', label: 'الكادر التعليمي', icon: <Users size={12} /> },
+          { id: 'students_sr', label: 'الطلاب/ الطالبات', icon: <GraduationCap size={12} /> },
+          { id: 'tests', label: 'تقارير الاختبار', icon: <FileSearch size={12} /> },
         ];
       case 'substitutions':
         return [
@@ -91,7 +85,55 @@ const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) =>
     }
   };
 
-  // Memoized data processing for efficiency
+  // START OF CHANGE - Helper for 3rd level sub-sub-categories
+  const getSubSubTypes = (subType: string) => {
+    switch (subType) {
+      case 'supervisor':
+        return [
+          { id: 'all', label: 'الكل' },
+          { id: 'الخطة الفصلية', label: 'الخطة الفصلية' },
+          { id: 'الخلاصة الشهرية', label: 'الخلاصة الشهرية' },
+          { id: 'المهام اليومية', label: 'المهام اليومية' },
+          { id: 'المهام المضافة', label: 'المهام المضافة' },
+          { id: 'المهام المرحلة', label: 'المهام المرحلة' },
+          { id: 'أهم المشكلات اليومية', label: 'أهم المشكلات اليومية' },
+          { id: 'التوصيات العامة', label: 'التوصيات العامة' },
+          { id: 'احتياجات الدور', label: 'احتياجات الدور' },
+          { id: 'سجل متابعة الدفاتر والتصحيح', label: 'سجل متابعة الدفاتر والتصحيح' },
+          { id: 'الجرد العام للعهد', label: 'الجرد العام للعهد' },
+          { id: 'ملاحظات عامة', label: 'ملاحظات عامة' },
+        ];
+      case 'staff':
+        return [
+          { id: 'all', label: 'الكل' },
+          { id: 'سجل الإبداع والتميز', label: 'سجل الإبداع والتميز' },
+          { id: 'كشف الاستلام والتسليم', label: 'كشف الاستلام والتسليم' },
+          { id: 'المخالفات', label: 'المخالفات' },
+          { id: 'التعميمات', label: 'التعميمات' },
+        ];
+      case 'students_sr':
+        return [
+          { id: 'all', label: 'الكل' },
+          { id: 'الغياب اليومي', label: 'الغياب اليومي' },
+          { id: 'التأخر', label: 'التأخر' },
+          { id: 'خروج طالب أثناء الدراسة', label: 'خروج طالب أثناء الدراسة' },
+          { id: 'المخالفات الطلابية', label: 'المخالفات الطلابية' },
+          { id: 'سجل الإتلاف المدرسي', label: 'سجل الإتلاف المدرسي' },
+          { id: 'سجل الحالات الخاصة', label: 'سجل الحالات الخاصة' },
+          { id: 'سجل الحالة الصحية', label: 'سجل الحالة الصحية' },
+          { id: 'سجل زيارة أولياء الأمور والتواصل بهم', label: 'سجل زيارة أولياء الأمور والتواصل بهم' },
+        ];
+      case 'tests':
+        return [
+          { id: 'all', label: 'الكل' },
+          { id: 'الاختبار الشهري', label: 'الاختبار الشهري' },
+          { id: 'الاختبار الفصلي', label: 'الاختبار الفصلي' },
+        ];
+      default:
+        return [];
+    }
+  };
+
   const processedData = useMemo(() => {
     const results: Record<string, any[]> = {
       students: (data.studentReports || []).map(s => ({ ...s, displayName: s.name, type: 'student' })),
@@ -99,15 +141,16 @@ const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) =>
       violations: (data.violations || []).map(v => ({ ...v, displayName: v.studentName || v.teacherName, type: 'violation' })),
       substitutions: (data.substitutions || []).map(s => ({ ...s, displayName: s.absentTeacher, type: 'substitution' })),
       special_reports: [
-        ...(data.absenceLogs || []).map(l => ({ ...l, displayName: l.studentName, stype: 'absences', icon: <UserX size={12}/> })),
-        ...(data.latenessLogs || []).map(l => ({ ...l, displayName: l.studentName, stype: 'lateness', icon: <Clock size={12}/> })),
-        ...(data.exitLogs || []).map(l => ({ ...l, displayName: l.studentName, stype: 'exits', icon: <UserPlusIcon size={12}/> })),
-        ...(data.damageLogs || []).map(l => ({ ...l, displayName: l.studentName, stype: 'damages', icon: <Hammer size={12}/> })),
-        ...(data.parentVisitLogs || []).map(l => ({ ...l, displayName: l.studentName, stype: 'visits', icon: <Users size={12}/> })),
+        ...(data.absenceLogs || []).map(l => ({ ...l, displayName: l.studentName, cat: 'students_sr', sub: 'الغياب اليومي', icon: <UserX size={12}/> })),
+        ...(data.latenessLogs || []).map(l => ({ ...l, displayName: l.studentName, cat: 'students_sr', sub: 'التأخر', icon: <Clock size={12}/> })),
+        ...(data.exitLogs || []).map(l => ({ ...l, displayName: l.studentName, cat: 'students_sr', sub: 'خروج طالب أثناء الدراسة', icon: <UserPlusIcon size={12}/> })),
+        ...(data.damageLogs || []).map(l => ({ ...l, displayName: l.studentName, cat: 'students_sr', sub: 'سجل الإتلاف المدرسي', icon: <Hammer size={12}/> })),
+        ...(data.studentViolationLogs || []).map(l => ({ ...l, displayName: l.studentName, cat: 'students_sr', sub: 'المخالفات الطلابية', icon: <ShieldAlert size={12}/> })),
+        ...(data.parentVisitLogs || []).map(l => ({ ...l, displayName: l.studentName, cat: 'students_sr', sub: 'سجل زيارة أولياء الأمور والتواصل بهم', icon: <Users size={12}/> })),
+        ...(data.genericSpecialReports || []).map(l => ({ ...l, displayName: l.title, cat: l.category === 'supervisor' ? 'supervisor' : l.category === 'staff' ? 'staff' : l.category === 'tests' ? 'tests' : 'supervisor', sub: l.subCategory, icon: <FileText size={12}/> })),
       ]
     };
 
-    // Apply Global Time Filters
     Object.keys(results).forEach(key => {
       if (globalTimeRange !== 'all') {
         const now = new Date();
@@ -130,10 +173,9 @@ const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) =>
     return results;
   }, [data, globalTimeRange, dateRange]);
 
-  // Initial Card Setup
   const [cards, setCards] = useState<CardConfig[]>(() => {
     const cats: DataCategory[] = ['students', 'teachers', 'violations', 'special_reports', 'substitutions', 'students', 'teachers', 'special_reports'];
-    return cats.map((cat, i) => ({ id: i + 1, category: cat, subType: 'all' }));
+    return cats.map((cat, i) => ({ id: i + 1, category: cat, subType: 'all', subSubType: 'all' }));
   });
 
   useEffect(() => {
@@ -141,12 +183,18 @@ const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) =>
     return () => clearInterval(timer);
   }, [cycleDuration]);
 
-  // Pagination Logic
   useEffect(() => {
     setCardOffsets(prev => {
       const nextOffsets = { ...prev };
       cards.forEach(card => {
-        const list = processedData[card.category] || [];
+        let list = processedData[card.category] || [];
+        if (card.category === 'special_reports') {
+          if (card.subType !== 'all') list = list.filter(i => i.cat === card.subType);
+          if (card.subSubType !== 'all') list = list.filter(i => i.sub === card.subSubType);
+        } else if (card.subType !== 'all') {
+          if (card.category === 'substitutions') list = list.filter(i => i.paymentStatus === card.subType);
+          else if (card.category === 'students') list = list.filter(i => (i as any)[card.subType]);
+        }
         if (list.length > 3) {
           const current = nextOffsets[card.id] || 0;
           let next = current + 3;
@@ -173,10 +221,34 @@ const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) =>
   };
 
   const handleExportExcel = (title: string, list: any[]) => {
-    const worksheet = XLSX.utils.json_to_sheet(list.map(item => ({ 'الاسم': item.displayName, 'الحالة': item.stype || '---' })));
+    const worksheet = XLSX.utils.json_to_sheet(list.map(item => ({ 'الاسم': item.displayName, 'الحالة': item.sub || item.stype || '---', 'تاريخ': item.date || item.createdAt || '---' })));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
     XLSX.writeFile(workbook, `${title}_Report.xlsx`);
+  };
+
+  // START OF CHANGE - WhatsApp Rich Sharing Logic
+  const handleExportWhatsApp = (title: string, list: any[]) => {
+    let msg = `*📋 تقرير داشبورد: ${title}*\n`;
+    msg += `*التاريخ:* ${new Date().toLocaleDateString('ar-EG')}\n`;
+    msg += `----------------------------------\n\n`;
+
+    list.slice(0, 15).forEach((item, idx) => {
+      const isBad = (item.behaviorLevel && (item.behaviorLevel.includes('ضعيف') || item.behaviorLevel.includes('مخالفة'))) || 
+                    (item.academicReading && item.academicReading.includes('ضعيف')) || 
+                    (item.stype === 'absences') || (item.violations_score > 0);
+      
+      const emoji = isBad ? '🔴' : '🔹';
+      msg += `*${emoji} (${idx + 1}) الاسم:* ${item.displayName}\n`;
+      if (item.grade) msg += `📍 *الصف:* ${item.grade} / ${item.section || ''}\n`;
+      if (item.sub || item.stype) msg += `🏷️ *النوع:* _${item.sub || item.stype}_\n`;
+      if (isBad) msg += `⚠️ *ملاحظة:* يرجى المتابعة العاجلة\n`;
+      msg += `\n`;
+    });
+    msg += `----------------------------------\n`;
+    msg += `*رفيق المشرف الإداري - إبراهيم دخان*`;
+    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
   };
 
   const cardColors = [
@@ -236,19 +308,18 @@ const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) =>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {cards.map((card, idx) => {
           let list = processedData[card.category] || [];
-          // Filtering logic based on subtype if not 'all'
-          if (card.subType !== 'all') {
-            if (card.category === 'special_reports') list = list.filter(i => i.stype === card.subType);
-            else if (card.category === 'substitutions') list = list.filter(i => i.paymentStatus === card.subType);
-            else if (card.category === 'students') {
-               // Show only students who have data in that specific field
-               list = list.filter(i => (i as any)[card.subType]);
-            }
+          if (card.category === 'special_reports') {
+            if (card.subType !== 'all') list = list.filter(i => i.cat === card.subType);
+            if (card.subSubType !== 'all') list = list.filter(i => i.sub === card.subSubType);
+          } else if (card.subType !== 'all') {
+            if (card.category === 'substitutions') list = list.filter(i => i.paymentStatus === card.subType);
+            else if (card.category === 'students') list = list.filter(i => (i as any)[card.subType]);
           }
 
           const count = list.length;
           const currentCat = mainCategories.find(c => c.id === card.category);
           const currentSub = getSubTypes(card.category).find(s => s.id === card.subType);
+          const subSubOptions = getSubSubTypes(card.subType);
           const design = cardColors[idx % cardColors.length];
           const offset = cardOffsets[card.id] || 0;
           const visibleItems = list.slice(offset, offset + 3);
@@ -256,13 +327,19 @@ const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) =>
           return (
             <div 
                 key={card.id} 
-                className={`rounded-[2.5rem] border-2 ${design.border} p-4 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group flex flex-col gap-1.5 relative overflow-visible h-[290px] mt-6`}
+                className={`rounded-[2.5rem] border-2 ${design.border} p-4 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group flex flex-col gap-1.5 relative overflow-visible h-[310px] mt-6`}
                 style={{ background: design.gradient }}
             >
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-30">
                  <div className={`w-14 h-14 rounded-full border-4 border-white flex items-center justify-center font-black text-2xl text-white shadow-xl ${design.accent}`}>
                     {count}
                  </div>
+              </div>
+
+              {/* START OF CHANGE - Export Icons in corner */}
+              <div className="absolute top-4 left-4 z-40 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => handleExportWhatsApp(currentSub?.label || currentCat?.label || 'تقرير', list)} className="p-1 bg-white/80 rounded-lg text-green-600 shadow-sm hover:bg-white"><Share2 size={12}/></button>
+                <button onClick={() => handleExportExcel(currentSub?.label || currentCat?.label || 'تقرير', list)} className="p-1 bg-white/80 rounded-lg text-blue-600 shadow-sm hover:bg-white"><FileSpreadsheet size={12}/></button>
               </div>
 
               <div className="flex flex-col gap-1 relative z-10 pt-4 px-1">
@@ -273,29 +350,39 @@ const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) =>
                         </div>
                         <select 
                             value={card.category}
-                            onChange={(e) => updateCard(card.id, { category: e.target.value as DataCategory, subType: 'all' })}
+                            onChange={(e) => updateCard(card.id, { category: e.target.value as DataCategory, subType: 'all', subSubType: 'all' })}
                             className={`text-[9px] font-black bg-white ${design.text} rounded-lg px-2 py-1 outline-none border-none cursor-pointer shadow-sm hover:bg-slate-50 transition-colors uppercase tracking-wider`}
                         >
                             {mainCategories.map(cat => <option key={cat.id} value={cat.id}>{cat.label}</option>)}
                         </select>
                     </div>
-                    
-                    <div className="flex gap-1">
-                      <button onClick={() => handleExportExcel(currentSub?.label || 'Data', list)} className="p-1.5 bg-white text-blue-600 rounded-lg shadow-sm hover:bg-blue-50 transition-colors">
-                        <FileSpreadsheet size={12} />
-                      </button>
-                    </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 bg-white/60 backdrop-blur-md p-0.5 rounded-lg border border-white/40 shadow-inner">
-                    <div className={`p-1 rounded bg-white shadow-sm`}>{currentSub?.icon}</div>
-                    <select 
-                        value={card.subType}
-                        onChange={(e) => updateCard(card.id, { subType: e.target.value })}
-                        className={`text-[9px] font-bold ${design.text} bg-transparent outline-none w-full cursor-pointer`}
-                    >
-                        {getSubTypes(card.category).map(sub => <option key={sub.id} value={sub.id}>{sub.label}</option>)}
-                    </select>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5 bg-white/60 backdrop-blur-md p-0.5 rounded-lg border border-white/40 shadow-inner">
+                      <div className={`p-1 rounded bg-white shadow-sm`}>{currentSub?.icon}</div>
+                      <select 
+                          value={card.subType}
+                          onChange={(e) => updateCard(card.id, { subType: e.target.value, subSubType: 'all' })}
+                          className={`text-[9px] font-bold ${design.text} bg-transparent outline-none w-full cursor-pointer`}
+                      >
+                          {getSubTypes(card.category).map(sub => <option key={sub.id} value={sub.id}>{sub.label}</option>)}
+                      </select>
+                  </div>
+                  
+                  {/* START OF CHANGE - Support for 3rd level sub-sub-type select */}
+                  {subSubOptions.length > 0 && (
+                    <div className="flex items-center gap-1.5 bg-white/40 backdrop-blur-md p-0.5 rounded-lg border border-white/20 shadow-inner animate-in slide-in-from-top-1">
+                      <div className={`p-1 rounded bg-white/50 shadow-sm`}><Filter size={10} className="text-slate-400" /></div>
+                      <select 
+                          value={card.subSubType}
+                          onChange={(e) => updateCard(card.id, { subSubType: e.target.value })}
+                          className={`text-[8px] font-bold ${design.text} bg-transparent outline-none w-full cursor-pointer`}
+                      >
+                          {subSubOptions.map(ss => <option key={ss.id} value={ss.id}>{ss.label}</option>)}
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -306,30 +393,24 @@ const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) =>
                       <span className="italic text-[8px] font-bold">لا توجد بيانات</span>
                     </div>
                  ) : (
-                    visibleItems.map((item, i) => {
-                       // Dynamic Icon based on sub filter
-                       let dynamicIcon = currentSub?.icon || <User size={12} />;
-                       if (card.category === 'special_reports') dynamicIcon = item.icon || dynamicIcon;
-                       
-                       return (
+                    visibleItems.map((item, i) => (
                         <div 
                           key={`${card.id}-${offset}-${i}`}
                           onClick={() => setView?.(currentCat?.view || 'dashboard')}
                           className="bg-white/90 backdrop-blur-sm p-1 rounded-xl border border-white shadow-sm flex items-center gap-2 hover:bg-white hover:shadow-lg hover:-translate-x-1 cursor-pointer transition-all animate-in slide-in-from-right-2 fade-in duration-300 h-[38px]"
                         >
                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs bg-slate-50 border`}>
-                             {dynamicIcon}
+                             {item.icon || <User size={12} />}
                            </div>
                            <div className="flex-1 overflow-hidden">
                               <div className="font-black text-[9px] text-slate-800 truncate leading-none">{item.displayName}</div>
                               <div className="text-[7px] text-slate-500 font-bold truncate">
-                                {item.grade ? `${item.grade} - ${item.section}` : item.subjectCode || item.date || '---'}
+                                {item.grade ? `${item.grade} - ${item.section || ''}` : item.sub || item.subjectCode || item.date || '---'}
                               </div>
                            </div>
                            <ChevronLeft size={10} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
                         </div>
-                       );
-                    })
+                    ))
                  )}
               </div>
 
@@ -389,14 +470,12 @@ const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) =>
             <TrendingUp className="text-green-600" />
             الوصول السريع
           </h3>
-          {/* START OF CHANGE - Expanded grid for 12 buttons (4 static + 8 recent) */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
             {[
               { label: 'التقرير اليومي', icon: <FileText />, view: 'daily' },
               { label: 'تغطية الحصص', icon: <UserPlusIcon />, view: 'substitute' },
               { label: 'تعهد طالب', icon: <AlertCircle />, view: 'violations' },
               { label: 'خطة الإشراف', icon: <CalendarDays />, view: 'specialReports' },
-              // Map recent actions (last 8)
               ...recentActions.map(action => ({
                 label: action.label,
                 icon: action.icon,
@@ -415,7 +494,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setView, recentActions = [] }) =>
               </button>
             ))}
           </div>
-          {/* END OF CHANGE */}
         </div>
       </div>
     </div>
