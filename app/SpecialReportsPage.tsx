@@ -55,6 +55,12 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
     status: ''
   });
 
+  // START OF CHANGE
+  const [isAddAbsentModalOpen, setIsAddAbsentModalOpen] = useState(false);
+  const [absentEntries, setAbsentEntries] = useState<{name: string, subject: string, studentData?: StudentReport}[]>([{ name: '', subject: '' }]);
+  const [activeSearchIdx, setActiveSearchIdx] = useState<number | null>(null);
+  // END OF CHANGE
+
   const absenceFormInitial = { date: today, semester: 'الأول', status: 'expected', reason: '', commStatus: 'لم يتم التواصل', commType: 'هاتف', replier: 'الأب', result: 'لم يتم الرد', notes: '', prevAbsenceCount: 0 };
   const [absenceForm, setAbsenceForm] = useState<Partial<AbsenceLog>>(absenceFormInitial as any);
 
@@ -236,19 +242,61 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
       return true;
     });
 
+    // START OF CHANGE
     const handleAddExamRow = () => {
-      const newLog: ExamLog = {
-        id: Date.now().toString(),
-        studentId: '',
-        studentName: '',
-        date: today,
-        semester: 'الأول',
-        stage: examStage,
-        type: activeSubTab === 'الاختبار الشهري' ? 'monthly' : 'final',
-        subjectsData: currentSubjects.reduce((acc, s) => ({ ...acc, [s]: { class: '', grade: '', status: 'not_tested' } }), {})
-      };
-      updateData({ examLogs: [newLog, ...(data.examLogs || [])] });
+      setAbsentEntries([{ name: '', subject: '' }]);
+      setIsAddAbsentModalOpen(true);
     };
+
+    const submitAddAbsentees = () => {
+      const newLogs: ExamLog[] = absentEntries
+        .filter(entry => entry.name.trim() !== '')
+        .map(entry => {
+          const s = entry.studentData;
+          const subjectsData: Record<string, { class: string; grade: string; status: 'tested' | 'not_tested' }> = {};
+          currentSubjects.forEach(subj => {
+             subjectsData[subj] = { 
+               class: entry.subject === subj ? (s ? `${s.grade} - ${s.section}` : '') : '', 
+               grade: '', 
+               status: entry.subject === subj ? 'not_tested' : 'tested' 
+             };
+          });
+
+          return {
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            studentId: s?.id || '',
+            studentName: entry.name,
+            date: today,
+            semester: 'الأول',
+            stage: examStage,
+            type: activeSubTab === 'الاختبار الشهري' ? 'monthly' : 'final',
+            subjectsData
+          };
+        });
+
+      updateData({ examLogs: [...newLogs, ...(data.examLogs || [])] });
+      setIsAddAbsentModalOpen(false);
+    };
+
+    const updateAbsentEntry = (idx: number, field: string, value: any) => {
+      const updated = [...absentEntries];
+      (updated[idx] as any)[field] = value;
+      if (field === 'name' && value.length > 2) {
+        setActiveSearchIdx(idx);
+      } else {
+        setActiveSearchIdx(null);
+      }
+      setAbsentEntries(updated);
+    };
+
+    const selectStudentForEntry = (idx: number, s: StudentReport) => {
+      const updated = [...absentEntries];
+      updated[idx].name = s.name;
+      updated[idx].studentData = s;
+      setAbsentEntries(updated);
+      setActiveSearchIdx(null);
+    };
+    // END OF CHANGE
 
     const updateExamLog = (id: string, field: string, value: any) => {
       const updated = (data.examLogs || []).map(log => log.id === id ? { ...log, [field]: value } : log);
@@ -318,6 +366,11 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
               <button onClick={() => setExamStage('basic')} className={`px-8 py-3 rounded-2xl font-black text-sm transition-all shadow-md ${examStage === 'basic' ? 'bg-[#7030A0] text-white' : 'bg-white text-[#7030A0] border border-[#7030A0]'}`}>أساسي</button>
               <button onClick={() => setExamStage('secondary')} className={`px-8 py-3 rounded-2xl font-black text-sm transition-all shadow-md ${examStage === 'secondary' ? 'bg-[#7030A0] text-white' : 'bg-white text-[#7030A0] border border-[#7030A0]'}`}>ثانوي</button>
               <button onClick={handleAddExamRow} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-sm hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg"><Plus size={18}/> إضافة غائب</button>
+              {/* START OF CHANGE */}
+              <button onClick={() => setActiveSubTab(null)} className="flex items-center gap-2 bg-slate-800 text-white px-8 py-3 rounded-2xl font-black text-sm hover:bg-black transition-all shadow-md">
+                <FileSearch size={18}/> التقارير الخاصة
+              </button>
+              {/* END OF CHANGE */}
               <button onClick={() => setActiveSubTab(null)} className="p-3 bg-white border border-slate-200 hover:bg-slate-50 rounded-2xl transition-all shadow-sm"><X size={20}/></button>
            </div>
            <div className="flex flex-col items-center md:items-end">
@@ -325,6 +378,88 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
               <div className="mt-2 text-slate-500 font-bold">سجل متابعة غياب الطلاب في قاعة الاختبار</div>
            </div>
         </div>
+
+        {/* START OF CHANGE - Add Absentee Modal */}
+        {isAddAbsentModalOpen && (
+          <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 font-arabic">
+             <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border-4 border-blue-600 flex flex-col max-h-[85vh]">
+                <div className="p-6 bg-blue-600 text-white flex justify-between items-center shadow-lg">
+                   <h3 className="text-2xl font-black flex items-center gap-3"><Plus size={28}/> إضافة أسماء الغائبين</h3>
+                   <button onClick={() => setIsAddAbsentModalOpen(false)} className="hover:bg-blue-700 p-2 rounded-full transition-colors"><X size={24}/></button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-8 space-y-4">
+                   {absentEntries.map((entry, idx) => (
+                     <div key={idx} className="flex flex-col md:flex-row gap-4 p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 relative group">
+                        <div className="flex-1 relative">
+                           <label className="text-[10px] font-black text-slate-400 mr-2 block mb-1">اسم الطالب</label>
+                           <input 
+                              className="w-full p-3 rounded-xl border-2 outline-none focus:border-blue-500 font-black text-xs" 
+                              placeholder="اكتب الاسم للبحث..." 
+                              value={entry.name}
+                              onChange={(e) => updateAbsentEntry(idx, 'name', e.target.value)}
+                           />
+                           {activeSearchIdx === idx && entry.name.length > 2 && (
+                             <div className="absolute top-full left-0 right-0 z-[600] bg-white border-2 rounded-xl shadow-2xl mt-1 max-h-40 overflow-y-auto">
+                               {students
+                                 .filter(s => s.name.includes(entry.name))
+                                 .map(s => (
+                                   <button 
+                                     key={s.id} 
+                                     onClick={() => selectStudentForEntry(idx, s)}
+                                     className="w-full text-right p-3 hover:bg-blue-50 border-b last:border-none flex justify-between items-center transition-colors"
+                                   >
+                                      <span className="font-bold text-xs">{s.name}</span>
+                                      <span className="text-[9px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span>
+                                   </button>
+                                 ))
+                               }
+                             </div>
+                           )}
+                        </div>
+                        <div className="flex-1">
+                           <label className="text-[10px] font-black text-slate-400 mr-2 block mb-1">مادة الاختبار</label>
+                           <select 
+                              className="w-full p-3 rounded-xl border-2 outline-none focus:border-blue-500 font-black text-xs bg-white"
+                              value={entry.subject}
+                              onChange={(e) => updateAbsentEntry(idx, 'subject', e.target.value)}
+                           >
+                              <option value="">اختر المادة...</option>
+                              {currentSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+                           </select>
+                        </div>
+                        <button 
+                          onClick={() => setAbsentEntries(absentEntries.filter((_, i) => i !== idx))} 
+                          className="md:mt-6 p-3 text-red-400 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 size={20}/>
+                        </button>
+                     </div>
+                   ))}
+                   <button 
+                     onClick={() => setAbsentEntries([...absentEntries, { name: '', subject: '' }])}
+                     className="w-full p-4 border-2 border-dashed border-blue-200 rounded-2xl text-blue-600 font-black flex items-center justify-center gap-2 hover:bg-blue-50 transition-all"
+                   >
+                      <Plus size={20}/> إضافة حقل لاسم جديد
+                   </button>
+                </div>
+                <div className="p-6 bg-slate-50 border-t flex gap-4">
+                   <button 
+                     onClick={submitAddAbsentees}
+                     className="flex-1 bg-blue-600 text-white p-4 rounded-2xl font-black text-lg hover:bg-blue-700 shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3"
+                   >
+                      <CheckCircle size={24}/> تأكيد وإضافة للجدول
+                   </button>
+                   <button 
+                     onClick={() => setIsAddAbsentModalOpen(false)}
+                     className="px-8 bg-white border-2 text-slate-400 rounded-2xl font-black hover:bg-slate-100 transition-all"
+                   >
+                      إلغاء
+                   </button>
+                </div>
+             </div>
+          </div>
+        )}
+        {/* END OF CHANGE */}
 
         <div className="bg-white p-6 rounded-[2.5rem] border-2 border-[#7030A0]/10 mb-8 shadow-sm space-y-4">
            <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 items-end">
