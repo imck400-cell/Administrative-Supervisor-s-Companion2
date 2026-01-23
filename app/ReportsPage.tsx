@@ -335,6 +335,7 @@ export const DailyReportsPage: React.FC = () => {
                     )}
                     {displayedMetrics.map(m => (
                       <td key={m.key} className="p-1 border-e">
+                        {/* START OF CHANGE - Added onFocus select() */}
                         <input 
                             id={`input-${t.id}-${m.key}`}
                             type="number" 
@@ -345,7 +346,9 @@ export const DailyReportsPage: React.FC = () => {
                                 updateTeacher(t.id, m.key, val);
                             }} 
                             onKeyDown={(e) => handleKeyDown(e, idx, m.key)}
+                            onFocus={(e) => e.target.select()}
                         />
+                        {/* END OF CHANGE */}
                       </td>
                     ))}
                     <td 
@@ -353,13 +356,16 @@ export const DailyReportsPage: React.FC = () => {
                         onClick={() => setViolationModal({ id: t.id, notes: t.violations_notes })}
                     >
                       <div className="flex items-center justify-center gap-1">
+                          {/* START OF CHANGE - Added onFocus select() */}
                           <input 
                              type="number" 
                              className="w-full text-center text-red-600 font-bold outline-none bg-transparent text-xs" 
                              value={t.violations_score} 
                              onChange={e => updateTeacher(t.id, 'violations_score', parseInt(e.target.value) || 0)} 
                              onClick={(e) => e.stopPropagation()}
+                             onFocus={(e) => e.target.select()}
                           />
+                          {/* END OF CHANGE */}
                           {t.violations_notes.length > 0 && <div className="w-2 h-2 rounded-full bg-red-600 absolute top-1 right-1"></div>}
                       </div>
                     </td>
