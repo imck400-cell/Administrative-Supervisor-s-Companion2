@@ -8,11 +8,11 @@ import {
   ClipboardCheck, Sparkles, GraduationCap, ShieldAlert, 
   UserCheck as UserPlusIcon, CalendarDays, Activity, Medal, School, User,
   FileSpreadsheet, Share2, ChevronLeft, ChevronRight, Triangle,
-  ArrowLeftRight, History
+  ArrowLeftRight, History, Home, MapPin, Briefcase, HeartPulse, UserPlus, Hammer, MessageSquare
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-type DataCategory = 'students' | 'teachers' | 'violations' | 'substitutions' | 'absences' | 'lateness' | 'student_violations';
+type DataCategory = 'students' | 'teachers' | 'violations' | 'substitutions' | 'special_reports';
 type TimeRange = 'daily' | 'weekly' | 'monthly' | 'custom' | 'all';
 
 interface CardConfig {
@@ -32,63 +32,115 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
   const [cycleDuration, setCycleDuration] = useState(5000);
   const [cardOffsets, setCardOffsets] = useState<Record<number, number>>({});
 
-  // START OF CHANGE - Performance Optimization: Memoize all category lists at once
-  const memoizedCategoryData = useMemo(() => {
-    const cats: DataCategory[] = ['students', 'teachers', 'violations', 'substitutions', 'absences', 'lateness', 'student_violations'];
-    const results: Record<string, any[]> = {};
-    
-    cats.forEach(cat => {
-      let list: any[] = [];
-      if (cat === 'students') list = (data.studentReports || []).map(s => ({ ...s, displayName: s.name, type: 'student' }));
-      if (cat === 'teachers') list = (data.dailyReports.flatMap(r => r.teachersData)).map(t => ({ ...t, displayName: t.teacherName, type: 'teacher' }));
-      if (cat === 'violations') list = (data.violations || []).map(v => ({ ...v, displayName: v.studentName, type: 'violation' }));
-      if (cat === 'substitutions') list = (data.substitutions || []).map(s => ({ ...s, displayName: s.absentTeacher || 'معلم غير محدد', type: 'substitution' }));
-      if (cat === 'absences') list = (data.studentReports || []).filter(s => s.mainNotes?.includes('غياب')).map(s => ({ ...s, displayName: s.name, type: 'student' }));
-      if (cat === 'lateness') list = (data.studentReports || []).filter(s => s.mainNotes?.includes('تأخر')).map(s => ({ ...s, displayName: s.name, type: 'student' }));
-      if (cat === 'student_violations') list = (data.studentReports || []).filter(s => s.mainNotes?.length > 0 && !s.mainNotes.includes('ممتاز')).map(s => ({ ...s, displayName: s.name, type: 'student' }));
+  // Main Categories defined by user request
+  const mainCategories = [
+    { id: 'students', label: 'تقارير الطلاب', icon: <GraduationCap className="text-blue-500" />, view: 'studentReports' },
+    { id: 'teachers', label: 'متابعة المعلمين', icon: <UserCheck className="text-emerald-500" />, view: 'daily' },
+    { id: 'violations', label: 'التعهدات والمخالفات', icon: <ShieldAlert className="text-red-500" />, view: 'violations' },
+    { id: 'special_reports', label: 'التقارير الخاصة', icon: <FileText className="text-orange-500" />, view: 'specialReports' },
+    { id: 'substitutions', label: 'جدول التغطية', icon: <UserPlusIcon className="text-purple-500" />, view: 'substitute' },
+  ];
 
-      // Global Time Filtering Logic (Optimized)
+  // Logic to fetch subtypes for each main category as requested (Surgical Detail)
+  const getSubTypes = (category: DataCategory) => {
+    switch (category) {
+      case 'students':
+        return [
+          { id: 'all', label: 'جميع الحقول', icon: <Users size={12} /> },
+          { id: 'address', label: 'السكن', icon: <MapPin size={12} /> },
+          { id: 'workOutside', label: 'العمل', icon: <Briefcase size={12} /> },
+          { id: 'healthStatus', label: 'الحالة الصحية', icon: <HeartPulse size={12} /> },
+          { id: 'academicReading', label: 'القراءة', icon: <BookOpen size={12} /> },
+          { id: 'academicWriting', label: 'الكتابة', icon: <FileText size={12} /> },
+          { id: 'behaviorLevel', label: 'المستوى السلوكي', icon: <Activity size={12} /> },
+          { id: 'mainNotes', label: 'الملاحظات السلوكية', icon: <AlertTriangle size={12} /> },
+          { id: 'guardianCooperation', label: 'تعاون ولي الأمر', icon: <UserPlus size={12} /> },
+          { id: 'notes', label: 'ملاحظات أخرى', icon: <MessageSquare size={12} /> },
+        ];
+      case 'teachers':
+        return [
+          { id: 'all', label: 'الكل', icon: <Users size={12} /> },
+          { id: 'attendance', label: 'الحضور', icon: <Clock size={12} /> },
+          { id: 'preparation', label: 'التحضير', icon: <CheckCircle2 size={12} /> },
+          { id: 'supervision', label: 'الإشراف', icon: <UserCheck size={12} /> },
+          { id: 'violations', label: 'المخالفات', icon: <AlertCircle size={12} /> },
+        ];
+      case 'special_reports':
+        return [
+          { id: 'all', label: 'جميع السجلات', icon: <History size={12} /> },
+          { id: 'absences', label: 'غياب الطلاب', icon: <UserX size={12} /> },
+          { id: 'lateness', label: 'تأخر الطلاب', icon: <Clock size={12} /> },
+          { id: 'exits', label: 'خروج الطلاب', icon: <UserPlusIcon size={12} /> },
+          { id: 'damages', label: 'إتلافات المدرسة', icon: <Hammer size={12} /> },
+          { id: 'visits', label: 'زيارات أولياء الأمور', icon: <Users size={12} /> },
+        ];
+      case 'substitutions':
+        return [
+          { id: 'all', label: 'الكل', icon: <UserPlusIcon size={12} /> },
+          { id: 'pending', label: 'قيد التغطية', icon: <Clock size={12} /> },
+          { id: 'paid', label: 'تمت التغطية', icon: <CheckCircle2 size={12} /> },
+        ];
+      default:
+        return [{ id: 'all', label: 'الكل', icon: <Users size={12} /> }];
+    }
+  };
+
+  // Memoized data processing for efficiency
+  const processedData = useMemo(() => {
+    const results: Record<string, any[]> = {
+      students: (data.studentReports || []).map(s => ({ ...s, displayName: s.name, type: 'student' })),
+      teachers: (data.dailyReports.flatMap(r => r.teachersData)).map(t => ({ ...t, displayName: t.teacherName, type: 'teacher' })),
+      violations: (data.violations || []).map(v => ({ ...v, displayName: v.studentName || v.teacherName, type: 'violation' })),
+      substitutions: (data.substitutions || []).map(s => ({ ...s, displayName: s.absentTeacher, type: 'substitution' })),
+      special_reports: [
+        ...(data.absenceLogs || []).map(l => ({ ...l, displayName: l.studentName, stype: 'absences', icon: <UserX size={12}/> })),
+        ...(data.latenessLogs || []).map(l => ({ ...l, displayName: l.studentName, stype: 'lateness', icon: <Clock size={12}/> })),
+        ...(data.exitLogs || []).map(l => ({ ...l, displayName: l.studentName, stype: 'exits', icon: <UserPlusIcon size={12}/> })),
+        ...(data.damageLogs || []).map(l => ({ ...l, displayName: l.studentName, stype: 'damages', icon: <Hammer size={12}/> })),
+        ...(data.parentVisitLogs || []).map(l => ({ ...l, displayName: l.studentName, stype: 'visits', icon: <Users size={12}/> })),
+      ]
+    };
+
+    // Apply Global Time Filters
+    Object.keys(results).forEach(key => {
       if (globalTimeRange !== 'all') {
         const now = new Date();
-        list = list.filter(item => {
+        results[key] = results[key].filter(item => {
           const itemDate = new Date(item.date || item.createdAt || Date.now());
           if (globalTimeRange === 'daily') return itemDate.toDateString() === now.toDateString();
-          if (globalTimeRange === 'weekly') {
-            const diff = now.getTime() - itemDate.getTime();
-            return diff <= 7 * 24 * 60 * 60 * 1000;
-          }
-          if (globalTimeRange === 'monthly') {
-            return itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
-          }
+          if (globalTimeRange === 'weekly') return (now.getTime() - itemDate.getTime()) <= 7 * 24 * 60 * 60 * 1000;
+          if (globalTimeRange === 'monthly') return itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
           if (globalTimeRange === 'custom') {
             const start = new Date(dateRange.start);
             const end = new Date(dateRange.end);
-            // Set end date to end of day
             end.setHours(23, 59, 59, 999);
             return itemDate >= start && itemDate <= end;
           }
           return true;
         });
       }
-      results[cat] = list;
     });
+
     return results;
   }, [data, globalTimeRange, dateRange]);
-  // END OF CHANGE
+
+  // Initial Card Setup
+  const [cards, setCards] = useState<CardConfig[]>(() => {
+    const cats: DataCategory[] = ['students', 'teachers', 'violations', 'special_reports', 'substitutions', 'students', 'teachers', 'special_reports'];
+    return cats.map((cat, i) => ({ id: i + 1, category: cat, subType: 'all' }));
+  });
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCycleIndex(prev => prev + 1);
-    }, cycleDuration);
+    const timer = setInterval(() => setCycleIndex(prev => prev + 1), cycleDuration);
     return () => clearInterval(timer);
   }, [cycleDuration]);
 
-  // START OF CHANGE - Optimized Offset Shifter
+  // Pagination Logic
   useEffect(() => {
     setCardOffsets(prev => {
       const nextOffsets = { ...prev };
       cards.forEach(card => {
-        const list = memoizedCategoryData[card.category] || [];
+        const list = processedData[card.category] || [];
         if (list.length > 3) {
           const current = nextOffsets[card.id] || 0;
           let next = current + 3;
@@ -98,65 +150,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
       });
       return nextOffsets;
     });
-  }, [cycleIndex, memoizedCategoryData]);
-  // END OF CHANGE
-
-  const [cards, setCards] = useState<CardConfig[]>(() => {
-    const initial: CardConfig[] = [];
-    const categories: DataCategory[] = ['students', 'teachers', 'substitutions', 'violations', 'absences', 'lateness', 'student_violations', 'students'];
-    for (let i = 1; i <= 8; i++) {
-      initial.push({
-        id: i,
-        category: categories[i-1],
-        subType: 'all'
-      });
-    }
-    return initial;
-  });
-
-  const categories = [
-    { id: 'students', label: 'تقارير الطلاب', icon: <GraduationCap className="text-blue-500" />, view: 'studentReports' },
-    { id: 'teachers', label: 'متابعة المعلمين', icon: <UserCheck className="text-emerald-500" />, view: 'daily' },
-    { id: 'violations', label: 'التعهدات والمخالفات', icon: <ShieldAlert className="text-red-500" />, view: 'violations' },
-    { id: 'substitutions', label: 'تغطية الحصص', icon: <UserCheck className="text-purple-500" />, view: 'substitute' },
-    { id: 'absences', label: 'غياب الطلاب', icon: <UserX className="text-orange-500" />, view: 'specialReports' },
-    { id: 'lateness', label: 'تأخر الطلاب', icon: <Clock className="text-amber-500" />, view: 'specialReports' },
-    { id: 'student_violations', label: 'المخالفات الطلابية', icon: <AlertTriangle className="text-rose-500" />, view: 'specialReports' },
-  ];
-
-  const getSubTypes = (category: DataCategory) => {
-    switch (category) {
-      case 'students':
-        return [
-          { id: 'all', label: 'جميع الطلاب', icon: <Users size={12} className="text-blue-500"/> },
-          { id: 'excellence', label: 'المتميزين (نجمة)', icon: <Star size={12} className="fill-yellow-500 text-yellow-500"/> },
-          { id: 'blacklist', label: 'القائمة السوداء', icon: <ShieldAlert size={12} className="text-slate-900"/> },
-          { id: 'health_sick', label: 'حالات صحية (مريض)', icon: <Activity size={12} className="text-red-500"/> },
-          { id: 'weak_reading', label: 'ضعف القراءة', icon: <BookOpen size={12} className="text-orange-400"/> },
-          { id: 'weak_writing', label: 'ضعف الكتابة', icon: <FileText size={12} className="text-amber-600"/> },
-        ];
-      case 'teachers':
-        return [
-          { id: 'all', label: 'جميع المعلمين', icon: <Users size={12} className="text-emerald-500"/> },
-          { id: 'attendance_perfect', label: 'التزام كامل بالحضور', icon: <CheckCircle2 size={12} className="text-green-500"/> },
-          { id: 'full_scores', label: 'تقييم كلي كامل', icon: <Medal size={12} className="text-yellow-600"/> },
-          { id: 'has_violations', label: 'بمخالفات إدارية', icon: <AlertTriangle size={12} className="text-red-600"/> },
-        ];
-      default:
-        return [{ id: 'all', label: 'الكل', icon: <Users size={12} className="text-slate-400"/> }];
-    }
-  };
-
-  const cardColors = [
-    { gradient: 'linear-gradient(135deg, #f0f9ff 50%, #e0f2fe 50%)', text: 'text-sky-700', border: 'border-sky-200', accent: 'bg-sky-600' },
-    { gradient: 'linear-gradient(135deg, #f0fdf4 50%, #dcfce7 50%)', text: 'text-emerald-700', border: 'border-emerald-200', accent: 'bg-emerald-600' },
-    { gradient: 'linear-gradient(135deg, #faf5ff 50%, #f3e8ff 50%)', text: 'text-purple-700', border: 'border-purple-200', accent: 'bg-purple-600' },
-    { gradient: 'linear-gradient(135deg, #fff7ed 50%, #ffedd5 50%)', text: 'text-orange-700', border: 'border-orange-200', accent: 'bg-orange-600' },
-    { gradient: 'linear-gradient(135deg, #f5f3ff 50%, #ede9fe 50%)', text: 'text-indigo-700', border: 'border-indigo-200', accent: 'bg-indigo-600' },
-    { gradient: 'linear-gradient(135deg, #fdf2f8 50%, #fce7f3 50%)', text: 'text-pink-700', border: 'border-pink-200', accent: 'bg-pink-600' },
-    { gradient: 'linear-gradient(135deg, #f0fdfa 50%, #ccfbf1 50%)', text: 'text-teal-700', border: 'border-teal-200', accent: 'bg-teal-600' },
-    { gradient: 'linear-gradient(135deg, #fefce8 50%, #fef9c3 50%)', text: 'text-yellow-700', border: 'border-yellow-200', accent: 'bg-yellow-600' },
-  ];
+  }, [cycleIndex, processedData]);
 
   const updateCard = (id: number, updates: Partial<CardConfig>) => {
     setCards(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
@@ -173,32 +167,22 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
   };
 
   const handleExportExcel = (title: string, list: any[]) => {
-    const worksheet = XLSX.utils.json_to_sheet(list.map(item => ({
-      'الاسم': item.displayName,
-      'التفاصيل': item.grade ? `${item.grade} - ${item.section}` : item.subjectCode || '---',
-      'الحالة': item.mainNotes?.join(', ') || item.behaviorLevel || '---'
-    })));
+    const worksheet = XLSX.utils.json_to_sheet(list.map(item => ({ 'الاسم': item.displayName, 'الحالة': item.stype || '---' })));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
     XLSX.writeFile(workbook, `${title}_Report.xlsx`);
   };
 
-  const handleExportWhatsApp = (title: string, list: any[]) => {
-    let msg = `*📋 تقرير: ${title}*\n`;
-    msg += `*التاريخ:* ${new Date().toLocaleDateString('ar-EG')}\n`;
-    msg += `----------------------------------\n\n`;
-    list.slice(0, 15).forEach((item, idx) => {
-      let emoji = '🔹';
-      if (item.isBlacklisted || item.violations_score > 0) emoji = '🔴';
-      if (item.isExcellent || item.attendance === 5) emoji = '🟢';
-      msg += `*${emoji} (${idx + 1}) الاسم:* ${item.displayName}\n`;
-      if (item.grade) msg += `📍 *الصف:* ${item.grade} / ${item.section}\n`;
-      if (item.subjectCode) msg += `📚 *المادة:* ${item.subjectCode}\n`;
-      msg += `\n`;
-    });
-    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank');
-  };
+  const cardColors = [
+    { gradient: 'linear-gradient(135deg, #f0f9ff 50%, #e0f2fe 50%)', text: 'text-sky-700', border: 'border-sky-200', accent: 'bg-sky-600' },
+    { gradient: 'linear-gradient(135deg, #f0fdf4 50%, #dcfce7 50%)', text: 'text-emerald-700', border: 'border-emerald-200', accent: 'bg-emerald-600' },
+    { gradient: 'linear-gradient(135deg, #faf5ff 50%, #f3e8ff 50%)', text: 'text-purple-700', border: 'border-purple-200', accent: 'bg-purple-600' },
+    { gradient: 'linear-gradient(135deg, #fff7ed 50%, #ffedd5 50%)', text: 'text-orange-700', border: 'border-orange-200', accent: 'bg-orange-600' },
+    { gradient: 'linear-gradient(135deg, #f5f3ff 50%, #ede9fe 50%)', text: 'text-indigo-700', border: 'border-indigo-200', accent: 'bg-indigo-600' },
+    { gradient: 'linear-gradient(135deg, #fdf2f8 50%, #fce7f3 50%)', text: 'text-pink-700', border: 'border-pink-200', accent: 'bg-pink-600' },
+    { gradient: 'linear-gradient(135deg, #f0fdfa 50%, #ccfbf1 50%)', text: 'text-teal-700', border: 'border-teal-200', accent: 'bg-teal-600' },
+    { gradient: 'linear-gradient(135deg, #fefce8 50%, #fef9c3 50%)', text: 'text-yellow-700', border: 'border-yellow-200', accent: 'bg-yellow-600' },
+  ];
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 font-arabic pb-20">
@@ -214,11 +198,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
         <div className="flex flex-wrap items-center gap-4 bg-slate-50 p-4 rounded-3xl border border-slate-100">
            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-2xl border shadow-sm">
               <History className="w-4 h-4 text-blue-500" />
-              <select 
-                value={cycleDuration} 
-                onChange={(e) => setCycleDuration(Number(e.target.value))}
-                className="text-[10px] font-black bg-transparent outline-none cursor-pointer"
-              >
+              <select value={cycleDuration} onChange={(e) => setCycleDuration(Number(e.target.value))} className="text-[10px] font-black bg-transparent outline-none cursor-pointer">
                 <option value={3000}>3 ثوانٍ</option>
                 <option value={5000}>5 ثوانٍ</option>
                 <option value={10000}>10 ثوانٍ</option>
@@ -239,19 +219,9 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
 
            {globalTimeRange === 'custom' && (
              <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-2xl border shadow-sm animate-in slide-in-from-right-2">
-               <input 
-                 type="date" 
-                 value={dateRange.start} 
-                 onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
-                 className="text-[9px] font-black outline-none bg-transparent"
-               />
+               <input type="date" value={dateRange.start} onChange={(e) => setDateRange({...dateRange, start: e.target.value})} className="text-[9px] font-black outline-none bg-transparent" />
                <span className="text-slate-200">|</span>
-               <input 
-                 type="date" 
-                 value={dateRange.end} 
-                 onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
-                 className="text-[9px] font-black outline-none bg-transparent"
-               />
+               <input type="date" value={dateRange.end} onChange={(e) => setDateRange({...dateRange, end: e.target.value})} className="text-[9px] font-black outline-none bg-transparent" />
              </div>
            )}
         </div>
@@ -259,24 +229,32 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {cards.map((card, idx) => {
-          // START OF CHANGE - Use memoized list for maximum performance
-          const filteredList = memoizedCategoryData[card.category] || [];
-          // END OF CHANGE
-          const count = filteredList.length;
-          const currentCat = categories.find(c => c.id === card.category);
+          let list = processedData[card.category] || [];
+          // Filtering logic based on subtype if not 'all'
+          if (card.subType !== 'all') {
+            if (card.category === 'special_reports') list = list.filter(i => i.stype === card.subType);
+            else if (card.category === 'substitutions') list = list.filter(i => i.paymentStatus === card.subType);
+            else if (card.category === 'students') {
+               // Show only students who have data in that specific field
+               list = list.filter(i => (i as any)[card.subType]);
+            }
+          }
+
+          const count = list.length;
+          const currentCat = mainCategories.find(c => c.id === card.category);
           const currentSub = getSubTypes(card.category).find(s => s.id === card.subType);
           const design = cardColors[idx % cardColors.length];
           const offset = cardOffsets[card.id] || 0;
-          const visibleItems = filteredList.slice(offset, offset + 3);
+          const visibleItems = list.slice(offset, offset + 3);
 
           return (
             <div 
                 key={card.id} 
-                className={`rounded-[2.5rem] border-2 ${design.border} p-4 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group flex flex-col gap-1.5 relative overflow-visible h-[260px] mt-6`}
+                className={`rounded-[2.5rem] border-2 ${design.border} p-4 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group flex flex-col gap-1.5 relative overflow-visible h-[290px] mt-6`}
                 style={{ background: design.gradient }}
             >
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-30">
-                 <div className={`w-14 h-14 rounded-full border-4 border-white flex items-center justify-center font-black text-2xl text-white shadow-xl ${design.accent} bg-opacity-100`}>
+                 <div className={`w-14 h-14 rounded-full border-4 border-white flex items-center justify-center font-black text-2xl text-white shadow-xl ${design.accent}`}>
                     {count}
                  </div>
               </div>
@@ -292,30 +270,19 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
                             onChange={(e) => updateCard(card.id, { category: e.target.value as DataCategory, subType: 'all' })}
                             className={`text-[9px] font-black bg-white ${design.text} rounded-lg px-2 py-1 outline-none border-none cursor-pointer shadow-sm hover:bg-slate-50 transition-colors uppercase tracking-wider`}
                         >
-                            {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.label}</option>)}
+                            {mainCategories.map(cat => <option key={cat.id} value={cat.id}>{cat.label}</option>)}
                         </select>
                     </div>
                     
-                    <div className="flex gap-1 opacity-100 transition-all duration-300">
-                      <button 
-                        onClick={() => handleExportWhatsApp(currentSub?.label || 'Data', filteredList)}
-                        className="p-1.5 bg-white text-green-500 rounded-lg shadow-sm hover:bg-green-50 transition-colors"
-                      >
-                        <Share2 size={12} />
-                      </button>
-                      <button 
-                        onClick={() => handleExportExcel(currentSub?.label || 'Data', filteredList)}
-                        className="p-1.5 bg-white text-blue-600 rounded-lg shadow-sm hover:bg-blue-50 transition-colors"
-                      >
+                    <div className="flex gap-1">
+                      <button onClick={() => handleExportExcel(currentSub?.label || 'Data', list)} className="p-1.5 bg-white text-blue-600 rounded-lg shadow-sm hover:bg-blue-50 transition-colors">
                         <FileSpreadsheet size={12} />
                       </button>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-1.5 bg-white/60 backdrop-blur-md p-0.5 rounded-lg border border-white/40 shadow-inner">
-                    <div className={`p-1 rounded bg-white shadow-sm`}>
-                        {currentSub?.icon}
-                    </div>
+                    <div className={`p-1 rounded bg-white shadow-sm`}>{currentSub?.icon}</div>
                     <select 
                         value={card.subType}
                         onChange={(e) => updateCard(card.id, { subType: e.target.value })}
@@ -334,21 +301,23 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
                     </div>
                  ) : (
                     visibleItems.map((item, i) => {
-                       let statusEmoji = '👤';
-                       if (item.isBlacklisted) statusEmoji = '🚫';
-                       else if (item.isExcellent) statusEmoji = '⭐';
-                       else if (item.violations_score > 0) statusEmoji = '⚠️';
+                       // Dynamic Icon based on sub filter
+                       let dynamicIcon = currentSub?.icon || <User size={12} />;
+                       if (card.category === 'special_reports') dynamicIcon = item.icon || dynamicIcon;
+                       
                        return (
                         <div 
                           key={`${card.id}-${offset}-${i}`}
                           onClick={() => setView?.(currentCat?.view || 'dashboard')}
                           className="bg-white/90 backdrop-blur-sm p-1 rounded-xl border border-white shadow-sm flex items-center gap-2 hover:bg-white hover:shadow-lg hover:-translate-x-1 cursor-pointer transition-all animate-in slide-in-from-right-2 fade-in duration-300 h-[38px]"
                         >
-                           <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-sm bg-white border shadow-sm`}>{statusEmoji}</div>
+                           <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs bg-slate-50 border`}>
+                             {dynamicIcon}
+                           </div>
                            <div className="flex-1 overflow-hidden">
                               <div className="font-black text-[9px] text-slate-800 truncate leading-none">{item.displayName}</div>
                               <div className="text-[7px] text-slate-500 font-bold truncate">
-                                {item.grade ? `${item.grade} - ${item.section}` : item.subjectCode || '---'}
+                                {item.grade ? `${item.grade} - ${item.section}` : item.subjectCode || item.date || '---'}
                               </div>
                            </div>
                            <ChevronLeft size={10} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
@@ -359,23 +328,18 @@ const Dashboard: React.FC<{ setView?: (v: string) => void }> = ({ setView }) => 
               </div>
 
               {count > 3 && (
-                <div className="flex justify-center items-center gap-6 relative z-20 pt-1 border-t border-white/40">
+                <div className="flex justify-center items-center gap-10 relative z-20 pt-1 border-t border-white/40 mt-auto">
                    <button 
                      onClick={() => shiftCardData(card.id, 'prev', count)}
                      className={`p-1.5 rounded-full bg-white/80 hover:bg-white ${design.text} transition-all shadow-md active:scale-90`}
                    >
-                     <ChevronRight size={14} />
+                     <ChevronRight size={16} />
                    </button>
-                   <div className="flex gap-1">
-                      {Array.from({ length: Math.min(Math.ceil(count / 3), 4) }).map((_, dotIdx) => (
-                        <div key={dotIdx} className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${Math.floor(offset / 3) === dotIdx ? design.accent + ' scale-110 shadow-md' : 'bg-white/60 shadow-inner'}`} />
-                      ))}
-                   </div>
                    <button 
                      onClick={() => shiftCardData(card.id, 'next', count)}
                      className={`p-1.5 rounded-full bg-white/80 hover:bg-white ${design.text} transition-all shadow-md active:scale-90`}
                    >
-                     <ChevronLeft size={14} />
+                     <ChevronLeft size={16} />
                    </button>
                 </div>
               )}
