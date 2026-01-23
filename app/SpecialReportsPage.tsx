@@ -258,11 +258,12 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
     const updateSubjectData = (id: string, subject: string, field: string, value: any) => {
       const updated = (data.examLogs || []).map(log => {
         if (log.id === id) {
+          const currentSubjectData = log.subjectsData[subject] || { class: '', grade: '', status: 'not_tested' };
           return {
             ...log,
             subjectsData: {
               ...log.subjectsData,
-              [subject]: { ...log.subjectsData[subject], [field]: value }
+              [subject]: { ...currentSubjectData, [field]: value }
             }
           };
         }
@@ -410,8 +411,8 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                                         <div className="flex items-center gap-1">
                                             <input className="w-full p-1 text-center text-[11px] font-black text-red-600 outline-none bg-transparent focus:bg-white rounded" value={log.subjectsData[subj]?.grade} onChange={e => updateSubjectData(log.id, subj, 'grade', e.target.value)} placeholder="0" />
                                             <button 
-                                                onClick={() => updateSubjectData(log.id, subj, 'status', log.subjectsData[subj].status === 'tested' ? 'not_tested' : 'tested')}
-                                                className={`p-1 rounded-md transition-all ${log.subjectsData[subj].status === 'tested' ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-300'}`}
+                                                onClick={() => updateSubjectData(log.id, subj, 'status', log.subjectsData[subj]?.status === 'tested' ? 'not_tested' : 'tested')}
+                                                className={`p-1 rounded-md transition-all ${log.subjectsData[subj]?.status === 'tested' ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-300'}`}
                                             >
                                                 <CheckCircle size={10} />
                                             </button>
