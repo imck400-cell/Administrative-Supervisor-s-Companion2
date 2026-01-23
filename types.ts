@@ -135,6 +135,23 @@ export interface StudentViolationLog {
   notes: string;
 }
 
+export interface ExitLog {
+  id: string;
+  studentId: string;
+  studentName: string;
+  grade: string;
+  section: string;
+  semester: 'الأول' | 'الثاني' | 'الفصلين';
+  date: string;
+  day: string;
+  status: string;
+  customStatusItems: string[];
+  action: string;
+  pledge: string;
+  notes: string;
+  prevExitCount: number;
+}
+
 export interface GenericSpecialReport {
   id: string;
   category: string;
@@ -156,6 +173,9 @@ export interface AppData {
   absenceLogs?: AbsenceLog[];
   latenessLogs?: LatenessLog[];
   studentViolationLogs?: StudentViolationLog[];
+  exitLogs?: ExitLog[];
+  customExitItems?: string[];
+  pinnedExitStudents?: string[];
   genericSpecialReports?: GenericSpecialReport[];
   customViolationElements?: {
     behavior: string[];

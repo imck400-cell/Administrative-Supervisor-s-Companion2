@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useGlobal } from '../context/GlobalState';
+// Add missing LayoutList to imports from lucide-react
 import { 
   Briefcase, Users, FileText, GraduationCap, 
   ChevronRight, Calendar, Plus, Save, Share2, 
@@ -9,9 +10,9 @@ import {
   UserCircle, Star, Filter, Clock, ShieldAlert, X,
   FileSearch, Archive, CheckSquare, PencilLine, Zap,
   Sparkles, Database, FileUp, FileDown, MessageCircle,
-  Activity, Fingerprint, History, RefreshCw, Upload
+  Activity, Fingerprint, History, RefreshCw, Upload, LayoutList
 } from 'lucide-react';
-import { AbsenceLog, LatenessLog, StudentViolationLog, StudentReport } from '../types';
+import { AbsenceLog, LatenessLog, StudentViolationLog, StudentReport, ExitLog } from '../types';
 import * as XLSX from 'xlsx';
 
 type MainTab = 'supervisor' | 'staff' | 'students' | 'tests';
@@ -48,11 +49,32 @@ const SpecialReportsPage: React.FC = () => {
   const [appliedViolationNames, setAppliedViolationNames] = useState<string[]>([]);
   const [violationNameInput, setViolationNameInput] = useState('');
 
-  // START OF CHANGE - Lateness Filter States (Requirement 1 & 2)
+  // Lateness Filter States
   const [latenessFilterDates, setLatenessFilterDates] = useState({ start: today, end: today });
   const [tempLatenessNames, setTempLatenessNames] = useState<string[]>([]);
   const [appliedLatenessNames, setAppliedLatenessNames] = useState<string[]>([]);
   const [latenessNameInput, setLatenessNameInput] = useState('');
+
+  // START OF CHANGE - Exit Module States
+  const [exitForm, setExitForm] = useState<Partial<ExitLog>>({
+    date: today,
+    semester: 'الفصلين',
+    status: 'نادر الخروج',
+    customStatusItems: [],
+    action: 'تنبيه 1',
+    pledge: '',
+    notes: ''
+  });
+  const [exitFilterValues, setExitFilterValues] = useState({
+    semester: '',
+    start: today,
+    end: today,
+    grade: '',
+    section: ''
+  });
+  const [tempExitNames, setTempExitNames] = useState<string[]>([]);
+  const [appliedExitNames, setAppliedExitNames] = useState<string[]>([]);
+  const [exitNameInput, setExitNameInput] = useState('');
   // END OF CHANGE
 
   // Data helpers
@@ -109,7 +131,6 @@ const SpecialReportsPage: React.FC = () => {
     const currentLogs = data.absenceLogs || [];
     updateData({ absenceLogs: [newLog, ...currentLogs] });
     
-    // Update student report history count
     const updatedStudents = students.map(s => 
       s.id === newLog.studentId ? { ...s, totalAbsences: (s.totalAbsences || 0) + 1 } : s
     );
@@ -186,6 +207,44 @@ const SpecialReportsPage: React.FC = () => {
     setViolationForm({ ...violationForm, studentName: '', studentId: '', behaviorViolations: [], dutiesViolations: [], achievementViolations: [] });
   };
 
+  // START OF CHANGE - Exit Module Logic
+  const saveExitLog = () => {
+    if (!exitForm.studentId) return alert('يرجى اختيار طالب أولاً');
+    const newLog: ExitLog = {
+      ...exitForm as ExitLog,
+      id: Date.now().toString(),
+      day: getDayName(exitForm.date || today)
+    };
+    const currentLogs = data.exitLogs || [];
+    updateData({ exitLogs: [newLog, ...currentLogs] });
+    alert('تم حفظ بيان الخروج بنجاح');
+    setExitForm({ ...exitForm, studentName: '', studentId: '', grade: '', section: '', notes: '', pledge: '', customStatusItems: [] });
+  };
+
+  const togglePinnedStudent = (studentName: string) => {
+    const pinned = data.pinnedExitStudents || [];
+    const updated = pinned.includes(studentName) 
+      ? pinned.filter(n => n !== studentName) 
+      : [...pinned, studentName];
+    updateData({ pinnedExitStudents: updated });
+  };
+
+  const addCustomExitStatus = () => {
+    const val = prompt('أدخل وصفاً لحالة الخروج الجديدة:');
+    if (!val) return;
+    const customs = data.customExitItems || [];
+    updateData({ customExitItems: [...customs, val] });
+  };
+
+  const toggleExitStatusItem = (val: string) => {
+    const current = exitForm.customStatusItems || [];
+    const updated = current.includes(val) 
+      ? current.filter(v => v !== val) 
+      : [...current, val];
+    setExitForm({ ...exitForm, customStatusItems: updated });
+  };
+  // END OF CHANGE
+
   // Generic Export/Share
   const exportToWhatsApp = (title: string, tableData: any[], columns: { label: string, key: string }[]) => {
     let msg = `*📋 ${title}*\n`;
@@ -197,20 +256,19 @@ const SpecialReportsPage: React.FC = () => {
         let val = Array.isArray(row[col.key]) ? row[col.key].join('، ') : row[col.key];
         let symbol = '▪️';
         
-        // Dynamic Symbols for Visuals (Requirement L)
         if (col.key === 'studentName' || col.key === 'name') symbol = '👤';
         if (col.key === 'grade') symbol = '📍';
-        if (col.key === 'totalViolations' || col.key === 'prevLatenessCount') symbol = '🔢';
+        if (col.key === 'totalViolations' || col.key === 'prevLatenessCount' || col.key === 'prevExitCount') symbol = '🔢';
         if (col.key === 'date') symbol = '📅';
         if (col.key === 'status') symbol = '🏷️';
         if (col.key === 'action' || col.key === 'procedure') symbol = '🛡️';
         if (col.key === 'reason') symbol = '❓';
         if (col.key === 'pledge') symbol = '✍️';
+        if (col.key === 'notes') symbol = '📝';
         
-        // Color coding logic using WhatsApp emojis (Requirement L)
-        if (val?.toString().includes('تنبيه') || val?.toString().includes('ضعيف') || val?.toString().includes('متكرر')) symbol = '⚠️';
+        if (val?.toString().includes('تنبيه') || val?.toString().includes('ضعيف') || val?.toString().includes('متكرر') || val?.toString().includes('كثير الخروج')) symbol = '⚠️';
         if (val?.toString().includes('blacklist') || val?.toString().includes('كثير المخالفة') || val?.toString().includes('دائم')) symbol = '🔴';
-        if (val?.toString().includes('نادر') || val?.toString().includes('ممتاز') || val?.toString().includes('تم التوقيع')) symbol = '🟢';
+        if (val?.toString().includes('نادر') || val?.toString().includes('ممتاز') || val?.toString().includes('تم التوقيع') || val?.toString().includes('تم التبصيم')) symbol = '🟢';
         
         msg += `${symbol} *${col.label}:* ${val || '---'}\n`;
       });
@@ -474,20 +532,14 @@ const SpecialReportsPage: React.FC = () => {
   const renderLatenessModule = () => {
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
     
-    // START OF CHANGE - Requirement 1, 2: Filtering logic for Lateness module
     const filteredLogs = (data.latenessLogs || []).filter(l => {
-      // Filter by multiple names (Requirement 2)
       if (appliedLatenessNames.length > 0 && !appliedLatenessNames.includes(l.studentName)) return false;
-      
-      // Filter by Date Range (Requirement 1)
       if (latenessFilterDates.start && l.date < latenessFilterDates.start) return false;
       if (latenessFilterDates.end && l.date > latenessFilterDates.end) return false;
-      
       return true;
     });
 
     const lNameSuggestions = latenessNameInput.trim() ? students.filter(s => s.name.includes(latenessNameInput) && !tempLatenessNames.includes(s.name)) : [];
-    // END OF CHANGE
 
     return (
       <div className="bg-white p-6 rounded-[2.5rem] border-2 shadow-xl animate-in fade-in duration-300 font-arabic text-right">
@@ -511,7 +563,7 @@ const SpecialReportsPage: React.FC = () => {
               <div className="flex flex-wrap gap-2">
                 {['recurring', 'frequent', 'permanent'].map(st => (
                   <button key={st} onClick={() => setLatenessForm({...latenessForm, status: st as any})} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${latenessForm.status === st ? 'bg-orange-500 text-white shadow-lg' : 'bg-slate-50 text-slate-400'}`}>
-                    {st === 'recurring' ? 'تأخر متكرر' : st === 'frequent' ? 'كثير التأخر' : 'دائم التأخر'}
+                    {st === 'recurring' ? 'تأخر متكرر' : st === 'frequent' ? 'كثير التأخر' : st === 'permanent' ? 'دائم التأخر' : ''}
                   </button>
                 ))}
               </div>
@@ -580,10 +632,8 @@ const SpecialReportsPage: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* START OF CHANGE - Requirement 1, 2 & 3: Filter bar and Actions for Lateness module */}
             <div className="bg-slate-50 p-6 rounded-3xl border space-y-4 shadow-sm">
                 <div className="flex flex-wrap gap-4 items-end">
-                    {/* Multi-Name selection (Requirement 2) */}
                     <div className="flex-1 min-w-[300px] space-y-2">
                         <label className="text-xs font-black text-slate-400">فلترة بأسماء الطلاب المتأخرين</label>
                         <div className="flex gap-2">
@@ -631,7 +681,6 @@ const SpecialReportsPage: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Date Range Selection (Requirement 1) */}
                     <div className="space-y-2">
                         <label className="text-xs font-black text-slate-400">تاريخ التأخر</label>
                         <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border">
@@ -648,7 +697,6 @@ const SpecialReportsPage: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Action Buttons (Requirement 3) */}
                     <div className="flex gap-2 pb-1">
                         <button title="استيراد" className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100"><Upload size={20}/></button>
                         <button title="تصدير TXT" className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200"><FileText size={20}/></button>
@@ -669,7 +717,6 @@ const SpecialReportsPage: React.FC = () => {
                     </div>
                 </div>
             </div>
-            {/* END OF CHANGE */}
 
              <div className="overflow-x-auto rounded-3xl border-2">
               <table className="w-full text-center text-sm">
@@ -777,7 +824,7 @@ const SpecialReportsPage: React.FC = () => {
                     <div className="flex gap-2">
                         {['blacklist', 'high', 'medium', 'rare'].map(st => (
                             <button key={st} onClick={() => setViolationForm({...violationForm, status: st as any})} className={`flex-1 p-2 rounded-xl text-[10px] font-black border ${violationForm.status === st ? 'bg-red-600 text-white' : 'bg-white'}`}>
-                                {st === 'blacklist' ? 'القائمة السوداء' : st === 'high' ? 'كثير المخالفة' : st === 'medium' ? 'متوسط' : 'نادر'}
+                                {st === 'blacklist' ? 'القائمة سوداء' : st === 'high' ? 'كثير المخالفة' : st === 'medium' ? 'متوسط' : 'نادر'}
                             </button>
                         ))}
                     </div>
@@ -841,7 +888,7 @@ const SpecialReportsPage: React.FC = () => {
                                         <input 
                                             type="text" 
                                             className="text-xs font-bold outline-none bg-transparent w-full" 
-                                            placeholder="اكتب الاسم لإضافته..." 
+                                            placeholder="اكتب اسم الطالب لإضافته..." 
                                             value={violationNameInput} 
                                             onChange={e => setViolationNameInput(e.target.value)} 
                                         />
@@ -918,7 +965,7 @@ const SpecialReportsPage: React.FC = () => {
                 </div>
 
                 <div className="overflow-x-auto rounded-3xl border-2">
-                    <table className="w-full text-center text-sm">
+                    <table className="w-full text-center text-sm border-collapse">
                         <thead className="bg-[#FFD966] text-slate-800 font-black">
                             <tr>
                                 <th className="p-4 border-e">اسم الطالب</th>
@@ -959,6 +1006,340 @@ const SpecialReportsPage: React.FC = () => {
     );
   };
 
+  // START OF CHANGE - Requirement: Exit School Module Implementation
+  const renderExitModule = () => {
+    const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
+    const customs = data.customExitItems || [];
+    const pinned = data.pinnedExitStudents || [];
+    
+    const filteredLogs = (data.exitLogs || []).filter(l => {
+      if (appliedExitNames.length > 0 && !appliedExitNames.includes(l.studentName)) return false;
+      if (exitFilterValues.start && l.date < exitFilterValues.start) return false;
+      if (exitFilterValues.end && l.date > exitFilterValues.end) return false;
+      if (exitFilterValues.semester && l.semester !== exitFilterValues.semester) return false;
+      if (exitFilterValues.grade && l.grade !== exitFilterValues.grade) return false;
+      if (exitFilterValues.section && l.section !== exitFilterValues.section) return false;
+      return true;
+    });
+
+    const eNameSuggestions = exitNameInput.trim() ? students.filter(s => s.name.includes(exitNameInput) && !tempExitNames.includes(s.name)) : [];
+
+    return (
+      <div className="bg-white p-8 rounded-[3rem] border-2 shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-2 h-full bg-amber-500"></div>
+        
+        <div className="flex items-center justify-between mb-8 border-b-2 border-amber-50 pb-6">
+          <div className="flex gap-3">
+            <button onClick={() => setShowTable(!showTable)} className="flex items-center gap-2 bg-amber-50 text-amber-700 px-6 py-3 rounded-2xl font-black text-sm hover:bg-amber-100 shadow-sm transition-all active:scale-95">
+              {showTable ? <Plus size={18}/> : <LayoutList size={18}/>}
+              {showTable ? 'رصد خروج جديد' : 'جدول الخروج'}
+            </button>
+            <button onClick={() => setActiveSubTab(null)} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={20}/></button>
+          </div>
+          <div className="text-left">
+            <h2 className="text-3xl font-black text-amber-600 flex items-center justify-end gap-3">
+               سجل خروج الطلاب أثناء الدراسة <ShieldAlert size={32} />
+            </h2>
+            <p className="text-slate-400 font-bold mt-1">تاريخ اليوم: {getDayName(today)} {today}</p>
+          </div>
+        </div>
+
+        {!showTable ? (
+          <div className="space-y-10">
+            {/* Part A: Student Data */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-100 space-y-6">
+                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2 border-r-4 border-amber-500 pr-3">بيانات الطالب الأساسية</h3>
+                
+                <div className="relative">
+                  <label className="text-xs font-black text-slate-400 mb-2 block mr-2">اسم الطالب</label>
+                  <div className="flex items-center gap-2 bg-white border-2 rounded-2xl p-4 focus-within:border-amber-500 shadow-sm transition-all">
+                    <Search className="text-slate-400" size={20}/>
+                    <input type="text" className="bg-transparent w-full outline-none font-black text-lg" placeholder="ابحث عن الاسم في شؤون الطلاب..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                    {exitForm.studentName && (
+                      <button onClick={() => togglePinnedStudent(exitForm.studentName!)} className="p-2 hover:bg-amber-50 rounded-xl transition-colors">
+                        <Star className={`w-6 h-6 ${pinned.includes(exitForm.studentName!) ? 'fill-amber-500 text-amber-500' : 'text-slate-300'}`} />
+                      </button>
+                    )}
+                  </div>
+                  {suggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-50 bg-white border rounded-2xl shadow-2xl mt-2 max-h-64 overflow-y-auto">
+                      {suggestions.map(s => (
+                        <button key={s.id} onClick={() => { 
+                          setExitForm({ 
+                            ...exitForm, 
+                            studentId: s.id, 
+                            studentName: s.name, 
+                            grade: s.grade, 
+                            section: s.section, 
+                            prevExitCount: (data.exitLogs || []).filter(l => l.studentId === s.id).length 
+                          });
+                          setSearchQuery('');
+                        }} className="w-full text-right p-4 hover:bg-amber-50 font-black border-b last:border-none flex justify-between items-center">
+                          <span>{s.name}</span>
+                          <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg">{s.grade} - {s.section}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-white p-4 rounded-2xl border shadow-sm"><label className="text-[10px] block text-slate-400 mb-1">الصف</label><span className="font-black text-amber-700">{exitForm.grade || '---'}</span></div>
+                  <div className="bg-white p-4 rounded-2xl border shadow-sm"><label className="text-[10px] block text-slate-400 mb-1">الشعبة</label><span className="font-black text-amber-700">{exitForm.section || '---'}</span></div>
+                  <div className="bg-amber-600 text-white p-4 rounded-2xl border shadow-sm text-center">
+                    <label className="text-[10px] block text-amber-100 mb-1">مرات الخروج</label>
+                    <span className="font-black text-2xl">{exitForm.prevExitCount ?? 0}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-2xl border shadow-sm">
+                    <label className="text-[10px] block text-slate-400 mb-1 mr-2">تاريخ الخروج</label>
+                    <input type="date" className="w-full p-2 text-xs font-black outline-none bg-transparent" value={exitForm.date} onChange={e => setExitForm({...exitForm, date: e.target.value})}/>
+                  </div>
+                </div>
+
+                <div>
+                   <label className="text-xs font-black text-slate-400 mb-2 block mr-2">الفصل الدراسي</label>
+                   <div className="flex gap-2">
+                     {['الفصلين', 'الأول', 'الثاني'].map(sem => (
+                       <button key={sem} onClick={() => setExitForm({...exitForm, semester: sem as any})} className={`flex-1 p-3 rounded-xl font-black text-sm border-2 transition-all ${exitForm.semester === sem ? 'bg-amber-600 border-amber-600 text-white' : 'bg-white border-slate-100 text-slate-500'}`}>{sem}</button>
+                     ))}
+                   </div>
+                </div>
+              </div>
+
+              {/* Part B: Exit Status */}
+              <div className="bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-100 space-y-6 flex flex-col">
+                 <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-lg font-black text-slate-800 border-r-4 border-blue-500 pr-3">حالة الخروج</h3>
+                    <button onClick={addCustomExitStatus} className="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 shadow-md active:scale-95 transition-all"><Plus size={16}/></button>
+                 </div>
+
+                 <div className="space-y-4 flex-1">
+                    <div className="flex gap-2 flex-wrap">
+                      {['كثير الخروج', 'متوسط الخروج', 'نادر الخروج'].map(st => (
+                        <button key={st} onClick={() => setExitForm({...exitForm, status: st})} className={`px-4 py-2 rounded-xl text-[10px] font-black border-2 transition-all ${exitForm.status === st ? 'bg-amber-600 border-amber-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400'}`}>
+                          {st}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="bg-white/50 p-4 rounded-[2rem] border-2 border-dashed border-slate-200 min-h-[140px] flex flex-wrap gap-2 content-start shadow-inner">
+                       {customs.length === 0 && <p className="text-[10px] text-slate-400 w-full text-center mt-8 italic">لا توجد عناصر مضافة.. اضغط + للإضافة</p>}
+                       {customs.map(c => (
+                         <button key={c} onClick={() => toggleExitStatusItem(c)} className={`px-3 py-1.5 rounded-lg text-[9px] font-black border transition-all ${exitForm.customStatusItems?.includes(c) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-100 text-slate-500'}`}>{c}</button>
+                       ))}
+                    </div>
+                 </div>
+              </div>
+            </div>
+
+            {/* Part C: Action and Pledge */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t-2 border-slate-50 pt-10">
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-black text-slate-700 mr-2">الإجراء المتخذ</label>
+                  <select className="w-full p-5 bg-white border-2 border-slate-100 rounded-3xl font-black text-slate-700 outline-none focus:border-amber-500 shadow-sm" value={exitForm.action} onChange={e => setExitForm({...exitForm, action: e.target.value})}>
+                    {['تنبيه 1', 'تنبيه 2', 'تعهد', 'اتصال بولي الأمر', 'توقيف جزئي', 'الرفع به إلى جهة إدارية عليا', 'غيرها'].map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-black text-slate-700 mr-2">ملاحظات عامة</label>
+                  <textarea className="w-full p-5 bg-white border-2 border-slate-100 rounded-3xl font-black text-sm outline-none focus:border-amber-500 shadow-sm min-h-[120px]" placeholder="أدخل تفاصيل إضافية هنا..." value={exitForm.notes} onChange={e => setExitForm({...exitForm, notes: e.target.value})}></textarea>
+                </div>
+              </div>
+
+              <div className="p-8 bg-amber-600 text-white rounded-[3rem] shadow-2xl space-y-6 relative group overflow-hidden">
+                <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
+                <h4 className="flex items-center gap-3 font-black text-xl"><Fingerprint className="text-amber-200" size={28}/> بصمة الطالب الرقمية</h4>
+                <div className="p-6 bg-amber-700/50 rounded-2xl border-2 border-amber-400/30">
+                  <p className="text-sm font-bold leading-relaxed opacity-95">
+                    أتعهد بعدم تكرار الخروج المتكرر وفي حالة التكرار فللإدارة الحق في اتخاذ كافة الإجراءات اللازمة.
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setExitForm({...exitForm, pledge: 'تم التوقيع بنجاح'})} 
+                  className={`w-full p-5 rounded-[1.5rem] font-black text-lg transition-all flex items-center justify-center gap-3 shadow-xl ${exitForm.pledge ? 'bg-green-500 text-white' : 'bg-white text-amber-700 hover:scale-105 active:scale-95'}`}
+                >
+                  {exitForm.pledge ? <CheckCircle size={24}/> : <Zap size={24}/>}
+                  {exitForm.pledge || 'توقيع البصمة والاعتماد'}
+                </button>
+              </div>
+            </div>
+
+            <button onClick={saveExitLog} className="w-full bg-slate-900 text-white p-7 rounded-[2.5rem] font-black text-2xl hover:bg-black shadow-2xl flex items-center justify-center gap-4 transition-all active:scale-[0.98]">
+               <Save size={32}/> حفظ بيان الخروج
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-8 animate-in slide-in-from-top-4 duration-500">
+            {/* Table / Archive View (Part H) */}
+            <div className="bg-slate-50 p-8 rounded-[2.5rem] border-2 border-slate-100 space-y-6 shadow-sm">
+                <div className="flex flex-wrap gap-6 items-end">
+                    <div className="flex-1 min-w-[350px] space-y-2">
+                        <label className="text-sm font-black text-slate-500 mr-2">فلترة حسب أسماء الطلاب (متعدد)</label>
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl border-2 focus-within:border-amber-400 transition-all shadow-sm">
+                                    <Search size={18} className="text-slate-400"/>
+                                    <input 
+                                        type="text" 
+                                        className="text-sm font-black outline-none bg-transparent w-full" 
+                                        placeholder="اكتب اسم الطالب لإضافته للقائمة..." 
+                                        value={exitNameInput} 
+                                        onChange={e => setExitNameInput(e.target.value)} 
+                                    />
+                                </div>
+                                {eNameSuggestions.length > 0 && (
+                                    <div className="absolute top-full left-0 right-0 z-[70] bg-white border-2 rounded-2xl shadow-2xl mt-2 max-h-56 overflow-y-auto">
+                                        {eNameSuggestions.map(s => (
+                                            <button key={s.id} onClick={() => { setTempExitNames([...tempExitNames, s.name]); setExitNameInput(''); }} className="w-full text-right p-4 text-xs font-black hover:bg-amber-50 border-b last:border-none flex justify-between">
+                                                {s.name}
+                                                <span className="text-[10px] text-slate-300">{s.grade}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <button 
+                                onClick={() => setAppliedExitNames(tempExitNames)}
+                                className="bg-amber-600 text-white px-8 py-3 rounded-2xl font-black text-sm hover:bg-amber-700 shadow-md transition-all active:scale-95"
+                            >
+                                موافق
+                            </button>
+                            <button 
+                                onClick={() => { setTempExitNames([]); setAppliedExitNames([]); }}
+                                className="bg-white text-slate-400 border-2 border-slate-100 px-5 py-3 rounded-2xl font-black text-xs hover:bg-slate-50"
+                            >
+                                إعادة ضبط
+                            </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                            {tempExitNames.map(name => (
+                                <span key={name} className="inline-flex items-center gap-2 bg-amber-100 text-amber-700 px-3 py-1.5 rounded-xl text-[10px] font-black border border-amber-200">
+                                    {name}
+                                    <button onClick={() => setTempExitNames(tempExitNames.filter(n => n !== name))}><X size={12}/></button>
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-black text-slate-500 mr-2">الفترة الزمنية</label>
+                        <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl border-2 shadow-sm">
+                            <Calendar size={18} className="text-slate-400"/>
+                            <div className="flex flex-col">
+                                <span className="text-[9px] font-black text-slate-300">من:</span>
+                                <input type="date" className="text-xs font-black outline-none bg-transparent" value={exitFilterValues.start} onChange={e => setExitFilterValues({...exitFilterValues, start: e.target.value})} />
+                            </div>
+                            <span className="mx-4 text-slate-200 text-xl font-thin">|</span>
+                            <div className="flex flex-col">
+                                <span className="text-[9px] font-black text-slate-300">إلى:</span>
+                                <input type="date" className="text-xs font-black outline-none bg-transparent" value={exitFilterValues.end} onChange={e => setExitFilterValues({...exitFilterValues, end: e.target.value})} />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-black text-slate-500 mr-2">الفصل الدراسي</label>
+                        <select className="p-4 bg-white border-2 rounded-2xl font-black text-xs shadow-sm" value={exitFilterValues.semester} onChange={e => setExitFilterValues({...exitFilterValues, semester: e.target.value})}>
+                            <option value="">جميع الفصول</option>
+                            <option value="الفصلين">الفصلين</option>
+                            <option value="الأول">الأول</option>
+                            <option value="الثاني">الثاني</option>
+                        </select>
+                    </div>
+
+                    <div className="flex gap-2 pb-1">
+                        <button title="استيراد" className="p-4 bg-white border-2 border-slate-100 text-blue-600 rounded-2xl hover:bg-blue-50 transition-all shadow-sm"><FileUp size={22}/></button>
+                        <button title="تصدير TXT" className="p-4 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl hover:bg-slate-50 transition-all shadow-sm"><FileText size={22}/></button>
+                        <button 
+                            title="تصدير Excel" 
+                            onClick={() => {
+                              const worksheet = XLSX.utils.json_to_sheet(filteredLogs.map(l => ({
+                                'اسم الطالب': l.studentName,
+                                'الصف': l.grade,
+                                'الشعبة': l.section,
+                                'مرات الخروج': l.prevExitCount,
+                                'التاريخ': l.date,
+                                'الحالة': l.status,
+                                'الإجراء': l.action,
+                                'الملاحظات': l.notes
+                              })));
+                              const workbook = XLSX.utils.book_new();
+                              XLSX.utils.book_append_sheet(workbook, worksheet, "Exits");
+                              XLSX.writeFile(workbook, `Exits_Report_${today}.xlsx`);
+                            }}
+                            className="p-4 bg-white border-2 border-slate-100 text-green-700 rounded-2xl hover:bg-green-50 transition-all shadow-sm"
+                        >
+                            <FileSpreadsheet size={22}/>
+                        </button>
+                        <button 
+                            title="إرسال واتساب"
+                            onClick={() => exportToWhatsApp('تقرير خروج الطلاب المفلتر', filteredLogs, [
+                                { label: 'اسم الطالب', key: 'studentName' },
+                                { label: 'الصف', key: 'grade' },
+                                { label: 'مرات الخروج', key: 'prevExitCount' },
+                                { label: 'التاريخ', key: 'date' },
+                                { label: 'حالة الخروج', key: 'status' },
+                                { label: 'الإجراء', key: 'action' },
+                                { label: 'الملاحظات', key: 'notes' }
+                            ])} 
+                            className="p-4 bg-green-600 text-white rounded-2xl hover:bg-green-700 shadow-xl transition-all active:scale-95"
+                        >
+                            <MessageCircle size={22}/>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-[2.5rem] border-4 border-slate-50 shadow-inner">
+                <table className="w-full text-center text-sm border-collapse">
+                    <thead className="bg-[#FFD966] text-slate-800 font-black">
+                        <tr>
+                            <th className="p-6 border-e border-amber-200">اسم الطالب</th>
+                            <th className="p-6 border-e border-amber-200">الصف / الشعبة</th>
+                            <th className="p-6 border-e border-amber-200">إجمالي الخروج</th>
+                            <th className="p-6 border-e border-amber-200">التاريخ</th>
+                            <th className="p-6 border-e border-amber-200">حالة الخروج</th>
+                            <th className="p-6 border-e border-amber-200">نوع الإجراء</th>
+                            <th className="p-6">ملاحظات</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                        {filteredLogs.length === 0 ? (
+                            <tr>
+                                <td colSpan={7} className="p-20 text-slate-300 italic text-lg font-bold">لا توجد سجلات خروج مسجلة لهذه الفلاتر حالياً.</td>
+                            </tr>
+                        ) : (
+                            filteredLogs.map(l => (
+                                <tr key={l.id} className="hover:bg-amber-50/30 font-bold transition-colors">
+                                    <td className="p-5 border-e border-slate-50 font-black text-slate-800">{l.studentName}</td>
+                                    <td className="p-5 border-e border-slate-50 text-slate-500">{l.grade} / {l.section}</td>
+                                    <td className="p-5 border-e border-slate-50 text-amber-600 font-black text-lg">{l.prevExitCount + 1}</td>
+                                    <td className="p-5 border-e border-slate-50 text-slate-500">{l.date}</td>
+                                    <td className="p-5 border-e border-slate-50">
+                                        <div className="flex flex-col gap-1">
+                                            <span className={`px-3 py-1 rounded-xl text-[10px] ${l.status.includes('كثير') ? 'bg-red-600 text-white' : l.status.includes('متوسط') ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                                                {l.status}
+                                            </span>
+                                            {l.customStatusItems?.length > 0 && <span className="text-[8px] text-slate-400 font-normal">{l.customStatusItems.join(', ')}</span>}
+                                        </div>
+                                    </td>
+                                    <td className="p-5 border-e border-slate-50 text-red-600">{l.action}</td>
+                                    <td className="p-5 text-slate-400 text-xs text-right max-w-[200px]">{l.notes}</td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+  // END OF CHANGE
+
   // --- Main View Entry ---
 
   const renderCurrentModule = () => {
@@ -966,6 +1347,9 @@ const SpecialReportsPage: React.FC = () => {
       case 'الغياب اليومي': return renderAbsenceModule();
       case 'التأخر': return renderLatenessModule();
       case 'المخالفات الطلابية': return renderViolationModule();
+      // START OF CHANGE - Requirement: Linking the Exit School tab to the new module
+      case 'خروج طالب أثناء الدراسة': return renderExitModule();
+      // END OF CHANGE
       default:
         return (
           <div className="bg-white p-8 rounded-[3rem] border shadow-2xl relative overflow-hidden">
