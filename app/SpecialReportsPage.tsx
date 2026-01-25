@@ -69,7 +69,8 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
 
   // START OF CHANGE - Presence Tracker State
   const [showPresenceTracker, setShowPresenceTracker] = useState(false);
-  const [presenceBranch, setPresenceBranch] = useState('');
+  // Requirement: Multi-select Branch (طلاب، طالبات)
+  const [presenceBranch, setPresenceBranch] = useState<string[]>([]);
   const [presenceGrade, setPresenceGrade] = useState('');
   const [presenceSection, setPresenceSection] = useState('');
   const [attendanceMap, setAttendanceMap] = useState<Record<string, 'present' | 'absent'>>({});
@@ -624,8 +625,12 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
     
     // START OF CHANGE - Presence Tracker Logic
+    // Requirement: Automatic population from student reports data + multi-select Branch filter
     const filteredPresence = students.filter(s => {
-      const branchMatch = !presenceBranch || s.gender === (presenceBranch === 'طلاب' ? 'ذكر' : 'أنثى');
+      // Requirement 2: allow choosing both (طلاب، طالبات) together
+      const branchMatch = !presenceBranch.length || 
+                         (presenceBranch.includes('طلاب') && s.gender === 'ذكر') || 
+                         (presenceBranch.includes('طالبات') && s.gender === 'أنثى');
       const gradeMatch = !presenceGrade || s.grade === presenceGrade;
       const sectionMatch = !presenceSection || s.section === presenceSection;
       return branchMatch && gradeMatch && sectionMatch;
@@ -647,6 +652,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
           const statusIcon = status === 'present' ? '✅' : '❌';
           const statusText = status === 'present' ? 'حاضر' : 'غائب';
           msg += `*${idx + 1}* 👤 *الاسم:* ${s.name}\n`;
+          msg += `📍 *الصف:* ${s.grade} / ${s.section}\n`;
           msg += `🏷️ *الحالة:* ${statusIcon} ${statusText}\n`;
           msg += `📞 *ولي الأمر:* ${s.guardianPhones[0] || '---'}\n\n`;
       });
@@ -754,7 +760,14 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                             <label className="text-[10px] font-black text-slate-400 mr-2">الفرع</label>
                             <div className="flex gap-1 bg-white p-1 rounded-xl border-2">
                                 {['طلاب', 'طالبات'].map(b => (
-                                    <button key={b} onClick={() => setPresenceBranch(b)} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${presenceBranch === b ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}>{b}</button>
+                                    <button 
+                                      key={b} 
+                                      // Requirement: Enable choosing both (طلاب، طالبات) together
+                                      onClick={() => setPresenceBranch(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])} 
+                                      className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${presenceBranch.includes(b) ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
+                                    >
+                                      {b}
+                                    </button>
                                 ))}
                             </div>
                         </div>
@@ -786,12 +799,15 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
             </div>
 
             <div className="overflow-x-auto rounded-[2.5rem] border-[3px] border-blue-100 shadow-xl bg-white">
-                <table className="w-full text-center border-collapse min-w-[900px]">
+                <table className="w-full text-center border-collapse min-w-[1000px]">
                     <thead className="bg-[#FFD966] text-slate-800 font-black border-b-2 border-blue-100">
                         <tr>
                             <th className="p-4 border-e border-blue-50 w-12">م</th>
                             <th className="p-4 border-e border-blue-50 w-12"><CheckSquare size={16}/></th>
                             <th className="p-4 border-e border-blue-50 text-right">اسم الطالب</th>
+                            {/* Requirement: Automatically population includes Grade and Section in table */}
+                            <th className="p-4 border-e border-blue-50 w-24">الصف</th>
+                            <th className="p-4 border-e border-blue-50 w-24">الشعبة</th>
                             <th className="p-4 border-e border-blue-50 w-32">حالة الغياب</th>
                             <th className="p-4 border-e border-blue-50 w-48">هاتف ولي الأمر</th>
                             <th className="p-4 w-32">إجراءات</th>
@@ -799,7 +815,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {filteredPresence.length === 0 ? (
-                            <tr><td colSpan={6} className="p-20 text-slate-300 italic text-lg font-bold">لا يوجد طلاب مطابقين للفلتر المختار.</td></tr>
+                            <tr><td colSpan={8} className="p-20 text-slate-300 italic text-lg font-bold">لا يوجد طلاب مطابقين للفلتر المختار.</td></tr>
                         ) : filteredPresence.map((s, idx) => {
                             const status = attendanceMap[s.id] || 'present';
                             const isSelected = selectedForWA.includes(s.id);
@@ -810,6 +826,9 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                                         <input type="checkbox" checked={isSelected} onChange={() => setSelectedForWA(prev => isSelected ? prev.filter(id => id !== s.id) : [...prev, s.id])} className="w-5 h-5 rounded cursor-pointer" />
                                     </td>
                                     <td className="p-2 border-e border-slate-50 text-right font-black text-slate-700">{s.name}</td>
+                                    {/* Requirement: Automatic Population of Grade/Section */}
+                                    <td className="p-2 border-e border-slate-50 font-bold text-slate-500">{s.grade}</td>
+                                    <td className="p-2 border-e border-slate-50 font-bold text-slate-500">{s.section}</td>
                                     <td className="p-2 border-e border-slate-50">
                                         <button 
                                             onClick={() => setAttendanceMap(prev => ({...prev, [s.id]: status === 'present' ? 'absent' : 'present'}))}
