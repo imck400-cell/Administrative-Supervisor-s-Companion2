@@ -85,6 +85,24 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
   const [appliedNames, setAppliedNames] = useState<string[]>([]);
   const [nameInput, setNameInput] = useState('');
 
+  const students = data.studentReports || [];
+
+  // START OF CHANGE - Lifted hook to top level to prevent Hook mismatch error
+  const filteredPresence = useMemo(() => {
+    return students.filter(s => {
+      const studentGender = (s.gender || "").trim();
+      const branchMatch = !presenceBranch.length || 
+                         (presenceBranch.includes('طلاب') && (studentGender === 'ذكر' || studentGender === 'Male')) || 
+                         (presenceBranch.includes('طالبات') && (studentGender === 'أنثى' || studentGender === 'Female'));
+      
+      const gradeMatch = !presenceGrade || (s.grade || "").trim() === presenceGrade.trim();
+      const sectionMatch = !presenceSection || (s.section || "").trim() === presenceSection.trim();
+      
+      return branchMatch && gradeMatch && sectionMatch;
+    });
+  }, [students, presenceBranch, presenceGrade, presenceSection]);
+  // END OF CHANGE
+
   // Exam Record Specific States
   const [examStage, setExamStage] = useState<'basic' | 'secondary'>('basic');
   const [examFilters, setExamFilters] = useState({
@@ -126,7 +144,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
     date: today, semester: 'الفصلين', type: 'visit', status: 'نادر الزيارة', customStatusItems: [], visitorName: '', reason: '', recommendations: '', actions: '', followUpStatus: [], notes: '', prevVisitCount: 0
   });
 
-  const students = data.studentReports || [];
   const getDayName = (dateStr: string) => {
     if (!dateStr) return '';
     try {
@@ -622,24 +639,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
     
-    // START OF CHANGE - Presence Tracker Logic (Automatic population verified with enhanced string matching)
-    const filteredPresence = useMemo(() => {
-      return students.filter(s => {
-        // Requirement: filter by multiple branches if selected, plus specific grade and section
-        // Added .trim() and multi-language support (Male/Female/ذكر/أنثى) for robustness
-        const studentGender = (s.gender || "").trim();
-        const branchMatch = !presenceBranch.length || 
-                           (presenceBranch.includes('طلاب') && (studentGender === 'ذكر' || studentGender === 'Male')) || 
-                           (presenceBranch.includes('طالبات') && (studentGender === 'أنثى' || studentGender === 'Female'));
-        
-        // Use normalized comparisons to avoid whitespace issues
-        const gradeMatch = !presenceGrade || (s.grade || "").trim() === presenceGrade.trim();
-        const sectionMatch = !presenceSection || (s.section || "").trim() === presenceSection.trim();
-        
-        return branchMatch && gradeMatch && sectionMatch;
-      });
-    }, [students, presenceBranch, presenceGrade, presenceSection]);
-
     const handleWhatsAppAttendance = (mode: 'all' | 'present' | 'absent' | 'selected') => {
       let list = filteredPresence;
       if (mode === 'present') list = list.filter(s => (attendanceMap[s.id] || 'present') === 'present');
@@ -664,7 +663,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
       msg += `----------------------------------\n*إعداد مدارس الرائد*`;
       window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
     };
-    // END OF CHANGE
 
     const filtered = (data.absenceLogs || []).filter(l => {
       if (appliedNames.length > 0 && !appliedNames.includes(l.studentName)) return false;
@@ -755,7 +753,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
         </div>
 
         {showPresenceTracker ? (
-          // START OF CHANGE - Presence Tracker Table
           <div className="space-y-6 animate-in slide-in-from-top-4 duration-300">
             <div className="bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100 space-y-6 shadow-sm">
                 <div className="flex flex-wrap gap-4 items-center justify-between">
@@ -865,7 +862,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                 </div>
             </div>
           </div>
-          // END OF CHANGE
         ) : !showTable ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
             <div className="space-y-6">
@@ -1707,7 +1703,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
             <FilterSection suggestions={nameSugg} values={filterValues} setValues={setFilterValues} tempNames={tempNames} setTempNames={setTempNames} appliedNames={appliedNames} setAppliedNames={setAppliedNames} nameInput={nameInput} setNameInput={setNameInput} onExportExcel={() => exportExcelFiltered('زيارات_أولياء_الأمور', filtered, cols)} onExportTxt={() => exportTxtFiltered('زيارات_أولياء_الأمور', filtered, cols)} onExportWA={() => shareWhatsAppRich('سجل زيارات وتواصل أولياء الأمور المفلتر', filtered, cols)} />
             <div className="overflow-x-auto rounded-[1.5rem] border shadow-inner">
               <table className="w-full text-center text-[10px] md:text-sm border-collapse min-w-[1200px]"><thead className="bg-[#FFD966] text-slate-800 font-black"><tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e border-indigo-200">{c.label}</th>)}</tr></thead>
-              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد سجلات.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-indigo-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.visitorName}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-50 text-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.type === 'visit' ? 'زيارة' : 'تواصل'}</td><td className="p-3 md:p-5 border-e border-slate-50 text-[10px]">{l.reason}</td><td className="p-3 md:p-5 border-e border-slate-50 text-[10px]">{l.actions}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
+              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد سجلات.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-indigo-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.visitorName}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.type === 'visit' ? 'زيارة' : 'تواصل'}</td><td className="p-3 md:p-5 border-e border-slate-50 text-[10px]">{l.reason}</td><td className="p-3 md:p-5 border-e border-slate-50 text-[10px]">{l.actions}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
             </div>
           </div>
         )}
