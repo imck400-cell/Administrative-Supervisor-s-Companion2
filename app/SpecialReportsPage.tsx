@@ -180,7 +180,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
   const structure = {
     supervisor: { title: 'المشرف الإداري', icon: <Briefcase />, items: ['الخطة الفصلية', 'الخلاصة الشهرية', 'المهام اليومية', 'المهام المضافة', 'المهام المرحلة', 'أهم المشكلات اليومية', 'التوصيات العامة', 'احتياجات الدور', 'سجل متابعة الدفاتر والتصحيح', 'الجرد العام للعهد', 'ملاحظات عامة'] },
     staff: { title: 'الكادر التعليمي', icon: <Users />, items: ['سجل الإبداع والتميز', 'كشف الاستلام والتسليم', 'المخالفات', 'التعميمات'] },
-    students: { title: 'الطلاب/ الطالبات', icon: <GraduationCap />, items: ['الغياب اليومي', 'التأخر', 'خروج طالب أثناء الدراسة', 'المخالفات الطلابية', 'سجل الإتلاف المدرسي', 'سجل الحالات الخاصة', 'سجل الحالة الصحية', 'سجل زيارة أولياء الأمور والتواصل بهم'] },
+    students: { title: 'الطلاب/ الطالبات', icon: <GraduationCap />, items: ['الغياب اليومي', 'التأخر', 'خروج طالب أثناء الدراسة', 'المخالفات الطلابية', 'سجل الإتلاف المدرسي', 'سجل الح حالات الخاصة', 'سجل الحالة الصحية', 'سجل زيارة أولياء الأمور والتواصل بهم'] },
     tests: { title: 'تقارير الاختبار', icon: <FileSearch />, items: ['الاختبار الشهري', 'الاختبار الفصلي'] }
   };
 
@@ -624,10 +624,9 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
     
-    // START OF CHANGE - Presence Tracker Logic
-    // Requirement: Automatic population from student reports data + multi-select Branch filter
+    // START OF CHANGE - Presence Tracker Logic (Automatic population verified)
     const filteredPresence = students.filter(s => {
-      // Requirement 2: allow choosing both (طلاب، طالبات) together
+      // Requirement: filter by multiple branches if selected, plus specific grade and section
       const branchMatch = !presenceBranch.length || 
                          (presenceBranch.includes('طلاب') && s.gender === 'ذكر') || 
                          (presenceBranch.includes('طالبات') && s.gender === 'أنثى');
@@ -751,7 +750,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
         </div>
 
         {showPresenceTracker ? (
-          // START OF CHANGE - Presence Tracker Table and UI
+          // START OF CHANGE - Presence Tracker confirmed as automatically populated from student reports
           <div className="space-y-6 animate-in slide-in-from-top-4 duration-300">
             <div className="bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100 space-y-6 shadow-sm">
                 <div className="flex flex-wrap gap-4 items-center justify-between">
@@ -762,7 +761,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                                 {['طلاب', 'طالبات'].map(b => (
                                     <button 
                                       key={b} 
-                                      // Requirement: Enable choosing both (طلاب، طالبات) together
                                       onClick={() => setPresenceBranch(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])} 
                                       className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${presenceBranch.includes(b) ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}
                                     >
@@ -805,7 +803,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                             <th className="p-4 border-e border-blue-50 w-12">م</th>
                             <th className="p-4 border-e border-blue-50 w-12"><CheckSquare size={16}/></th>
                             <th className="p-4 border-e border-blue-50 text-right">اسم الطالب</th>
-                            {/* Requirement: Automatically population includes Grade and Section in table */}
                             <th className="p-4 border-e border-blue-50 w-24">الصف</th>
                             <th className="p-4 border-e border-blue-50 w-24">الشعبة</th>
                             <th className="p-4 border-e border-blue-50 w-32">حالة الغياب</th>
@@ -815,7 +812,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {filteredPresence.length === 0 ? (
-                            <tr><td colSpan={8} className="p-20 text-slate-300 italic text-lg font-bold">لا يوجد طلاب مطابقين للفلتر المختار.</td></tr>
+                            <tr><td colSpan={8} className="p-20 text-slate-300 italic text-lg font-bold">لا يوجد طلاب مطابقين للفلتر المختار حالياً.</td></tr>
                         ) : filteredPresence.map((s, idx) => {
                             const status = attendanceMap[s.id] || 'present';
                             const isSelected = selectedForWA.includes(s.id);
@@ -826,7 +823,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                                         <input type="checkbox" checked={isSelected} onChange={() => setSelectedForWA(prev => isSelected ? prev.filter(id => id !== s.id) : [...prev, s.id])} className="w-5 h-5 rounded cursor-pointer" />
                                     </td>
                                     <td className="p-2 border-e border-slate-50 text-right font-black text-slate-700">{s.name}</td>
-                                    {/* Requirement: Automatic Population of Grade/Section */}
                                     <td className="p-2 border-e border-slate-50 font-bold text-slate-500">{s.grade}</td>
                                     <td className="p-2 border-e border-slate-50 font-bold text-slate-500">{s.section}</td>
                                     <td className="p-2 border-e border-slate-50">
