@@ -144,13 +144,15 @@ const MainApp: React.FC = () => {
         >
           <ArrowUp size={20} />
         </button>
+        {/* START OF CHANGE - Modified color to permanent red as per request */}
         <button 
           onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
-          className="p-2 bg-orange-50 text-white rounded-full shadow-lg hover:bg-orange-600 transition-all active:scale-90"
+          className="p-2 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700 transition-all active:scale-90"
           title="أسفل الشاشة"
         >
           <ArrowDown size={20} />
         </button>
+        {/* END OF CHANGE */}
       </div>
 
       <div className="mb-6 flex items-center justify-between flex-wrap gap-4">

@@ -9,7 +9,7 @@ import {
   FileSearch, Archive, CheckSquare, PencilLine, Zap,
   Sparkles, Database, FileUp, FileDown, MessageCircle,
   Activity, Fingerprint, History, RefreshCw, Upload, LayoutList,
-  Hammer, UserPlus, Edit, ArrowUpDown
+  Hammer, UserPlus, Edit, ArrowUpDown, PhoneCall, Mail
 } from 'lucide-react';
 import { AbsenceLog, LatenessLog, StudentViolationLog, StudentReport, ExitLog, DamageLog, ParentVisitLog, ExamLog } from '../types';
 import * as XLSX from 'xlsx';
@@ -66,6 +66,16 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
   const [showTable, setShowTable] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFrequentNames, setShowFrequentNames] = useState(false);
+
+  // START OF CHANGE - Presence Tracker State
+  const [showPresenceTracker, setShowPresenceTracker] = useState(false);
+  const [presenceBranch, setPresenceBranch] = useState('');
+  const [presenceGrade, setPresenceGrade] = useState('');
+  const [presenceSection, setPresenceSection] = useState('');
+  const [attendanceMap, setAttendanceMap] = useState<Record<string, 'present' | 'absent'>>({});
+  const [presenceDate, setPresenceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedForWA, setSelectedForWA] = useState<string[]>([]);
+  // END OF CHANGE
 
   const today = new Date().toISOString().split('T')[0];
   const gradeOptions = ["تمهيدي", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
@@ -612,6 +622,40 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
   const renderAbsenceModule = () => {
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
+    
+    // START OF CHANGE - Presence Tracker Logic
+    const filteredPresence = students.filter(s => {
+      const branchMatch = !presenceBranch || s.gender === (presenceBranch === 'طلاب' ? 'ذكر' : 'أنثى');
+      const gradeMatch = !presenceGrade || s.grade === presenceGrade;
+      const sectionMatch = !presenceSection || s.section === presenceSection;
+      return branchMatch && gradeMatch && sectionMatch;
+    });
+
+    const handleWhatsAppAttendance = (mode: 'all' | 'present' | 'absent' | 'selected') => {
+      let list = filteredPresence;
+      if (mode === 'present') list = list.filter(s => (attendanceMap[s.id] || 'present') === 'present');
+      if (mode === 'absent') list = list.filter(s => (attendanceMap[s.id] || 'present') === 'absent');
+      if (mode === 'selected') list = list.filter(s => selectedForWA.includes(s.id));
+      
+      let msg = `*📋 حضور وغياب يوم: ${getDayName(presenceDate)}*\n`;
+      msg += `*بتاريخ:* ${presenceDate}\n`;
+      msg += `*للصف:* ${presenceGrade || 'الكل'} *والشعبة:* ${presenceSection || 'الكل'}\n`;
+      msg += `----------------------------------\n\n`;
+      
+      list.forEach((s, idx) => {
+          const status = attendanceMap[s.id] || 'present';
+          const statusIcon = status === 'present' ? '✅' : '❌';
+          const statusText = status === 'present' ? 'حاضر' : 'غائب';
+          msg += `*${idx + 1}* 👤 *الاسم:* ${s.name}\n`;
+          msg += `🏷️ *الحالة:* ${statusIcon} ${statusText}\n`;
+          msg += `📞 *ولي الأمر:* ${s.guardianPhones[0] || '---'}\n\n`;
+      });
+      
+      msg += `----------------------------------\n*إعداد مدارس الرائد*`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    };
+    // END OF CHANGE
+
     const filtered = (data.absenceLogs || []).filter(l => {
       if (appliedNames.length > 0 && !appliedNames.includes(l.studentName)) return false;
       if (filterValues.start && l.date < filterValues.start) return false;
@@ -672,11 +716,16 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
         />
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
            <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
-              <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-blue-100 transition-all flex items-center gap-2">
-                {showTable ? <Plus size={18}/> : <LayoutList size={18}/>}
-                {showTable ? 'تسجيل جديد' : 'جدول الغائبين'}
+              <button onClick={() => { setShowTable(!showTable); setShowPresenceTracker(false); }} className={`px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm transition-all flex items-center gap-2 ${!showTable && !showPresenceTracker ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}>
+                <Plus size={18}/> رصد غياب جديد
               </button>
-              {!showTable && (
+              <button onClick={() => { setShowTable(true); setShowPresenceTracker(false); }} className={`px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm transition-all flex items-center gap-2 ${showTable && !showPresenceTracker ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}>
+                <LayoutList size={18}/> جدول السجلات
+              </button>
+              <button onClick={() => { setShowPresenceTracker(true); setShowTable(false); }} className={`px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm transition-all flex items-center gap-2 ${showPresenceTracker ? 'bg-green-600 text-white shadow-md' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>
+                <Filter size={18}/> تحضير الطلاب (فلتر)
+              </button>
+              {!showTable && !showPresenceTracker && (
                 <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
                   <RefreshCw size={18}/> الأسماء المتكررة
                 </button>
@@ -695,7 +744,109 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
            </div>
         </div>
 
-        {!showTable ? (
+        {showPresenceTracker ? (
+          // START OF CHANGE - Presence Tracker Table and UI
+          <div className="space-y-6 animate-in slide-in-from-top-4 duration-300">
+            <div className="bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100 space-y-6 shadow-sm">
+                <div className="flex flex-wrap gap-4 items-center justify-between">
+                    <div className="flex flex-wrap gap-2">
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 mr-2">الفرع</label>
+                            <div className="flex gap-1 bg-white p-1 rounded-xl border-2">
+                                {['طلاب', 'طالبات'].map(b => (
+                                    <button key={b} onClick={() => setPresenceBranch(b)} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${presenceBranch === b ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}>{b}</button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 mr-2">الصف</label>
+                            <select className="p-2.5 bg-white border-2 rounded-xl text-xs font-black outline-none min-w-[100px]" value={presenceGrade} onChange={e => setPresenceGrade(e.target.value)}>
+                                <option value="">اختر الصف...</option>
+                                {gradeOptions.map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 mr-2">الشعبة</label>
+                            <select className="p-2.5 bg-white border-2 rounded-xl text-xs font-black outline-none min-w-[80px]" value={presenceSection} onChange={e => setPresenceSection(e.target.value)}>
+                                <option value="">الكل</option>
+                                {sectionOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 mr-2">تاريخ التحضير</label>
+                        <input type="date" className="p-2.5 bg-white border-2 rounded-xl text-xs font-black outline-none" value={presenceDate} onChange={e => setPresenceDate(e.target.value)} />
+                    </div>
+                </div>
+            </div>
+
+            <div className="text-center py-4 space-y-2">
+                <h3 className="text-2xl font-black text-slate-800">حضور وغياب يوم: <span className="text-blue-600">{getDayName(presenceDate)}</span> بتاريخ <span className="text-blue-600">{presenceDate}</span></h3>
+                <p className="text-slate-500 font-bold">تفاصيل الجدول حسب الفلتر للصف: <span className="text-slate-800">{presenceGrade || '---'}</span> والشعبة <span className="text-slate-800">{presenceSection || '---'}</span></p>
+            </div>
+
+            <div className="overflow-x-auto rounded-[2.5rem] border-[3px] border-blue-100 shadow-xl bg-white">
+                <table className="w-full text-center border-collapse min-w-[900px]">
+                    <thead className="bg-[#FFD966] text-slate-800 font-black border-b-2 border-blue-100">
+                        <tr>
+                            <th className="p-4 border-e border-blue-50 w-12">م</th>
+                            <th className="p-4 border-e border-blue-50 w-12"><CheckSquare size={16}/></th>
+                            <th className="p-4 border-e border-blue-50 text-right">اسم الطالب</th>
+                            <th className="p-4 border-e border-blue-50 w-32">حالة الغياب</th>
+                            <th className="p-4 border-e border-blue-50 w-48">هاتف ولي الأمر</th>
+                            <th className="p-4 w-32">إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {filteredPresence.length === 0 ? (
+                            <tr><td colSpan={6} className="p-20 text-slate-300 italic text-lg font-bold">لا يوجد طلاب مطابقين للفلتر المختار.</td></tr>
+                        ) : filteredPresence.map((s, idx) => {
+                            const status = attendanceMap[s.id] || 'present';
+                            const isSelected = selectedForWA.includes(s.id);
+                            return (
+                                <tr key={s.id} className="hover:bg-slate-50/50 transition-colors h-14">
+                                    <td className="p-2 border-e border-slate-50 font-black text-blue-600">{idx + 1}</td>
+                                    <td className="p-2 border-e border-slate-50">
+                                        <input type="checkbox" checked={isSelected} onChange={() => setSelectedForWA(prev => isSelected ? prev.filter(id => id !== s.id) : [...prev, s.id])} className="w-5 h-5 rounded cursor-pointer" />
+                                    </td>
+                                    <td className="p-2 border-e border-slate-50 text-right font-black text-slate-700">{s.name}</td>
+                                    <td className="p-2 border-e border-slate-50">
+                                        <button 
+                                            onClick={() => setAttendanceMap(prev => ({...prev, [s.id]: status === 'present' ? 'absent' : 'present'}))}
+                                            className={`px-6 py-2 rounded-full text-xs font-black transition-all shadow-sm ${status === 'present' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}
+                                        >
+                                            {status === 'present' ? 'حاضر' : 'غائب'}
+                                        </button>
+                                    </td>
+                                    <td className="p-2 border-e border-slate-50 font-bold text-slate-600">{s.guardianPhones[0] || '---'}</td>
+                                    <td className="p-2">
+                                        <div className="flex justify-center gap-2">
+                                            <a href={`sms:${s.guardianPhones[0]}?body=${encodeURIComponent(`السلام عليكم، نبلغكم بغياب ${s.name} لهذا اليوم، مدارس الرائد.`)}`} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"><MessageSquare size={18}/></a>
+                                            <a href={`tel:${s.guardianPhones[0]}`} className="p-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-all"><PhoneCall size={18}/></a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+
+            <div className="bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100 flex flex-wrap gap-3 items-center justify-center">
+                <span className="font-black text-slate-400 ml-4">تصدير التحضير للواتساب:</span>
+                <button onClick={() => handleWhatsAppAttendance('all')} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl font-black text-xs hover:bg-blue-700 shadow-md">جميع الطلاب</button>
+                <button onClick={() => handleWhatsAppAttendance('present')} className="flex items-center gap-2 bg-green-600 text-white px-5 py-2.5 rounded-xl font-black text-xs hover:bg-green-700 shadow-md">الحاضرين فقط</button>
+                <button onClick={() => handleWhatsAppAttendance('absent')} className="flex items-center gap-2 bg-red-600 text-white px-5 py-2.5 rounded-xl font-black text-xs hover:bg-red-700 shadow-md">الغائبين فقط</button>
+                <button onClick={() => handleWhatsAppAttendance('selected')} className="flex items-center gap-2 bg-slate-800 text-white px-5 py-2.5 rounded-xl font-black text-xs hover:bg-black shadow-md">الأسماء المحددة</button>
+                <div className="flex gap-2 mr-6 border-r pr-6">
+                    <button onClick={() => {}} title="استيراد" className="p-3 bg-white border-2 text-blue-600 rounded-xl shadow-sm hover:bg-blue-50 transition-all"><Upload size={18}/></button>
+                    <button onClick={() => exportTxtFiltered('التحضير_اليومي', filteredPresence.map(s => ({...s, status: attendanceMap[s.id] === 'absent' ? 'غائب' : 'حاضر'})), [{label: 'الاسم', key: 'name'}, {label: 'الحالة', key: 'status'}])} title="تصدير TXT" className="p-3 bg-white border-2 text-slate-600 rounded-xl shadow-sm hover:bg-slate-50 transition-all"><FileText size={18}/></button>
+                    <button onClick={() => exportExcelFiltered('التحضير_اليومي', filteredPresence.map(s => ({...s, status: attendanceMap[s.id] === 'absent' ? 'غائب' : 'حاضر'})), [{label: 'الاسم', key: 'name'}, {label: 'الحالة', key: 'status'}])} title="تصدير إكسل" className="p-3 bg-white border-2 text-green-700 rounded-xl shadow-sm hover:bg-green-50 transition-all"><FileSpreadsheet size={18}/></button>
+                </div>
+            </div>
+          </div>
+          // END OF CHANGE
+        ) : !showTable ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
             <div className="space-y-6">
                <div className="flex flex-wrap gap-1.5 md:gap-2 justify-end">
@@ -731,8 +882,8 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                     <label className="text-[9px] md:text-[10px] font-black text-orange-600 mb-1 block">غياب سابق</label>
                     <span className="text-2xl md:text-3xl font-black text-slate-800">{absenceForm.prevAbsenceCount || 0}</span>
                   </div>
-                  <div className="bg-purple-50 p-4 md:p-5 rounded-3xl border-2 border-purple-100 relative shadow-sm text-center">
-                     <label className="text-[9px] md:text-[10px] font-black text-purple-600 mb-1 block">الفصل</label>
+                  <div className="bg-blue-50 p-4 md:p-5 rounded-3xl border-2 border-blue-100 relative shadow-sm text-center">
+                     <label className="text-[9px] md:text-[10px] font-black text-blue-600 mb-1 block">الفصل</label>
                      <select className="bg-white border text-[10px] md:text-xs font-black p-1 md:p-2 rounded-lg outline-none cursor-pointer w-full text-center" value={absenceForm.semester} onChange={e => setAbsenceForm({...absenceForm, semester: e.target.value as any})}>
                         <option value="الأول">الأول</option><option value="الثاني">الثاني</option>
                      </select>
@@ -790,18 +941,18 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
             <div className="overflow-x-auto rounded-[1.5rem] border shadow-inner">
                <table className="w-full text-center text-[10px] md:text-sm border-collapse min-w-[1000px]">
                   <thead className="bg-[#FFD966] text-slate-800 font-black">
-                     <tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e">{c.label}</th>)}</tr>
+                     <tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e border-slate-200">{c.label}</th>)}</tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white font-bold">
                      {filtered.length === 0 ? (<tr><td colSpan={8} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد بيانات غياب مسجلة.</td></tr>) : filtered.map(l => (
                        <tr key={l.id} className="hover:bg-blue-50/20 transition-colors h-10 md:h-12">
-                          <td className="p-2 md:p-4 border-e">{l.studentName}</td>
-                          <td className="p-2 md:p-4 border-e">{l.grade} / {l.section}</td>
-                          <td className="p-2 md:p-4 border-e text-red-600 font-black text-base">{l.prevAbsenceCount + 1}</td>
-                          <td className="p-2 md:p-4 border-e text-[10px] text-slate-400">{l.date}</td>
-                          <td className="p-2 md:p-4 border-e">{l.reason}</td>
-                          <td className="p-2 md:p-4 border-e">{l.commStatus}</td>
-                          <td className="p-2 md:p-4 border-e">{l.replier}</td>
+                          <td className="p-2 md:p-4 border-e border-slate-100 font-black">{l.studentName}</td>
+                          <td className="p-2 md:p-4 border-e border-slate-100">{l.grade} / {l.section}</td>
+                          <td className="p-2 md:p-4 border-e border-slate-100 text-red-600 font-black text-base">{l.prevAbsenceCount + 1}</td>
+                          <td className="p-2 md:p-4 border-e border-slate-100 text-[10px] text-slate-400">{l.date}</td>
+                          <td className="p-2 md:p-4 border-e border-slate-100">{l.reason}</td>
+                          <td className="p-2 md:p-4 border-e border-slate-100">{l.commStatus}</td>
+                          <td className="p-2 md:p-4 border-e border-slate-100">{l.replier}</td>
                           <td className="p-2 md:p-4 text-[10px] text-slate-400">{l.notes}</td>
                        </tr>
                      ))}
@@ -973,16 +1124,16 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
             <div className="overflow-x-auto rounded-[1.5rem] border shadow-inner">
                <table className="w-full text-center text-[10px] md:text-sm border-collapse min-w-[1000px]">
                   <thead className="bg-[#FFD966] text-slate-800 font-black">
-                     <tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e">{c.label}</th>)}</tr>
+                     <tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e border-slate-200">{c.label}</th>)}</tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white font-bold">
                      {filtered.length === 0 ? (<tr><td colSpan={5} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد سجلات تأخر.</td></tr>) : filtered.map(l => (
                        <tr key={l.id} className="hover:bg-orange-50/20 transition-colors h-10 md:h-12">
-                          <td className="p-2 md:p-4 border-e">{l.studentName}</td>
-                          <td className="p-2 md:p-4 border-e text-[10px] text-slate-400">{l.date}</td>
-                          <td className="p-2 md:p-4 border-e">{l.reason}</td>
-                          <td className="p-2 md:p-4 border-e text-red-600">{l.action}</td>
-                          <td className="p-2 md:p-4 text-[10px] text-green-600">{l.pledge || '---'}</td>
+                          <td className="p-2 md:p-4 border-e border-slate-100 font-black">{l.studentName}</td>
+                          <td className="p-2 md:p-4 border-e border-slate-100 text-[10px] text-slate-400">{l.date}</td>
+                          <td className="p-2 md:p-4 border-e border-slate-100">{l.reason}</td>
+                          <td className="p-2 md:p-4 border-e border-slate-100 text-red-600">{l.action}</td>
+                          <td className="p-2 md:p-4 text-[10px] text-green-600 border-slate-100">{l.pledge || '---'}</td>
                        </tr>
                      ))}
                   </tbody>
@@ -1162,12 +1313,12 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                   <tbody className="divide-y divide-slate-100 bg-white font-bold">
                      {filtered.length === 0 ? (<tr><td colSpan={6} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد مخالفات مسجلة.</td></tr>) : filtered.map(l => (
                        <tr key={l.id} className="hover:bg-red-50/20 transition-colors h-12 md:h-14">
-                          <td className="p-3 md:p-5 border-e">{l.studentName}</td>
-                          <td className="p-3 md:p-5 border-e">{l.grade} / {l.section}</td>
-                          <td className="p-3 md:p-5 border-e text-red-600 font-black text-lg">{l.totalViolations}</td>
-                          <td className="p-3 md:p-5 border-e text-[10px] text-slate-400">{l.date}</td>
-                          <td className="p-3 md:p-5 border-e"><span className="px-3 py-1 bg-slate-100 rounded-lg text-[8px] md:text-[10px] font-black uppercase">{l.status}</span></td>
-                          <td className="p-3 md:p-5 text-red-700 font-black">{l.action}</td>
+                          <td className="p-3 md:p-5 border-e border-slate-100 font-black">{l.studentName}</td>
+                          <td className="p-3 md:p-5 border-e border-slate-100 font-bold">{l.grade} / {l.section}</td>
+                          <td className="p-3 md:p-5 border-e border-slate-100 text-red-600 font-black text-lg">{l.totalViolations}</td>
+                          <td className="p-3 md:p-5 border-e border-slate-100 text-[10px] text-slate-400">{l.date}</td>
+                          <td className="p-3 md:p-5 border-e border-slate-100"><span className="px-3 py-1 bg-slate-100 rounded-lg text-[8px] md:text-[10px] font-black uppercase">{l.status}</span></td>
+                          <td className="p-3 md:p-5 text-red-700 font-black border-slate-100">{l.action}</td>
                        </tr>
                      ))}
                   </tbody>
@@ -1227,7 +1378,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
         />
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
            <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
-              <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-blue-100 transition-all flex items-center gap-2">
+              <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-blue-100 transition-all flex items-center gap-2 shadow-sm">
                 {showTable ? <Plus size={18}/> : <LayoutList size={18}/>}
                 {showTable ? 'رصد خروج جديد' : 'جدول الخروج'}
               </button>
@@ -1285,7 +1436,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
             <FilterSection suggestions={nameSugg} values={filterValues} setValues={setFilterValues} tempNames={tempNames} setTempNames={setTempNames} appliedNames={appliedNames} setAppliedNames={setAppliedNames} nameInput={nameInput} setNameInput={setNameInput} onExportExcel={() => exportExcelFiltered('خروج_الطلاب', filtered, cols)} onExportTxt={() => exportTxtFiltered('خروج_الطلاب', filtered, cols)} onExportWA={() => shareWhatsAppRich('سجل خروج الطلاب المفلتر', filtered, cols)} />
             <div className="overflow-x-auto rounded-[1.5rem] border shadow-inner">
               <table className="w-full text-center text-[10px] md:text-sm border-collapse min-w-[1000px]"><thead className="bg-[#FFD966] text-slate-800 font-black"><tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e border-blue-200">{c.label}</th>)}</tr></thead>
-              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد بيانات خروج.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-blue-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-50 text-blue-600 text-lg">{l.prevExitCount + 1}</td><td className="p-3 md:p-5 border-e border-slate-50 text-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.status}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.action}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
+              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد بيانات خروج.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-blue-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-50 text-blue-600 text-lg">{l.prevExitCount + 1}</td><td className="p-3 md:p-5 border-e border-slate-50 text-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.status}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.action}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
             </div>
           </div>
         )}
@@ -1399,7 +1550,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
             <FilterSection suggestions={nameSugg} values={filterValues} setValues={setFilterValues} tempNames={tempNames} setTempNames={setTempNames} appliedNames={appliedNames} setAppliedNames={setAppliedNames} nameInput={nameInput} setNameInput={setNameInput} onExportExcel={() => exportExcelFiltered('إتلاف_المدرسة', filtered, cols)} onExportTxt={() => exportTxtFiltered('إتلاف_المدرسة', filtered, cols)} onExportWA={() => shareWhatsAppRich('سجل إتلاف المدرسة المفلتر', filtered, cols)} />
             <div className="overflow-x-auto rounded-[1.5rem] border shadow-inner">
               <table className="w-full text-center text-[10px] md:text-sm border-collapse min-w-[1000px]"><thead className="bg-[#FFD966] text-slate-800 font-black"><tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e border-red-200">{c.label}</th>)}</tr></thead>
-              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد بيانات إتلاف.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-red-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-50 text-red-600 text-lg">{l.prevDamageCount + 1}</td><td className="p-3 md:p-5 border-e border-slate-50 text-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.description}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.action}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
+              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد بيانات إتلاف.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-red-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-50 text-red-600 text-lg">{l.prevDamageCount + 1}</td><td className="p-3 md:p-5 border-e border-slate-50 text-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.description}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.action}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
             </div>
           </div>
         )}
@@ -1536,7 +1687,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
             <FilterSection suggestions={nameSugg} values={filterValues} setValues={setFilterValues} tempNames={tempNames} setTempNames={setTempNames} appliedNames={appliedNames} setAppliedNames={setAppliedNames} nameInput={nameInput} setNameInput={setNameInput} onExportExcel={() => exportExcelFiltered('زيارات_أولياء_الأمور', filtered, cols)} onExportTxt={() => exportTxtFiltered('زيارات_أولياء_الأمور', filtered, cols)} onExportWA={() => shareWhatsAppRich('سجل زيارات وتواصل أولياء الأمور المفلتر', filtered, cols)} />
             <div className="overflow-x-auto rounded-[1.5rem] border shadow-inner">
               <table className="w-full text-center text-[10px] md:text-sm border-collapse min-w-[1200px]"><thead className="bg-[#FFD966] text-slate-800 font-black"><tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e border-indigo-200">{c.label}</th>)}</tr></thead>
-              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد سجلات.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-indigo-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.visitorName}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-50 text-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.type === 'visit' ? 'زيارة' : 'تواصل'}</td><td className="p-3 md:p-5 border-e border-slate-50 text-[10px]">{l.reason}</td><td className="p-3 md:p-5 border-e border-slate-50 text-[10px]">{l.actions}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
+              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد سجلات.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-indigo-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.visitorName}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-50 text-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.type === 'visit' ? 'زيارة' : 'تواصل'}</td><td className="p-3 md:p-5 border-e border-slate-50 text-[10px]">{l.reason}</td><td className="p-3 md:p-5 border-e border-slate-50 text-[10px]">{l.actions}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
             </div>
           </div>
         )}
@@ -1577,6 +1728,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
   const handleSubTabClick = (item: string) => {
     setActiveSubTab(item);
     setShowTable(false);
+    setShowPresenceTracker(false); // Ensure tracker is off when switching
     onSubTabOpen?.(item);
   };
 
