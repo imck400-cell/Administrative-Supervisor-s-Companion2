@@ -67,16 +67,14 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
   const [searchQuery, setSearchQuery] = useState('');
   const [showFrequentNames, setShowFrequentNames] = useState(false);
 
-  // START OF CHANGE - Presence Tracker State
+  // Presence Tracker State
   const [showPresenceTracker, setShowPresenceTracker] = useState(false);
-  // Requirement: Multi-select Branch (طلاب، طالبات)
   const [presenceBranch, setPresenceBranch] = useState<string[]>([]);
   const [presenceGrade, setPresenceGrade] = useState('');
   const [presenceSection, setPresenceSection] = useState('');
   const [attendanceMap, setAttendanceMap] = useState<Record<string, 'present' | 'absent'>>({});
   const [presenceDate, setPresenceDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedForWA, setSelectedForWA] = useState<string[]>([]);
-  // END OF CHANGE
 
   const today = new Date().toISOString().split('T')[0];
   const gradeOptions = ["تمهيدي", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
@@ -180,7 +178,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
   const structure = {
     supervisor: { title: 'المشرف الإداري', icon: <Briefcase />, items: ['الخطة الفصلية', 'الخلاصة الشهرية', 'المهام اليومية', 'المهام المضافة', 'المهام المرحلة', 'أهم المشكلات اليومية', 'التوصيات العامة', 'احتياجات الدور', 'سجل متابعة الدفاتر والتصحيح', 'الجرد العام للعهد', 'ملاحظات عامة'] },
     staff: { title: 'الكادر التعليمي', icon: <Users />, items: ['سجل الإبداع والتميز', 'كشف الاستلام والتسليم', 'المخالفات', 'التعميمات'] },
-    students: { title: 'الطلاب/ الطالبات', icon: <GraduationCap />, items: ['الغياب اليومي', 'التأخر', 'خروج طالب أثناء الدراسة', 'المخالفات الطلابية', 'سجل الإتلاف المدرسي', 'سجل الح حالات الخاصة', 'سجل الحالة الصحية', 'سجل زيارة أولياء الأمور والتواصل بهم'] },
+    students: { title: 'الطلاب/ الطالبات', icon: <GraduationCap />, items: ['الغياب اليومي', 'التأخر', 'خروج طالب أثناء الدراسة', 'المخالفات الطلابية', 'سجل الإتلاف المدرسي', 'سجل الحالات الخاصة', 'سجل الحالة الصحية', 'سجل زيارة أولياء الأمور والتواصل بهم'] },
     tests: { title: 'تقارير الاختبار', icon: <FileSearch />, items: ['الاختبار الشهري', 'الاختبار الفصلي'] }
   };
 
@@ -624,16 +622,23 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
     const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
     
-    // START OF CHANGE - Presence Tracker Logic (Automatic population verified)
-    const filteredPresence = students.filter(s => {
-      // Requirement: filter by multiple branches if selected, plus specific grade and section
-      const branchMatch = !presenceBranch.length || 
-                         (presenceBranch.includes('طلاب') && s.gender === 'ذكر') || 
-                         (presenceBranch.includes('طالبات') && s.gender === 'أنثى');
-      const gradeMatch = !presenceGrade || s.grade === presenceGrade;
-      const sectionMatch = !presenceSection || s.section === presenceSection;
-      return branchMatch && gradeMatch && sectionMatch;
-    });
+    // START OF CHANGE - Presence Tracker Logic (Automatic population verified with enhanced string matching)
+    const filteredPresence = useMemo(() => {
+      return students.filter(s => {
+        // Requirement: filter by multiple branches if selected, plus specific grade and section
+        // Added .trim() and multi-language support (Male/Female/ذكر/أنثى) for robustness
+        const studentGender = (s.gender || "").trim();
+        const branchMatch = !presenceBranch.length || 
+                           (presenceBranch.includes('طلاب') && (studentGender === 'ذكر' || studentGender === 'Male')) || 
+                           (presenceBranch.includes('طالبات') && (studentGender === 'أنثى' || studentGender === 'Female'));
+        
+        // Use normalized comparisons to avoid whitespace issues
+        const gradeMatch = !presenceGrade || (s.grade || "").trim() === presenceGrade.trim();
+        const sectionMatch = !presenceSection || (s.section || "").trim() === presenceSection.trim();
+        
+        return branchMatch && gradeMatch && sectionMatch;
+      });
+    }, [students, presenceBranch, presenceGrade, presenceSection]);
 
     const handleWhatsAppAttendance = (mode: 'all' | 'present' | 'absent' | 'selected') => {
       let list = filteredPresence;
@@ -750,7 +755,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
         </div>
 
         {showPresenceTracker ? (
-          // START OF CHANGE - Presence Tracker confirmed as automatically populated from student reports
+          // START OF CHANGE - Presence Tracker Table
           <div className="space-y-6 animate-in slide-in-from-top-4 duration-300">
             <div className="bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100 space-y-6 shadow-sm">
                 <div className="flex flex-wrap gap-4 items-center justify-between">
@@ -812,7 +817,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {filteredPresence.length === 0 ? (
-                            <tr><td colSpan={8} className="p-20 text-slate-300 italic text-lg font-bold">لا يوجد طلاب مطابقين للفلتر المختار حالياً.</td></tr>
+                            <tr><td colSpan={8} className="p-20 text-slate-300 italic text-lg font-bold">لا يوجد طلاب مطابقين للفلتر المختار حالياً. تأكد من صحة الفلتر أو وجود طلاب في "تقارير الطلاب".</td></tr>
                         ) : filteredPresence.map((s, idx) => {
                             const status = attendanceMap[s.id] || 'present';
                             const isSelected = selectedForWA.includes(s.id);
