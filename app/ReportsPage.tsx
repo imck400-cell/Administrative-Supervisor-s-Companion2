@@ -1,5 +1,4 @@
-
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { useGlobal } from '../context/GlobalState';
 import { 
   Plus, Search, Trash2, Filter, ChevronDown, Check, Calendar, Percent, User, Users, Target, Settings2, AlertCircle, X, ChevronRight, Zap, CheckCircle, FilePlus, FolderOpen, Save, ListOrdered, ArrowUpDown, ArrowUp, ArrowDown, SortAsc, Book, School, Type, Sparkles, FilterIcon, BarChart3, LayoutList, Upload, Download, Phone, UserCircle, Activity, Star, FileText, FileSpreadsheet, Share2, Edit, ChevronLeft, UserCheck, GraduationCap, MessageCircle
@@ -932,7 +931,7 @@ export const ViolationsPage: React.FC = () => {
                           </div>
                         ) : (
                           <button 
-                            onClick={() => handleSignature(id)}
+                            onClick={() => handleSignature(v.id)}
                             className="bg-slate-900 text-white px-4 py-1 rounded-lg text-[9px] font-black hover:bg-black transition-all"
                           >
                             توقيع البصمة
@@ -957,6 +956,121 @@ export const ViolationsPage: React.FC = () => {
   );
 };
 
+// Memoized Row for performance optimization
+const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShowNotesModal, toggleStar }: any) => {
+  return (
+    <tr className="hover:bg-blue-50/20 transition-colors h-10 group">
+      <td className="p-1 border-e border-slate-100 sticky right-0 bg-white z-10 group-hover:bg-blue-50 transition-colors shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
+        <div className="flex items-center gap-1 h-full">
+          <button onClick={() => toggleStar(s.id, 'isExcellent')} title={lang === 'ar' ? 'إضافة للتميز' : 'Add to Excellence'}>
+            <Star className={`w-3.5 h-3.5 ${s.isExcellent ? 'fill-green-500 text-green-500' : 'text-slate-300'}`} />
+          </button>
+          <button onClick={() => toggleStar(s.id, 'isBlacklisted')} title={lang === 'ar' ? 'إضافة للقائمة السوداء' : 'Add to Blacklist'}>
+            <Star className={`w-3.5 h-3.5 ${s.isBlacklisted ? 'fill-slate-900 text-slate-900' : 'text-slate-300'}`} />
+          </button>
+          <input className="flex-1 bg-transparent border-none outline-none font-bold text-[10px] text-right" value={s.name} onChange={(e) => updateStudent(s.id, 'name', e.target.value)} />
+        </div>
+      </td>
+      <td className="p-1 border-e border-slate-100">
+        <select className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.grade} onChange={(e) => updateStudent(s.id, 'grade', e.target.value)}>
+          {optionsAr.grades.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.grades[optionsAr.grades.indexOf(o)]}</option>)}
+        </select>
+      </td>
+      <td className="p-1 border-e border-slate-100">
+        <select className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.section} onChange={(e) => updateStudent(s.id, 'section', e.target.value)}>
+          {optionsAr.sections.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.sections[optionsAr.sections.indexOf(o)]}</option>)}
+        </select>
+      </td>
+      <td className="p-1 border-e border-slate-100">
+        <select className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.gender} onChange={(e) => updateStudent(s.id, 'gender', e.target.value)}>
+          {optionsAr.gender.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.gender[optionsAr.gender.indexOf(o)]}</option>)}
+        </select>
+      </td>
+      <td className="p-1 border-e border-slate-100">
+        <div className="flex flex-col gap-0.5">
+          <input className="w-full text-[9px] text-right bg-transparent outline-none" value={s.address} onChange={(e) => updateStudent(s.id, 'address', e.target.value)} placeholder="..." />
+          <select className="text-[8px] bg-slate-50/50 appearance-none text-center" value={s.workOutside} onChange={(e) => updateStudent(s.id, 'workOutside', e.target.value)}>
+            {optionsAr.workOutside.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.workOutside[optionsAr.workOutside.indexOf(o)]}</option>)}
+          </select>
+        </div>
+      </td>
+      <td className="p-1 border-e border-slate-100">
+        <div className="flex flex-col gap-0.5">
+          <select className={`text-[9px] font-bold appearance-none text-center outline-none bg-transparent ${s.healthStatus === 'مريض' ? 'text-red-600' : ''}`} value={s.healthStatus} onChange={(e) => updateStudent(s.id, 'healthStatus', e.target.value)}>
+            {optionsAr.health.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.health[optionsAr.health.indexOf(o)]}</option>)}
+          </select>
+          {s.healthStatus === 'مريض' && <input className="text-[8px] text-center border-b outline-none text-red-500" value={s.healthDetails} onChange={(e) => updateStudent(s.id, 'healthDetails', e.target.value)} />}
+        </div>
+      </td>
+      <td className="p-1 border-e border-slate-100">
+        <div className="flex flex-col gap-0.5">
+          <input className="text-[9px] font-bold text-right outline-none bg-transparent" value={s.guardianName} onChange={(e) => updateStudent(s.id, 'guardianName', e.target.value)} />
+          {s.guardianPhones.map((p: any, i: any) => (
+            <div key={i} className="flex gap-0.5 items-center">
+              <input className="text-[8px] w-full text-center bg-slate-50/50 outline-none" value={p} onChange={(e) => {
+                const newP = [...s.guardianPhones]; newP[i] = e.target.value; updateStudent(s.id, 'guardianPhones', newP);
+              }} />
+            </div>
+          ))}
+        </div>
+      </td>
+      <td className="p-1 border-e border-slate-100 bg-[#FFF2CC]/5">
+        <select className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicReading.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicReading} onChange={(e) => updateStudent(s.id, 'academicReading', e.target.value)}>
+          {optionsAr.level.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.level[optionsAr.level.indexOf(o)]}</option>)}
+        </select>
+      </td>
+      <td className="p-1 border-e border-slate-100 bg-[#FFF2CC]/5">
+        <select className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicWriting.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicWriting} onChange={(e) => updateStudent(s.id, 'academicWriting', e.target.value)}>
+          {optionsAr.level.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.level[optionsAr.level.indexOf(o)]}</option>)}
+        </select>
+      </td>
+      <td className="p-1 border-e border-slate-100 bg-[#FFF2CC]/5">
+        <select className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicParticipation.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicParticipation} onChange={(e) => updateStudent(s.id, 'academicParticipation', e.target.value)}>
+          {optionsAr.level.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.level[optionsAr.level.indexOf(o)]}</option>)}
+        </select>
+      </td>
+      <td className="p-1 border-e border-slate-100">
+        <select className={`text-[9px] font-bold w-full appearance-none text-center outline-none bg-transparent ${s.behaviorLevel.includes('ضعيف') ? 'text-red-600' : ''}`} value={s.behaviorLevel} onChange={(e) => updateStudent(s.id, 'behaviorLevel', e.target.value)}>
+          {optionsAr.behavior.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.behavior[optionsAr.behavior.indexOf(o)]}</option>)}
+        </select>
+      </td>
+      <td className="p-1 border-e border-slate-100">
+        <div className="flex flex-wrap gap-0.5 justify-center max-w-[180px]">
+          {optionsAr.mainNotes.map((n: any, nIdx: any) => (
+            <button key={n} onClick={() => {
+              const newN = s.mainNotes.includes(n) ? s.mainNotes.filter((x: any) => x !== n) : [...s.mainNotes, n];
+              updateStudent(s.id, 'mainNotes', newN);
+            }} className={`text-[7px] px-1 py-0.5 rounded border leading-none ${s.mainNotes.includes(n) ? 'bg-red-500 text-white' : 'bg-slate-50 text-slate-400'}`}>
+              {lang === 'ar' ? n : optionsEn.mainNotes[nIdx]}
+            </button>
+          ))}
+          <input className="text-[8px] border-b w-full mt-0.5 text-center outline-none" value={s.otherNotesText} onChange={(e) => updateStudent(s.id, 'otherNotesText', e.target.value)} />
+        </div>
+      </td>
+      <td className="p-1 border-e border-slate-100 bg-[#DDEBF7]/5">
+        <select className="text-[8px] w-full appearance-none text-center outline-none bg-transparent" value={s.guardianEducation} onChange={(e) => updateStudent(s.id, 'guardianEducation', e.target.value)}>
+          {optionsAr.eduStatus.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.eduStatus[optionsAr.eduStatus.indexOf(o)]}</option>)}
+        </select>
+      </td>
+      <td className="p-1 border-e border-slate-100 bg-[#DDEBF7]/5">
+        <select className={`text-[8px] w-full appearance-none text-center outline-none bg-transparent ${s.guardianFollowUp === 'ضعيفة' ? 'text-red-600 font-bold' : ''}`} value={s.guardianFollowUp} onChange={(e) => updateStudent(s.id, 'guardianFollowUp', e.target.value)}>
+          {optionsAr.followUp.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.followUp[optionsAr.followUp.indexOf(o)]}</option>)}
+        </select>
+      </td>
+      <td className="p-1 border-e border-slate-100 bg-[#DDEBF7]/5">
+        <select className={`text-[8px] w-full appearance-none text-center outline-none bg-transparent ${s.guardianCooperation === 'عدواني' || s.guardianCooperation === 'ضعيفة' ? 'text-red-600 font-bold' : ''}`} value={s.guardianCooperation} onChange={(e) => updateStudent(s.id, 'guardianCooperation', e.target.value)}>
+          {optionsAr.cooperation.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.cooperation[optionsAr.cooperation.indexOf(o)]}</option>)}
+        </select>
+      </td>
+      <td className="p-1">
+        <button onClick={() => setShowNotesModal({id: s.id, text: s.notes})} className="p-1.5 bg-slate-100 hover:bg-blue-100 rounded-lg transition-all">
+          {s.notes ? <CheckCircle size={14} className="text-green-500" /> : <Settings2 size={14} className="text-slate-400" />}
+        </button>
+      </td>
+    </tr>
+  );
+});
+
 export const StudentsReportsPage: React.FC = () => {
   const { data, updateData, lang } = useGlobal();
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
@@ -970,11 +1084,11 @@ export const StudentsReportsPage: React.FC = () => {
   const [showSpecificFilterModal, setShowSpecificFilterModal] = useState(false);
   const [selectedSpecifics, setSelectedSpecifics] = useState<string[]>([]);
   
-  // START OF CHANGE
+  // START OF CHANGE - Requirement: Detail Modal Features
   const [showIndividualReportModal, setShowIndividualReportModal] = useState(false);
   const [detailModalSearch, setDetailModalSearch] = useState('');
   const [currentDetailStudent, setCurrentDetailStudent] = useState<StudentReport | null>(null);
-  const [activeDetailFields, setActiveDetailFields] = useState<string[]>(['name', 'grade', 'section', 'gender']);
+  const [activeDetailFields, setActiveDetailFields] = useState<string[]>(['name', 'grade', 'section', 'gender', 'healthStatus', 'guardianInfo', 'academic', 'behaviorLevel', 'mainNotes', 'guardianFollowUp', 'notes']);
   // END OF CHANGE
 
   // New States for Blacklist and Excellence lists
@@ -1040,22 +1154,20 @@ export const StudentsReportsPage: React.FC = () => {
     guardianCooperation: "Guardian Cooperation"
   };
 
-  // START OF CHANGE - Field definitions for the report modal
   const detailFieldConfigs = [
-    { key: 'name', label: 'اسم الطالب', color: 'bg-blue-600' },
-    { key: 'grade', label: 'الصف', color: 'bg-indigo-600' },
-    { key: 'section', label: 'الشعبة', color: 'bg-purple-600' },
-    { key: 'gender', label: 'النوع', color: 'bg-pink-600' },
-    { key: 'address', label: 'السكن/ العمل', color: 'bg-orange-600' },
-    { key: 'healthStatus', label: 'الحالة الصحية', color: 'bg-red-600' },
-    { key: 'guardianInfo', label: 'ولي الأمر', color: 'bg-emerald-600' },
-    { key: 'academic', label: 'المستوى العلمي', color: 'bg-yellow-600' },
-    { key: 'behaviorLevel', label: 'المستوى السلوكي', color: 'bg-teal-600' },
-    { key: 'mainNotes', label: 'الملاحظات الأساسية', color: 'bg-rose-600' },
-    { key: 'guardianFollowUp', label: 'ولي الأمر المتابع', color: 'bg-cyan-600' },
-    { key: 'notes', label: 'ملاحظات أخرى', color: 'bg-slate-600' },
+    { key: 'name', label: 'اسم الطالب', color: 'border-blue-500' },
+    { key: 'grade', label: 'الصف', color: 'border-indigo-500' },
+    { key: 'section', label: 'الشعبة', color: 'border-purple-500' },
+    { key: 'gender', label: 'النوع', color: 'border-pink-500' },
+    { key: 'address', label: 'السكن/ العمل', color: 'border-orange-500' },
+    { key: 'healthStatus', label: 'الحالة الصحية', color: 'border-red-500' },
+    { key: 'guardianInfo', label: 'ولي الأمر', color: 'border-emerald-500' },
+    { key: 'academic', label: 'المستوى العلمي', color: 'border-yellow-500' },
+    { key: 'behaviorLevel', label: 'المستوى السلوكي', color: 'border-teal-500' },
+    { key: 'mainNotes', label: 'الملاحظات الأساسية', color: 'border-rose-500' },
+    { key: 'guardianFollowUp', label: 'ولي الأمر المتابع', color: 'border-cyan-500' },
+    { key: 'notes', label: 'ملاحظات أخرى', color: 'border-slate-500' },
   ];
-  // END OF CHANGE
 
   const updateStudent = (id: string, field: string, value: any) => {
     const updated = studentData.map(s => s.id === id ? { ...s, [field]: value } : s);
@@ -1291,7 +1403,7 @@ export const StudentsReportsPage: React.FC = () => {
     window.open(url, '_blank');
   };
 
-  // START OF CHANGE - Logic for Student Detail Modal
+  // START OF CHANGE - Requirement: Detail Modal Activation & Optimization
   const handleDetailStudentSearch = (val: string) => {
     setDetailModalSearch(val);
     const found = studentData.find(s => s.name === val);
@@ -1336,12 +1448,12 @@ export const StudentsReportsPage: React.FC = () => {
     msg += `▫️ الهواتف: ${s.guardianPhones.join(' - ') || '---'}\n\n`;
 
     msg += `📚 *المستوى العلمي:*\n`;
-    const getLevelIcon = (l: string) => l.includes('ضعيف') ? '🔴' : '🟢';
+    const getLevelIcon = (l: string) => (l.includes('ضعيف') || l.includes('مقبول')) ? '🔴' : '🟢';
     msg += `${getLevelIcon(s.academicReading)} القراءة: ${s.academicReading}\n`;
     msg += `${getLevelIcon(s.academicWriting)} الكتابة: ${s.academicWriting}\n`;
     msg += `${getLevelIcon(s.academicParticipation)} المشاركة: ${s.academicParticipation}\n\n`;
 
-    const behaviorIcon = s.behaviorLevel.includes('ضعيف') ? '🔴' : '🟢';
+    const behaviorIcon = (s.behaviorLevel.includes('ضعيف') || s.behaviorLevel.includes('مقبول')) ? '🔴' : '🟢';
     msg += `🎭 *المستوى السلوكي:* ${behaviorIcon} ${s.behaviorLevel}\n\n`;
 
     if (s.mainNotes.length > 0) {
@@ -1353,7 +1465,7 @@ export const StudentsReportsPage: React.FC = () => {
     msg += `🤝 *متابعة ولي الأمر:*\n`;
     msg += `▫️ التعليم: ${s.guardianEducation}\n`;
     msg += `▫️ المتابعة: ${s.guardianFollowUp}\n`;
-    const coopIcon = s.guardianCooperation === 'عدواني' ? '🔴' : '▫️';
+    const coopIcon = s.guardianCooperation === 'عدواني' || s.guardianCooperation === 'ضعيفة' ? '🔴' : '▫️';
     msg += `${coopIcon} التعاون: ${s.guardianCooperation}\n\n`;
 
     if (s.notes || s.otherNotesText) {
@@ -1377,14 +1489,12 @@ export const StudentsReportsPage: React.FC = () => {
             <Plus className="w-4 h-4" /> {lang === 'ar' ? 'إضافة طالب' : 'Add Student'}
           </button>
           
-          {/* START OF CHANGE - New Button */}
           <button 
             onClick={() => setShowIndividualReportModal(true)}
             className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-black text-sm hover:bg-emerald-700 shadow-md transform active:scale-95 transition-all"
           >
             <FileText className="w-4 h-4" /> {lang === 'ar' ? 'تقرير طالب' : 'Student Report'}
           </button>
-          {/* END OF CHANGE */}
 
           <label className="flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2.5 rounded-xl font-bold text-sm border border-green-200 cursor-pointer hover:bg-green-100 transition-all">
             <Upload className="w-4 h-4" /> {lang === 'ar' ? 'استيراد ملف' : 'Import File'}
@@ -1479,7 +1589,7 @@ export const StudentsReportsPage: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-[1.5rem] shadow-xl border border-slate-100 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto scroll-smooth">
           <table className={`w-full text-center border-collapse table-auto ${isOnlyMetricView ? 'min-w-[700px]' : 'min-w-[1600px]'}`}>
             <thead className="bg-[#FFD966] text-slate-800 sticky top-0 z-20">
               <tr className="border-b border-slate-300 h-12">
@@ -1528,138 +1638,16 @@ export const StudentsReportsPage: React.FC = () => {
                 </tr>
               ) : (
                 filteredData.map((s, idx) => (
-                  <tr key={s.id} className="hover:bg-blue-50/20 transition-colors h-10 group">
-                    <td className="p-1 border-e border-slate-100 sticky right-0 bg-white z-10 group-hover:bg-blue-50 transition-colors shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
-                      <div className="flex items-center gap-1 h-full">
-                        <button onClick={() => toggleStar(s.id, 'isExcellent')} title={lang === 'ar' ? 'إضافة للتميز' : 'Add to Excellence'}>
-                          <Star className={`w-3.5 h-3.5 ${s.isExcellent ? 'fill-green-500 text-green-500' : 'text-slate-300'}`} />
-                        </button>
-                        <button onClick={() => toggleStar(s.id, 'isBlacklisted')} title={lang === 'ar' ? 'إضافة للقائمة السوداء' : 'Add to Blacklist'}>
-                          <Star className={`w-3.5 h-3.5 ${s.isBlacklisted ? 'fill-slate-900 text-slate-900' : 'text-slate-300'}`} />
-                        </button>
-                        <input className="flex-1 bg-transparent border-none outline-none font-bold text-[10px] text-right" value={s.name} onChange={(e) => updateStudent(s.id, 'name', e.target.value)} />
-                      </div>
-                    </td>
-                    <td className="p-1 border-e border-slate-100">
-                      <select className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.grade} onChange={(e) => updateStudent(s.id, 'grade', e.target.value)}>
-                        {optionsAr.grades.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.grades[optionsAr.grades.indexOf(o)]}</option>)}
-                      </select>
-                    </td>
-                    <td className="p-1 border-e border-slate-100">
-                      <select className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.section} onChange={(e) => updateStudent(s.id, 'section', e.target.value)}>
-                        {optionsAr.sections.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.sections[optionsAr.sections.indexOf(o)]}</option>)}
-                      </select>
-                    </td>
-
-                    {!isOnlyMetricView && (
-                      <>
-                        <td className="p-1 border-e border-slate-100">
-                          <select className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.gender} onChange={(e) => updateStudent(s.id, 'gender', e.target.value)}>
-                            {optionsAr.gender.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.gender[optionsAr.gender.indexOf(o)]}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-1 border-e border-slate-100">
-                          <div className="flex flex-col gap-0.5">
-                            <input className="w-full text-[9px] text-right bg-transparent outline-none" value={s.address} onChange={(e) => updateStudent(s.id, 'address', e.target.value)} placeholder="..." />
-                            <select className="text-[8px] bg-slate-50/50 appearance-none text-center" value={s.workOutside} onChange={(e) => updateStudent(s.id, 'workOutside', e.target.value)}>
-                              {optionsAr.workOutside.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.workOutside[optionsAr.workOutside.indexOf(o)]}</option>)}
-                            </select>
-                          </div>
-                        </td>
-                        <td className="p-1 border-e border-slate-100">
-                          <div className="flex flex-col gap-0.5">
-                            <select className={`text-[9px] font-bold appearance-none text-center outline-none bg-transparent ${s.healthStatus === 'مريض' ? 'text-red-600' : ''}`} value={s.healthStatus} onChange={(e) => updateStudent(s.id, 'healthStatus', e.target.value)}>
-                              {optionsAr.health.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.health[optionsAr.health.indexOf(o)]}</option>)}
-                            </select>
-                            {s.healthStatus === 'مريض' && <input className="text-[8px] text-center border-b outline-none text-red-500" value={s.healthDetails} onChange={(e) => updateStudent(s.id, 'healthDetails', e.target.value)} />}
-                          </div>
-                        </td>
-                        <td className="p-1 border-e border-slate-100">
-                          <div className="flex flex-col gap-0.5">
-                            <input className="text-[9px] font-bold text-right outline-none bg-transparent" value={s.guardianName} onChange={(e) => updateStudent(s.id, 'guardianName', e.target.value)} />
-                            {s.guardianPhones.map((p, i) => (
-                              <div key={i} className="flex gap-0.5 items-center">
-                                <input className="text-[8px] w-full text-center bg-slate-50/50 outline-none" value={p} onChange={(e) => {
-                                  const newP = [...s.guardianPhones]; newP[i] = e.target.value; updateStudent(s.id, 'guardianPhones', newP);
-                                }} />
-                                {i === s.guardianPhones.length - 1 && <button onClick={() => updateStudent(s.id, 'guardianPhones', [...s.guardianPhones, ''])} className="text-blue-500 hover:scale-110"><Plus size={10}/></button>}
-                              </div>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="p-1 border-e border-slate-100 bg-[#FFF2CC]/5">
-                          <select className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicReading.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicReading} onChange={(e) => updateStudent(s.id, 'academicReading', e.target.value)}>
-                            {optionsAr.level.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.level[optionsAr.level.indexOf(o)]}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-1 border-e border-slate-100 bg-[#FFF2CC]/5">
-                          <select className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicReading.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicWriting} onChange={(e) => updateStudent(s.id, 'academicWriting', e.target.value)}>
-                            {optionsAr.level.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.level[optionsAr.level.indexOf(o)]}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-1 border-e border-slate-100 bg-[#FFF2CC]/5">
-                          <select className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicParticipation.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicParticipation} onChange={(e) => updateStudent(s.id, 'academicParticipation', e.target.value)}>
-                            {optionsAr.level.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.level[optionsAr.level.indexOf(o)]}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-1 border-e border-slate-100">
-                          <select className={`text-[9px] font-bold w-full appearance-none text-center outline-none bg-transparent ${s.behaviorLevel.includes('ضعيف') ? 'text-red-600' : ''}`} value={s.behaviorLevel} onChange={(e) => updateStudent(s.id, 'behaviorLevel', e.target.value)}>
-                            {optionsAr.behavior.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.behavior[optionsAr.behavior.indexOf(o)]}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-1 border-e border-slate-100">
-                          <div className="flex flex-wrap gap-0.5 justify-center max-w-[180px]">
-                            {optionsAr.mainNotes.map((n, nIdx) => (
-                              <button key={n} onClick={() => {
-                                const newN = s.mainNotes.includes(n) ? s.mainNotes.filter(x => x !== n) : [...s.mainNotes, n];
-                                updateStudent(s.id, 'mainNotes', newN);
-                              }} className={`text-[7px] px-1 py-0.5 rounded border leading-none ${s.mainNotes.includes(n) ? 'bg-red-500 text-white' : 'bg-slate-50 text-slate-400'}`}>
-                                {lang === 'ar' ? n : optionsEn.mainNotes[nIdx]}
-                              </button>
-                            ))}
-                            <input className="text-[8px] border-b w-full mt-0.5 text-center outline-none" value={s.otherNotesText} onChange={(e) => updateStudent(s.id, 'otherNotesText', e.target.value)} />
-                          </div>
-                        </td>
-                        <td className="p-1 border-e border-slate-100 bg-[#DDEBF7]/5">
-                          <select className="text-[8px] w-full appearance-none text-center outline-none bg-transparent" value={s.guardianEducation} onChange={(e) => updateStudent(s.id, 'guardianEducation', e.target.value)}>
-                            {optionsAr.eduStatus.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.eduStatus[optionsAr.eduStatus.indexOf(o)]}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-1 border-e border-slate-100 bg-[#DDEBF7]/5">
-                          <select className={`text-[8px] w-full appearance-none text-center outline-none bg-transparent ${s.guardianFollowUp === 'ضعيفة' ? 'text-red-600 font-bold' : ''}`} value={s.guardianFollowUp} onChange={(e) => updateStudent(s.id, 'guardianFollowUp', e.target.value)}>
-                            {optionsAr.followUp.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.followUp[optionsAr.followUp.indexOf(o)]}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-1 border-e border-slate-100 bg-[#DDEBF7]/5">
-                          <select className={`text-[8px] w-full appearance-none text-center outline-none bg-transparent ${s.guardianCooperation === 'عدواني' || s.guardianCooperation === 'ضعيفة' ? 'text-red-600 font-bold' : ''}`} value={s.guardianCooperation} onChange={(e) => updateStudent(s.id, 'guardianCooperation', e.target.value)}>
-                            {optionsAr.cooperation.map(o => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.cooperation[optionsAr.cooperation.indexOf(o)]}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-1">
-                          <button onClick={() => setShowNotesModal({id: s.id, text: s.notes})} className="p-1.5 bg-slate-100 hover:bg-blue-100 rounded-lg transition-all">
-                            {s.notes ? <CheckCircle size={14} className="text-green-500" /> : <Settings2 size={14} className="text-slate-400" />}
-                          </button>
-                        </td>
-                      </>
-                    )}
-
-                    {isOnlyMetricView && activeMetricFilter.map(mKey => {
-                      const currentVal = (s as any)[mKey];
-                      const optKey = mKey === 'healthStatus' ? 'health' : (mKey === 'academicReading' || mKey === 'academicWriting') ? 'level' : mKey;
-                      const possibleOpts = (optionsAr as any)[optKey] || [];
-                      return (
-                        <td key={mKey} className="p-1 border-e border-slate-100 bg-blue-50/5">
-                          {possibleOpts.length > 0 ? (
-                            <select className="text-[10px] w-full bg-transparent font-bold outline-none appearance-none text-center" value={currentVal} onChange={(e) => updateStudent(s.id, mKey, e.target.value)}>
-                              {possibleOpts.map((o: string) => <option key={o} value={o}>{lang === 'ar' ? o : (optionsEn as any)[optKey]?.[(optionsAr as any)[optKey].indexOf(o)] || o}</option>)}
-                            </select>
-                          ) : (
-                            <input className="text-[10px] w-full bg-transparent font-bold text-center outline-none" value={currentVal} onChange={(e) => updateStudent(s.id, mKey, e.target.value)} />
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
+                  <StudentRow 
+                    key={s.id} 
+                    s={s} 
+                    optionsAr={optionsAr} 
+                    optionsEn={optionsEn} 
+                    lang={lang} 
+                    updateStudent={updateStudent} 
+                    setShowNotesModal={setShowNotesModal} 
+                    toggleStar={toggleStar} 
+                  />
                 ))
               )}
             </tbody>
@@ -1669,4 +1657,407 @@ export const StudentsReportsPage: React.FC = () => {
 
       {showListModal && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200 text-right">
+            <h3 className={`font-black ${showListModal === 'blacklist' ? 'text-slate-800' : 'text-green-600'}`}>
+              {showListModal === 'blacklist' ? (lang === 'ar' ? 'القائمة السوداء' : 'Blacklist') : (lang === 'ar' ? 'قائمة التميز' : 'Excellence List')}
+            </h3>
+            <div className="relative">
+              <input 
+                className="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl text-right text-sm font-bold outline-none pr-10" 
+                placeholder={lang === 'ar' ? 'بحث عن اسم...' : 'Search for name...'} 
+                value={listSearch}
+                onChange={(e) => setListSearch(e.target.value)}
+              />
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-2 border rounded-xl p-2 text-right">
+              {listItemsToDisplay.length === 0 ? (
+                <div className="p-4 text-center text-slate-400 italic text-xs">{lang === 'ar' ? 'لا توجد أسماء مضافة' : 'No names added'}</div>
+              ) : (
+                listItemsToDisplay.map(s => (
+                  <label key={s.id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 text-blue-600" 
+                      checked={tempListSelected.includes(s.name)}
+                      onChange={(e) => {
+                        if (e.target.checked) setTempListSelected([...tempListSelected, s.name]);
+                        else setTempListSelected(tempListSelected.filter(n => n !== s.name));
+                      }}
+                    />
+                    <span className="text-sm font-bold">{s.name}</span>
+                  </label>
+                ))
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={handleListApply} className="flex-1 bg-blue-600 text-white p-3 rounded-2xl font-black">{lang === 'ar' ? 'موافق' : 'OK'}</button>
+              <button onClick={() => { setShowListModal(null); setTempListSelected([]); }} className="p-3 bg-slate-100 rounded-2xl font-black">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {metricFilterMode && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200 text-right">
+            <h3 className="font-black text-slate-800">{lang === 'ar' ? 'اختر المعايير المراد عرضها' : 'Choose Metrics to Show'}</h3>
+            <div className="grid grid-cols-2 gap-2 overflow-y-auto max-h-[60vh] p-1">
+              {Object.keys(metricLabels).map(m => (
+                <button key={m} onClick={() => setActiveMetricFilter(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m])} className={`p-2 rounded-xl text-xs font-bold border-2 transition-all ${activeMetricFilter.includes(m) ? 'border-blue-500 bg-blue-50' : 'border-slate-100 hover:border-blue-200'}`}>
+                  {metricLabels[m]}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setFilterMode('metric'); setMetricFilterMode(false); }} className="flex-1 bg-blue-600 text-white p-3 rounded-2xl font-black">{lang === 'ar' ? 'تطبيق' : 'Apply'}</button>
+              <button onClick={() => setMetricFilterMode(false)} className="bg-slate-100 text-slate-500 p-3 rounded-2xl font-black">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSpecificFilterModal && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-2xl max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in duration-200 text-right">
+            <div className="flex justify-between border-b pb-2 mb-4">
+              <h3 className="font-black">{lang === 'ar' ? 'فلترة حسب صفة معينة' : 'Filter by Specific Feature'}</h3>
+              <button onClick={() => setShowSpecificFilterModal(false)} className="hover:bg-slate-100 p-1 rounded-full transition-colors"><X/></button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-right">
+              {Object.entries(optionsAr).map(([key, vals]) => {
+                const label = key === 'gender' ? (lang === 'ar' ? 'النوع' : 'Gender') : 
+                              key === 'workOutside' ? (lang === 'ar' ? 'العمل' : 'Work') : 
+                              key === 'health' ? (lang === 'ar' ? 'الصحة' : 'Health') :
+                              key === 'level' ? (lang === 'ar' ? 'المستوى' : 'Level') :
+                              key === 'behavior' ? (lang === 'ar' ? 'السلوك' : 'Behavior') :
+                              key === 'mainNotes' ? (lang === 'ar' ? 'الملاحظات' : 'Notes') :
+                              key === 'eduStatus' ? (lang === 'ar' ? 'التعليم' : 'Education') :
+                              key === 'followUp' ? (lang === 'ar' ? 'المتابعة' : 'Follow-up') :
+                              key === 'cooperation' ? (lang === 'ar' ? 'التعاون' : 'Cooperation') :
+                              key === 'grades' ? (lang === 'ar' ? 'الصفوف' : 'Grades') :
+                              key === 'sections' ? (lang === 'ar' ? 'الشعب' : 'Sections') : key;
+
+                return (
+                  <div key={key} className="space-y-1">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase">{label}</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {vals.map((v: string, vIdx: number) => (
+                        <button key={v} onClick={() => {
+                          setFilterMode('specific');
+                          setSelectedSpecifics(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]);
+                        }} className={`text-right px-2 py-1.5 rounded-lg text-[9px] font-bold border transition-all ${selectedSpecifics.includes(v) ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-slate-50 border-slate-100 hover:border-blue-200'}`}>
+                          {lang === 'ar' ? v : (optionsEn as any)[key]?.[vIdx] || v}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap gap-2 mt-6 sticky bottom-0 bg-white pt-2 border-t">
+              <button onClick={() => setShowSpecificFilterModal(false)} className="flex-1 bg-slate-900 text-white p-4 rounded-2xl font-black shadow-xl">{lang === 'ar' ? 'تطبيق الفلتر' : 'Apply Filter'}</button>
+              <button onClick={() => setSelectedSpecifics([])} className="bg-slate-100 text-slate-500 p-4 rounded-2xl font-black">{lang === 'ar' ? 'إعادة ضبط' : 'Reset'}</button>
+              <button onClick={() => setShowSpecificFilterModal(false)} className="bg-red-50 text-red-500 p-4 rounded-2xl font-black">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showNotesModal && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200 text-right">
+            <h3 className="font-black text-slate-800">{lang === 'ar' ? 'ملاحظات إضافية' : 'Extra Notes'}</h3>
+            <textarea className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold outline-none h-48 text-right" value={showNotesModal.text} onChange={(e) => setShowNotesModal({...showNotesModal, text: e.target.value})} placeholder="..." />
+            <div className="flex gap-2">
+              <button onClick={() => { updateStudent(showNotesModal.id, 'notes', showNotesModal.text); setShowNotesModal(null); }} className="flex-1 bg-blue-600 text-white p-3 rounded-2xl font-black">{lang === 'ar' ? 'موافق' : 'OK'}</button>
+              <button onClick={() => setShowNotesModal(null)} className="p-3 bg-slate-100 rounded-2xl font-black">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* START OF CHANGE - Requirement: Detail Modal Implementation & Optimization */}
+      {showIndividualReportModal && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 font-arabic">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border-4 border-emerald-50 animate-in zoom-in-95 duration-300 text-right">
+            {/* Modal Header */}
+            <div className="p-6 bg-emerald-600 text-white flex justify-between items-center shadow-lg">
+              <div className="flex items-center gap-3">
+                <FileText size={28} />
+                <h3 className="text-xl font-black">تقرير طالب مخصص</h3>
+              </div>
+              <button onClick={() => setShowIndividualReportModal(false)} className="p-2 hover:bg-emerald-700 rounded-full transition-colors"><X size={24}/></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 space-y-8 scroll-smooth">
+              {/* Search Field */}
+              <div className="relative">
+                <label className="block text-xs font-black text-slate-500 mb-2 mr-2 uppercase tracking-widest">البحث عن الطالب</label>
+                <div className="flex items-center gap-3 bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 focus-within:border-emerald-500 focus-within:bg-white shadow-inner transition-all">
+                  <Search size={20} className="text-slate-400" />
+                  <input 
+                    type="text" 
+                    className="flex-1 bg-transparent border-none outline-none font-bold text-lg text-right"
+                    placeholder="ابدأ بكتابة اسم الطالب..."
+                    value={detailModalSearch}
+                    onChange={(e) => handleDetailStudentSearch(e.target.value)}
+                  />
+                </div>
+                {detailModalSearch.length > 1 && !currentDetailStudent && (
+                  <div className="absolute top-full left-0 right-0 z-[100] mt-2 bg-white border-2 border-slate-100 rounded-2xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto">
+                    {studentData
+                      .filter(s => s.name.toLowerCase().includes(detailModalSearch.toLowerCase()))
+                      .map(s => (
+                        <button key={s.id} onClick={() => handleDetailStudentSearch(s.name)} className="w-full text-right p-4 font-bold border-b last:border-none hover:bg-emerald-50 transition-colors flex items-center justify-between">
+                          <span>{s.name}</span>
+                          <span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500">{s.grade}-{s.section}</span>
+                        </button>
+                      ))
+                    }
+                  </div>
+                )}
+              </div>
+
+              {/* Field Toggles Container - "Colored Frames" as requested */}
+              <div className="bg-slate-50 p-6 rounded-[2rem] border-2 border-emerald-100 shadow-inner">
+                <h4 className="text-[10px] font-black text-emerald-700 mb-4 mr-2 uppercase tracking-widest">اختر المعايير المراد تعبئتها</h4>
+                <div className="flex flex-wrap gap-2">
+                  {detailFieldConfigs.map(f => (
+                    <button 
+                      key={f.key}
+                      onClick={() => toggleDetailField(f.key)}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all flex items-center gap-2 shadow-sm border-2 ${activeDetailFields.includes(f.key) ? `bg-emerald-600 text-white border-emerald-700 scale-105 shadow-md` : `bg-white text-slate-500 ${f.color} hover:border-emerald-300`}`}
+                    >
+                      {activeDetailFields.includes(f.key) ? <Check size={12}/> : <Plus size={12}/>}
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dynamic Vertical Form */}
+              {currentDetailStudent && (
+                <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                   {activeDetailFields.includes('name') && (
+                     <div className="p-4 bg-white border-2 border-blue-100 rounded-2xl shadow-sm space-y-2">
+                       <label className="text-[10px] font-black text-blue-600 mr-2">اسم الطالب</label>
+                       <input className="w-full p-3 bg-slate-50 rounded-xl font-bold border-none focus:ring-2 ring-blue-100 outline-none text-right" value={currentDetailStudent.name} onChange={e => setCurrentDetailStudent({...currentDetailStudent, name: e.target.value})} />
+                     </div>
+                   )}
+                   
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-right">
+                     {activeDetailFields.includes('grade') && (
+                       <div className="p-4 bg-white border-2 border-indigo-100 rounded-2xl shadow-sm space-y-2">
+                         <label className="text-[10px] font-black text-indigo-600 mr-2">الصف</label>
+                         <select className="w-full p-3 bg-slate-50 rounded-xl font-bold outline-none text-right" value={currentDetailStudent.grade} onChange={e => setCurrentDetailStudent({...currentDetailStudent, grade: e.target.value})}>
+                           {optionsAr.grades.map(o => <option key={o} value={o}>{o}</option>)}
+                         </select>
+                       </div>
+                     )}
+                     {activeDetailFields.includes('section') && (
+                       <div className="p-4 bg-white border-2 border-purple-100 rounded-2xl shadow-sm space-y-2">
+                         <label className="text-[10px] font-black text-purple-600 mr-2">الشعبة</label>
+                         <select className="w-full p-3 bg-slate-50 rounded-xl font-bold outline-none text-right" value={currentDetailStudent.section} onChange={e => setCurrentDetailStudent({...currentDetailStudent, section: e.target.value})}>
+                           {optionsAr.sections.map(o => <option key={o} value={o}>{o}</option>)}
+                         </select>
+                       </div>
+                     )}
+                   </div>
+
+                   {activeDetailFields.includes('gender') && (
+                     <div className="p-4 bg-white border-2 border-pink-100 rounded-2xl shadow-sm space-y-2 text-right">
+                       <label className="text-[10px] font-black text-pink-600 mr-2">النوع</label>
+                       <div className="flex gap-4">
+                         {optionsAr.gender.map(g => (
+                           <button key={g} onClick={() => setCurrentDetailStudent({...currentDetailStudent, gender: g})} className={`flex-1 py-3 rounded-xl font-black text-xs border-2 transition-all ${currentDetailStudent.gender === g ? 'bg-pink-600 text-white border-pink-600 shadow-md' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>{g}</button>
+                         ))}
+                       </div>
+                     </div>
+                   )}
+
+                   {activeDetailFields.includes('address') && (
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-right">
+                       <div className="p-4 bg-white border-2 border-orange-100 rounded-2xl shadow-sm space-y-2">
+                         <label className="text-[10px] font-black text-orange-600 mr-2">العنوان السكني</label>
+                         <input className="w-full p-3 bg-slate-50 rounded-xl font-bold outline-none text-right" value={currentDetailStudent.address} onChange={e => setCurrentDetailStudent({...currentDetailStudent, address: e.target.value})} placeholder="..." />
+                       </div>
+                       <div className="p-4 bg-white border-2 border-orange-100 rounded-2xl shadow-sm space-y-2">
+                         <label className="text-[10px] font-black text-orange-600 mr-2">حالة العمل</label>
+                         <select className="w-full p-3 bg-slate-50 rounded-xl font-bold outline-none text-right" value={currentDetailStudent.workOutside} onChange={e => setCurrentDetailStudent({...currentDetailStudent, workOutside: e.target.value})}>
+                           {optionsAr.workOutside.map(o => <option key={o} value={o}>{o}</option>)}
+                         </select>
+                       </div>
+                     </div>
+                   )}
+
+                   {activeDetailFields.includes('healthStatus') && (
+                     <div className="p-6 bg-white border-2 border-red-100 rounded-[2rem] shadow-sm space-y-4 text-right">
+                       <label className="text-[10px] font-black text-red-600 mr-2">المسح الصحي</label>
+                       <div className="flex gap-4">
+                         {optionsAr.health.map(h => (
+                           <button key={h} onClick={() => setCurrentDetailStudent({...currentDetailStudent, healthStatus: h})} className={`flex-1 py-3 rounded-xl font-black text-xs border-2 transition-all ${currentDetailStudent.healthStatus === h ? 'bg-red-600 text-white border-red-600 shadow-md' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>{h}</button>
+                         ))}
+                       </div>
+                       {currentDetailStudent.healthStatus === 'مريض' && (
+                         <textarea className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none focus:ring-2 ring-red-100 min-h-[80px] text-right" placeholder="تفاصيل الحالة الصحية..." value={currentDetailStudent.healthDetails} onChange={e => setCurrentDetailStudent({...currentDetailStudent, healthDetails: e.target.value})} />
+                       )}
+                     </div>
+                   )}
+
+                   {activeDetailFields.includes('guardianInfo') && (
+                     <div className="p-6 bg-white border-2 border-emerald-100 rounded-[2rem] shadow-sm space-y-4 text-right">
+                       <label className="text-[10px] font-black text-emerald-600 mr-2">بيانات التواصل مع ولي الأمر</label>
+                       <div className="space-y-4">
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-bold text-slate-400 mr-1">اسم ولي الأمر:</span>
+                            <input className="w-full p-3 bg-slate-50 rounded-xl font-bold outline-none text-right" value={currentDetailStudent.guardianName} onChange={e => setCurrentDetailStudent({...currentDetailStudent, guardianName: e.target.value})} />
+                          </div>
+                          <div className="space-y-2">
+                             <span className="text-[9px] font-bold text-slate-400 mr-1">أرقام الهواتف:</span>
+                             {currentDetailStudent.guardianPhones.map((p, pIdx) => (
+                               <div key={pIdx} className="flex gap-2 animate-in slide-in-from-right-2">
+                                 <input className="flex-1 p-3 bg-slate-50 rounded-xl font-bold outline-none focus:ring-2 ring-emerald-100 text-right" value={p} onChange={e => {
+                                   const newPhones = [...currentDetailStudent.guardianPhones];
+                                   newPhones[pIdx] = e.target.value;
+                                   setCurrentDetailStudent({...currentDetailStudent, guardianPhones: newPhones});
+                                 }} />
+                                 <button onClick={() => setCurrentDetailStudent({...currentDetailStudent, guardianPhones: currentDetailStudent.guardianPhones.filter((_, i) => i !== pIdx)})} className="p-3 text-red-400 hover:text-red-600"><Trash2 size={16}/></button>
+                               </div>
+                             ))}
+                             <button onClick={() => setCurrentDetailStudent({...currentDetailStudent, guardianPhones: [...currentDetailStudent.guardianPhones, '']})} className="w-full p-2 border-2 border-dashed border-emerald-100 rounded-xl text-emerald-600 font-black text-[10px] hover:bg-emerald-50 transition-all">+ إضافة هاتف آخر</button>
+                          </div>
+                       </div>
+                     </div>
+                   )}
+
+                   {activeDetailFields.includes('academic') && (
+                     <div className="p-6 bg-white border-2 border-yellow-200 rounded-[2rem] shadow-sm space-y-4 text-right">
+                       <label className="text-[10px] font-black text-yellow-600 mr-2">التقييم العلمي والأكاديمي</label>
+                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                         {['academicReading', 'academicWriting', 'academicParticipation'].map(field => (
+                           <div key={field} className="space-y-2">
+                             <span className="text-[9px] font-bold text-slate-400 block text-center">{field === 'academicReading' ? 'القراءة' : field === 'academicWriting' ? 'الكتابة' : 'المشاركة'}</span>
+                             <select className={`w-full p-3 rounded-xl font-black text-xs outline-none border-2 appearance-none text-center ${currentDetailStudent[field as keyof StudentReport]?.toString().includes('ضعيف') ? 'bg-red-50 border-red-200 text-red-600' : 'bg-slate-50 border-slate-100 text-slate-700'}`} value={currentDetailStudent[field as keyof StudentReport] as string} onChange={e => setCurrentDetailStudent({...currentDetailStudent, [field]: e.target.value})}>
+                               {optionsAr.level.map(o => <option key={o} value={o}>{o}</option>)}
+                             </select>
+                           </div>
+                         ))}
+                       </div>
+                     </div>
+                   )}
+
+                   {activeDetailFields.includes('behaviorLevel') && (
+                     <div className="p-6 bg-white border-2 border-teal-100 rounded-[2rem] shadow-sm space-y-4 text-right">
+                       <label className="text-[10px] font-black text-teal-600 mr-2">المستوى السلوكي العام</label>
+                       <div className="flex flex-wrap gap-2 justify-center">
+                         {optionsAr.behavior.map(b => (
+                           <button 
+                             key={b} 
+                             onClick={() => setCurrentDetailStudent({...currentDetailStudent, behaviorLevel: b})}
+                             className={`px-4 py-2 rounded-xl text-[10px] font-black border-2 transition-all ${currentDetailStudent.behaviorLevel === b ? ((b.includes('ضعيف') || b.includes('مقبول')) ? 'bg-red-600 text-white border-red-600 shadow-md' : 'bg-teal-600 text-white border-teal-600 shadow-md') : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-teal-200'}`}
+                           >
+                             {b}
+                           </button>
+                         ))}
+                       </div>
+                     </div>
+                   )}
+
+                   {activeDetailFields.includes('mainNotes') && (
+                     <div className="p-6 bg-white border-2 border-rose-100 rounded-[2rem] shadow-sm space-y-4 text-right">
+                       <label className="text-[10px] font-black text-rose-600 mr-2">الملاحظات السلوكية الأساسية</label>
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                         {optionsAr.mainNotes.map(n => (
+                           <button 
+                             key={n} 
+                             onClick={() => {
+                               const updated = currentDetailStudent.mainNotes.includes(n) ? currentDetailStudent.mainNotes.filter(x => x !== n) : [...currentDetailStudent.mainNotes, n];
+                               setCurrentDetailStudent({...currentDetailStudent, mainNotes: updated});
+                             }}
+                             className={`text-right p-3 rounded-xl text-[10px] font-bold border-2 transition-all flex items-center justify-between ${currentDetailStudent.mainNotes.includes(n) ? 'bg-red-50 border-red-500 text-red-700 shadow-sm' : 'bg-slate-50 border-slate-50 text-slate-500 hover:bg-white hover:border-rose-200'}`}
+                           >
+                             {n}
+                             {currentDetailStudent.mainNotes.includes(n) ? <Check size={14}/> : <Plus size={14} className="opacity-30"/>}
+                           </button>
+                         ))}
+                       </div>
+                     </div>
+                   )}
+
+                   {activeDetailFields.includes('guardianFollowUp') && (
+                     <div className="p-6 bg-white border-2 border-cyan-100 rounded-[2rem] shadow-sm space-y-4 text-right">
+                       <label className="text-[10px] font-black text-cyan-600 mr-2">تقييم متابعة ولي الأمر</label>
+                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-bold text-slate-400 block text-center">تعليم ولي الأمر</span>
+                            <select className="w-full p-3 bg-slate-50 rounded-xl font-bold outline-none text-center text-xs" value={currentDetailStudent.guardianEducation} onChange={e => setCurrentDetailStudent({...currentDetailStudent, guardianEducation: e.target.value})}>
+                              {optionsAr.eduStatus.map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-bold text-slate-400 block text-center">مستوى المتابعة</span>
+                            <select className={`w-full p-3 rounded-xl font-black text-xs outline-none border-2 text-center ${currentDetailStudent.guardianFollowUp === 'ضعيفة' ? 'bg-red-50 border-red-200 text-red-600' : 'bg-slate-50 border-slate-100'}`} value={currentDetailStudent.guardianFollowUp} onChange={e => setCurrentDetailStudent({...currentDetailStudent, guardianFollowUp: e.target.value})}>
+                              {optionsAr.followUp.map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-bold text-slate-400 block text-center">درجة التعاون</span>
+                            <select className={`w-full p-3 rounded-xl font-black text-xs outline-none border-2 text-center ${currentDetailStudent.guardianCooperation === 'عدواني' || currentDetailStudent.guardianCooperation === 'ضعيفة' ? 'bg-red-600 border-red-700 text-white' : 'bg-slate-50 border-slate-100'}`} value={currentDetailStudent.guardianCooperation} onChange={e => setCurrentDetailStudent({...currentDetailStudent, guardianCooperation: e.target.value})}>
+                              {optionsAr.cooperation.map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                          </div>
+                       </div>
+                     </div>
+                   )}
+
+                   {activeDetailFields.includes('notes') && (
+                     <div className="p-4 bg-white border-2 border-slate-200 rounded-2xl shadow-sm space-y-4 text-right">
+                       <label className="text-[10px] font-black text-slate-600 mr-2">الملاحظات الختامية</label>
+                       <div className="space-y-4">
+                          <textarea className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none h-24 text-sm text-right" placeholder="ملاحظات أخرى..." value={currentDetailStudent.notes} onChange={e => setCurrentDetailStudent({...currentDetailStudent, notes: e.target.value})} />
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-bold text-slate-400 mr-1 uppercase">ملاحظات برمجية (تلقائية):</span>
+                            <input className="w-full p-3 bg-slate-50 rounded-xl font-bold outline-none border-none italic text-blue-600 text-right" value={currentDetailStudent.otherNotesText} onChange={e => setCurrentDetailStudent({...currentDetailStudent, otherNotesText: e.target.value})} />
+                          </div>
+                       </div>
+                     </div>
+                   )}
+                </div>
+              )}
+
+              {!currentDetailStudent && detailModalSearch.length > 0 && (
+                <div className="flex flex-col items-center justify-center p-20 text-slate-300 gap-4">
+                   <Users size={64} className="opacity-20" />
+                   <p className="font-bold">يرجى اختيار طالب من القائمة للبدء</p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 bg-slate-50 border-t flex flex-col sm:flex-row gap-4">
+               <button 
+                 onClick={saveDetailStudent}
+                 disabled={!currentDetailStudent}
+                 className="flex-1 bg-emerald-600 text-white p-5 rounded-2xl font-black text-xl hover:bg-emerald-700 shadow-xl shadow-emerald-100 transition-all active:scale-[0.98] flex items-center justify-center gap-4 disabled:opacity-30"
+               >
+                 <CheckCircle size={28}/> موافق واعتماد البيانات
+               </button>
+               
+               <button 
+                 onClick={sendDetailWhatsApp}
+                 disabled={!currentDetailStudent}
+                 className="p-5 bg-white border-4 border-green-500 text-green-600 rounded-2xl hover:bg-green-500 hover:text-white transition-all shadow-lg flex items-center justify-center gap-3 active:scale-90 disabled:opacity-30"
+                 title="إرسال التقرير للواتساب"
+               >
+                 <MessageCircle size={28}/>
+                 <span className="font-black text-lg text-right">واتساب</span>
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* END OF CHANGE */}
+    </div>
+  );
+};
