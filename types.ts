@@ -245,4 +245,8 @@ export interface AppData {
     duties: string[];
     achievement: string[];
   };
+  // START OF CHANGE
+  absenceManualAdditions?: Record<string, string[]>;
+  absenceExclusions?: Record<string, string[]>;
+  // END OF CHANGE
 }

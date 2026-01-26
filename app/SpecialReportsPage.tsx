@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useGlobal } from '../context/GlobalState';
 import { 
@@ -52,6 +53,16 @@ const exportTxtFiltered = (title: string, list: any[], columns: { label: string,
   link.click();
 };
 
+// START OF CHANGE
+interface CategoryMember {
+  id: string;
+  name: string;
+  grade: string;
+  section: string;
+  isAuto: boolean;
+}
+// END OF CHANGE
+
 // Moved outside to prevent Hook mismatch error 310
 const FrequentNamesPicker = ({ logs, onSelectQuery, isOpen, onClose }: { logs: any[], onSelectQuery: (name: string) => void, isOpen: boolean, onClose: () => void }) => {
   const frequentList = useMemo(() => {
@@ -94,7 +105,9 @@ const FrequentNamesPicker = ({ logs, onSelectQuery, isOpen, onClose }: { logs: a
   );
 };
 
-const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id: string) => void }> = ({ initialSubTab, onSubTabOpen }) => {
+// START OF CHANGE - Requirement: Navigate Function from App
+const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id: string) => void, onNavigate?: (v: string) => void }> = ({ initialSubTab, onSubTabOpen, onNavigate }) => {
+// END OF CHANGE
   const { lang, data, updateData } = useGlobal();
   const [activeTab, setActiveTab] = useState<MainTab>('supervisor');
   const [activeSubTab, setActiveSubTab] = useState<SubTab | null>(null);
@@ -716,6 +729,102 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
       { label: 'المجيب', key: 'replier' }, { label: 'ملاحظات', key: 'notes' }
     ];
 
+    // START OF CHANGE - Requirement Logic for Smart Lists
+    const isNextDay = (d1: string, d2: string) => {
+      const date1 = new Date(d1);
+      const date2 = new Date(d2);
+      const diffTime = Math.abs(date2.getTime() - date1.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays === 1;
+    };
+
+    const getAbsenceStreak = (studentId: string) => {
+      const logs = [...(data.absenceLogs || [])].filter(l => l.studentId === studentId).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      let streak = 0;
+      for(let i=0; i<logs.length-1; i++) {
+        if(isNextDay(logs[i].date, logs[i+1].date)) streak++;
+        else break;
+      }
+      return streak + (logs.length > 0 ? 1 : 0);
+    };
+
+    const getSmartList = (statusId: string): CategoryMember[] => {
+      const logs = data.absenceLogs || [];
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      const manual = data.absenceManualAdditions?.[statusId] || [];
+      const exclusions = data.absenceExclusions?.[statusId] || [];
+      
+      let autoIds: string[] = [];
+      if (statusId === 'expected') {
+        autoIds = Array.from(new Set(logs.filter(l => l.date === yesterday).map(l => l.studentId)));
+      } else if (statusId === 'recurring') {
+        autoIds = Array.from(new Set(logs.filter(l => {
+          return logs.some(l2 => l2.studentId === l.studentId && isNextDay(l2.date, l.date));
+        }).map(l => l.studentId)));
+      } else if (statusId === 'most') {
+        const counts: Record<string, number> = {};
+        logs.forEach(l => counts[l.studentId] = (counts[l.studentId] || 0) + 1);
+        autoIds = Object.keys(counts).filter(id => counts[id] >= 15);
+      } else if (statusId === 'disconnected') {
+        autoIds = Array.from(new Set(students.map(s => s.id).filter(id => getAbsenceStreak(id) >= 20)));
+      } else if (statusId === 'week1') {
+        autoIds = Array.from(new Set(students.map(s => s.id).filter(id => getAbsenceStreak(id) >= 5)));
+      } else if (statusId === 'week2') {
+        autoIds = Array.from(new Set(students.map(s => s.id).filter(id => getAbsenceStreak(id) >= 10)));
+      }
+
+      const allIds = Array.from(new Set([...autoIds, ...manual])).filter(id => !exclusions.includes(id));
+      
+      return allIds.map(id => {
+        const s = students.find(x => x.id === id);
+        return {
+          id,
+          name: s?.name || 'طالب غير معروف',
+          grade: s?.grade || '---',
+          section: s?.section || '---',
+          isAuto: autoIds.includes(id)
+        };
+      });
+    };
+
+    const toggleExclusion = (statusId: string, studentId: string) => {
+      const exclusions = data.absenceExclusions || {};
+      const current = exclusions[statusId] || [];
+      const updated = current.includes(studentId) ? current.filter(id => id !== studentId) : [...current, studentId];
+      
+      // Update student notes sync
+      const statusLabel = statusOptions.find(o => o.id === statusId)?.label || '';
+      const isRemoving = !current.includes(studentId); // removing from auto list via exclusion
+      const updatedStudents = students.map(s => {
+        if (s.id === studentId) {
+          return { ...s, otherNotesText: isRemoving ? '' : statusLabel };
+        }
+        return s;
+      });
+      
+      updateData({ 
+        absenceExclusions: { ...exclusions, [statusId]: updated },
+        studentReports: updatedStudents
+      });
+    };
+
+    const addManual = (statusId: string, studentId: string) => {
+      const manual = data.absenceManualAdditions || {};
+      const current = manual[statusId] || [];
+      if(!current.includes(studentId)) {
+        const statusLabel = statusOptions.find(o => o.id === statusId)?.label || '';
+        const updatedStudents = students.map(s => {
+          if (s.id === studentId) return { ...s, otherNotesText: statusLabel };
+          return s;
+        });
+        updateData({ 
+          absenceManualAdditions: { ...manual, [statusId]: [...current, studentId] },
+          studentReports: updatedStudents
+        });
+      }
+    };
+    // END OF CHANGE
+
     return (
       <div className="bg-white p-4 md:p-8 rounded-[2.5rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
         {/* Pass state and handlers to Picker component */}
@@ -868,17 +977,64 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
         ) : !showTable ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
             <div className="space-y-6">
+               {/* START OF CHANGE - Enhanced Status Buttons with Popover List */}
                <div className="flex flex-wrap gap-1.5 md:gap-2 justify-end">
                   {statusOptions.map(opt => (
-                    <button 
-                      key={opt.id} 
-                      onClick={() => setAbsenceForm({...absenceForm, status: opt.id as any})}
-                      className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black transition-all border ${absenceForm.status === opt.id ? 'bg-red-600 text-white border-red-600 shadow-lg scale-105' : 'bg-slate-50 text-slate-500 border-slate-100'}`}
-                    >
-                      {opt.label}
-                    </button>
+                    <div key={opt.id} className="relative group">
+                      <button 
+                        onClick={() => {
+                          setAbsenceForm({...absenceForm, status: opt.id as any});
+                          // Toggle name selection mode or just set it
+                        }}
+                        className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black transition-all border ${absenceForm.status === opt.id ? 'bg-red-600 text-white border-red-600 shadow-lg scale-105' : 'bg-slate-50 text-slate-500 border-slate-100'}`}
+                      >
+                        {opt.label} ({getSmartList(opt.id).length})
+                      </button>
+                      
+                      {/* Popover List for each status */}
+                      <div className="hidden group-hover:block absolute top-full left-0 z-[110] mt-2 w-64 bg-white border-2 rounded-2xl shadow-2xl p-4 animate-in slide-in-from-top-2">
+                        <h4 className="text-[10px] font-black text-blue-600 mb-2 border-b pb-1">قائمة: {opt.label}</h4>
+                        <div className="max-h-48 overflow-y-auto space-y-1 mb-2">
+                          {getSmartList(opt.id).map(m => (
+                            <div key={m.id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg group/item border-b border-slate-50 last:border-none">
+                              <button 
+                                onClick={() => onNavigate?.('studentReports')} // Simplified navigation as we can't scroll easily across views
+                                className="text-[10px] font-bold text-slate-700 hover:text-blue-600 truncate flex-1 text-right"
+                                title="انتقل إلى شؤون الطلاب"
+                              >
+                                {m.name}
+                              </button>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[8px] text-slate-400 bg-slate-100 px-1 rounded">{m.grade}-{m.section}</span>
+                                <button 
+                                  onClick={() => toggleExclusion(opt.id, m.id)}
+                                  className="p-1 text-red-400 hover:text-red-600 rounded transition-colors"
+                                  title="حذف من القائمة"
+                                >
+                                  <Trash2 size={12}/>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="pt-2 border-t flex flex-col gap-2">
+                          <label className="text-[8px] font-black text-slate-400">إضافة طالب يدوياً:</label>
+                          <div className="flex gap-1">
+                            <select 
+                              className="flex-1 text-[9px] p-1 border rounded"
+                              onChange={(e) => addManual(opt.id, e.target.value)}
+                              value=""
+                            >
+                              <option value="">اختر...</option>
+                              {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   ))}
                </div>
+               {/* END OF CHANGE */}
                <div className="relative">
                   <label className="text-xs font-black text-slate-400 mb-2 block mr-2">اسم الطالب</label>
                   <div className="flex items-center gap-3 bg-white border-2 rounded-2xl p-3 md:p-4 focus-within:border-blue-500 shadow-sm transition-all">
@@ -1045,9 +1201,9 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
         />
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
            <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
-              <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-blue-100 transition-all flex items-center gap-2">
+              <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-blue-100 transition-all flex items-center gap-2 shadow-sm">
                 {showTable ? <Plus size={18}/> : <History size={18}/>}
-                {showTable ? 'رصد جديد' : 'أرشيف التأخر'}
+                {showTable ? 'رصد جديد' : 'جدول السجلات'}
               </button>
               {!showTable && (
                 <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
@@ -1581,7 +1737,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
             <FilterSection suggestions={nameSugg} values={filterValues} setValues={setFilterValues} tempNames={tempNames} setTempNames={setTempNames} appliedNames={appliedNames} setAppliedNames={setAppliedNames} nameInput={nameInput} setNameInput={setNameInput} onExportExcel={() => exportExcelFiltered('إتلاف_المدرسة', filtered, cols)} onExportTxt={() => exportTxtFiltered('إتلاف_المدرسة', filtered, cols)} onExportWA={() => shareWhatsAppRich('سجل إتلاف المدرسة المفلتر', filtered, cols)} />
             <div className="overflow-x-auto rounded-[1.5rem] border shadow-inner">
               <table className="w-full text-center text-[10px] md:text-sm border-collapse min-w-[1000px]"><thead className="bg-[#FFD966] text-slate-800 font-black"><tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e border-red-200">{c.label}</th>)}</tr></thead>
-              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد بيانات إتلاف.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-red-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-50 text-red-600 text-lg">{l.prevDamageCount + 1}</td><td className="p-3 md:p-5 border-e border-slate-50 text-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.description}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.action}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
+              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد بيانات إتلاف.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-red-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-50 text-red-600 text-lg">{l.prevDamageCount + 1}</td><td className="p-3 md:p-5 border-e border-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.description}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.action}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
             </div>
           </div>
         )}

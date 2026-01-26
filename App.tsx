@@ -128,7 +128,9 @@ const MainApp: React.FC = () => {
       case 'daily': return <DailyReportsPage />;
       case 'violations': return <ViolationsPage />;
       case 'studentReports': return <StudentsReportsPage />;
-      case 'specialReports': return <SpecialReportsPage initialSubTab={subView} onSubTabOpen={(subId) => trackAction(`specialReports:${subId}`)} />;
+      // START OF CHANGE
+      case 'specialReports': return <SpecialReportsPage initialSubTab={subView} onSubTabOpen={(subId) => trackAction(`specialReports:${subId}`)} onNavigate={handleSetView} />;
+      // END OF CHANGE
       case 'profile': return <ProfilePage />;
       default: return <Dashboard setView={handleSetView} recentActions={recentActions} />;
     }
@@ -144,7 +146,6 @@ const MainApp: React.FC = () => {
         >
           <ArrowUp size={20} />
         </button>
-        {/* START OF CHANGE - Modified color to permanent red as per request */}
         <button 
           onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
           className="p-2 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700 transition-all active:scale-90"
@@ -152,7 +153,6 @@ const MainApp: React.FC = () => {
         >
           <ArrowDown size={20} />
         </button>
-        {/* END OF CHANGE */}
       </div>
 
       <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
