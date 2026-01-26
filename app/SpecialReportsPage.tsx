@@ -52,6 +52,48 @@ const exportTxtFiltered = (title: string, list: any[], columns: { label: string,
   link.click();
 };
 
+// Moved outside to prevent Hook mismatch error 310
+const FrequentNamesPicker = ({ logs, onSelectQuery, isOpen, onClose }: { logs: any[], onSelectQuery: (name: string) => void, isOpen: boolean, onClose: () => void }) => {
+  const frequentList = useMemo(() => {
+    const uniqueMap = new Map();
+    [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).forEach(log => {
+      if (!uniqueMap.has(log.studentName)) {
+        uniqueMap.set(log.studentName, log);
+      }
+    });
+    return Array.from(uniqueMap.values());
+  }, [logs]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 font-arabic">
+      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="p-5 border-b bg-slate-50 flex justify-between items-center">
+          <h3 className="font-black text-slate-800">الأسماء المتكررة (الأحدث أولاً)</h3>
+          <button onClick={onClose}><X size={20} className="text-slate-400"/></button>
+        </div>
+        <div className="max-h-80 overflow-y-auto p-2 space-y-1">
+          {frequentList.length === 0 ? (
+            <p className="text-center p-8 text-slate-400 italic">لا توجد بيانات سابقة</p>
+          ) : (
+            frequentList.map((item, idx) => (
+              <button 
+                key={idx} 
+                onClick={() => { onSelectQuery(item.studentName); onClose(); }}
+                className="w-full text-right p-3 hover:bg-blue-50 rounded-xl font-bold flex justify-between items-center transition-colors border-b border-slate-50 last:border-none"
+              >
+                <span className="text-xs text-slate-400">{item.date}</span>
+                <span className="text-slate-700">{item.studentName}</span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id: string) => void }> = ({ initialSubTab, onSubTabOpen }) => {
   const { lang, data, updateData } = useGlobal();
   const [activeTab, setActiveTab] = useState<MainTab>('supervisor');
@@ -87,21 +129,20 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
 
   const students = data.studentReports || [];
 
-  // START OF CHANGE - Lifted hook to top level to prevent Hook mismatch error
+  // FIXED TypeError: ensures field conversion to string before .trim()
   const filteredPresence = useMemo(() => {
     return students.filter(s => {
-      const studentGender = (s.gender || "").trim();
+      const studentGender = String(s.gender || "").trim();
       const branchMatch = !presenceBranch.length || 
                          (presenceBranch.includes('طلاب') && (studentGender === 'ذكر' || studentGender === 'Male')) || 
                          (presenceBranch.includes('طالبات') && (studentGender === 'أنثى' || studentGender === 'Female'));
       
-      const gradeMatch = !presenceGrade || (s.grade || "").trim() === presenceGrade.trim();
-      const sectionMatch = !presenceSection || (s.section || "").trim() === presenceSection.trim();
+      const gradeMatch = !presenceGrade || String(s.grade || "").trim() === presenceGrade.trim();
+      const sectionMatch = !presenceSection || String(s.section || "").trim() === presenceSection.trim();
       
       return branchMatch && gradeMatch && sectionMatch;
     });
   }, [students, presenceBranch, presenceGrade, presenceSection]);
-  // END OF CHANGE
 
   // Exam Record Specific States
   const [examStage, setExamStage] = useState<'basic' | 'secondary'>('basic');
@@ -149,47 +190,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
     try {
       return new Intl.DateTimeFormat('ar-EG', { weekday: 'long' }).format(new Date(dateStr));
     } catch { return ''; }
-  };
-
-  const FrequentNamesPicker = ({ logs, onSelectQuery }: { logs: any[], onSelectQuery: (name: string) => void }) => {
-    const frequentList = useMemo(() => {
-      const uniqueMap = new Map();
-      [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).forEach(log => {
-        if (!uniqueMap.has(log.studentName)) {
-          uniqueMap.set(log.studentName, log);
-        }
-      });
-      return Array.from(uniqueMap.values());
-    }, [logs]);
-
-    if (!showFrequentNames) return null;
-
-    return (
-      <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 font-arabic">
-        <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-          <div className="p-5 border-b bg-slate-50 flex justify-between items-center">
-            <h3 className="font-black text-slate-800">الأسماء المتكررة (الأحدث أولاً)</h3>
-            <button onClick={() => setShowFrequentNames(false)}><X size={20} className="text-slate-400"/></button>
-          </div>
-          <div className="max-h-80 overflow-y-auto p-2 space-y-1">
-            {frequentList.length === 0 ? (
-              <p className="text-center p-8 text-slate-400 italic">لا توجد بيانات سابقة</p>
-            ) : (
-              frequentList.map((item, idx) => (
-                <button 
-                  key={idx} 
-                  onClick={() => { onSelectQuery(item.studentName); setShowFrequentNames(false); }}
-                  className="w-full text-right p-3 hover:bg-blue-50 rounded-xl font-bold flex justify-between items-center transition-colors border-b border-slate-50 last:border-none"
-                >
-                  <span className="text-xs text-slate-400">{item.date}</span>
-                  <span className="text-slate-700">{item.studentName}</span>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-    );
   };
 
   const structure = {
@@ -718,9 +718,12 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
 
     return (
       <div className="bg-white p-4 md:p-8 rounded-[2.5rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        {/* Pass state and handlers to Picker component */}
         <FrequentNamesPicker 
           logs={data.absenceLogs || []} 
           onSelectQuery={(q) => setSearchQuery(q)}
+          isOpen={showFrequentNames}
+          onClose={() => setShowFrequentNames(false)}
         />
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
            <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
@@ -1033,9 +1036,12 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
 
     return (
       <div className="bg-white p-4 md:p-8 rounded-[2.5rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        {/* Pass state and handlers to Picker component */}
         <FrequentNamesPicker 
           logs={data.latenessLogs || []} 
           onSelectQuery={(q) => setSearchQuery(q)}
+          isOpen={showFrequentNames}
+          onClose={() => setShowFrequentNames(false)}
         />
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
            <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
@@ -1182,8 +1188,8 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
 
     const toggleItem = (cat: string, item: string) => {
       const field = cat === 'behavior' ? 'behaviorViolations' : cat === 'duties' ? 'dutiesViolations' : 'achievementViolations';
-      const current = violationForm[field] || [];
-      const updated = current.includes(item) ? current.filter(i => i !== item) : [...current, item];
+      const current = (violationForm as any)[field] || [];
+      const updated = current.includes(item) ? current.filter((i: string) => i !== item) : [...current, item];
       setViolationForm({ ...violationForm, [field]: updated });
     };
 
@@ -1209,9 +1215,12 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
 
     return (
       <div className="bg-white p-4 md:p-8 rounded-[2.5rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        {/* Pass state and handlers to Picker component */}
         <FrequentNamesPicker 
           logs={data.studentViolationLogs || []} 
           onSelectQuery={(q) => setSearchQuery(q)}
+          isOpen={showFrequentNames}
+          onClose={() => setShowFrequentNames(false)}
         />
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
            <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
@@ -1287,7 +1296,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-1 gap-1.5 md:space-y-2">
                        {cat.items.map(item => (
-                         <button key={item} onClick={() => toggleItem(cat.id, item)} className={`text-right p-2 md:p-3 rounded-xl text-[9px] md:text-[10px] font-black border transition-all ${ (violationForm[cat.id === 'behavior' ? 'behaviorViolations' : cat.id === 'duties' ? 'dutiesViolations' : 'achievementViolations'] || []).includes(item) ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-slate-50 text-slate-500 border-slate-50 hover:bg-slate-100' }`}>{item}</button>
+                         <button key={item} onClick={() => toggleItem(cat.id, item)} className={`text-right p-2 md:p-3 rounded-xl text-[9px] md:text-[10px] font-black border transition-all ${ ((violationForm as any)[cat.id === 'behavior' ? 'behaviorViolations' : cat.id === 'duties' ? 'dutiesViolations' : 'achievementViolations'] || []).includes(item) ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-slate-50 text-slate-500 border-slate-50 hover:bg-slate-100' }`}>{item}</button>
                        ))}
                     </div>
                  </div>
@@ -1388,9 +1397,12 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
 
     return (
       <div className="bg-white p-4 md:p-8 rounded-[2.5rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        {/* Pass state and handlers to Picker component */}
         <FrequentNamesPicker 
           logs={data.exitLogs || []} 
           onSelectQuery={(q) => setSearchQuery(q)}
+          isOpen={showFrequentNames}
+          onClose={() => setShowFrequentNames(false)}
         />
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
            <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
@@ -1502,9 +1514,12 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
 
     return (
       <div className="bg-white p-4 md:p-8 rounded-[2.5rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        {/* Pass state and handlers to Picker component */}
         <FrequentNamesPicker 
           logs={data.damageLogs || []} 
           onSelectQuery={(q) => setSearchQuery(q)}
+          isOpen={showFrequentNames}
+          onClose={() => setShowFrequentNames(false)}
         />
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
            <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
@@ -1620,9 +1635,12 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
 
     return (
       <div className="bg-white p-4 md:p-8 rounded-[2.5rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
+        {/* Pass state and handlers to Picker component */}
         <FrequentNamesPicker 
           logs={data.parentVisitLogs || []} 
           onSelectQuery={(q) => setSearchQuery(q)}
+          isOpen={showFrequentNames}
+          onClose={() => setShowFrequentNames(false)}
         />
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
            <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
