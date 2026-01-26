@@ -1,12 +1,12 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useGlobal } from '../context/GlobalState';
 import { 
   Download, Upload, Save, History, Trash2, 
   AlertTriangle, CheckCircle2, Loader2, X, 
   FileJson, User, School, Database, FileText,
-  Calendar
+  Calendar, Layers, RefreshCcw
 } from 'lucide-react';
+import { AppData } from '../types';
 
 interface BackupVersion {
   id: string;
@@ -24,6 +24,11 @@ const DataManagementModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
   const [isLoading, setIsLoading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ type: 'error' | 'success', text: string } | null>(null);
+  
+  // START OF CHANGE
+  const [pendingData, setPendingData] = useState<any>(null);
+  const [showImportChoice, setShowImportChoice] = useState(false);
+  // END OF CHANGE
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -87,7 +92,7 @@ const DataManagementModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
       id: Date.now().toString(),
       timestamp: new Date().toLocaleString('ar-EG'),
       data: currentRaw,
-      label: `نسخة تلقائية قبل الاستيراد - ${new Date().toLocaleDateString('ar-EG')}`
+      label: `نسخة تلقائية قبل الاستيراد - ${new Date().toLocaleString('ar-EG')}`
     };
 
     const updatedBackups = [newBackup, ...backups].slice(0, 5);
@@ -95,6 +100,7 @@ const DataManagementModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
     setBackups(updatedBackups);
   };
 
+  // START OF CHANGE
   const handleImport = async (file: File) => {
     setIsLoading(true);
     const reader = new FileReader();
@@ -106,19 +112,8 @@ const DataManagementModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
         // Basic validation
         if (!parsed || (typeof parsed !== 'object')) throw new Error('Invalid JSON');
 
-        // 1. Archive
-        archiveCurrentData();
-
-        // 2. Clear current but preserve backups
-        const currentBackups = localStorage.getItem('app_history_backups');
-        localStorage.clear();
-        if (currentBackups) localStorage.setItem('app_history_backups', currentBackups);
-
-        // 3. Set new data
-        localStorage.setItem('rafiquk_data', JSON.stringify(parsed));
-        
-        showStatus('success', 'تم الاستيراد بنجاح! جاري التحديث...');
-        setTimeout(() => window.location.reload(), 1500);
+        setPendingData(parsed);
+        setShowImportChoice(true);
       } catch (err) {
         showStatus('error', 'ملف غير صالح أو تالف');
       } finally {
@@ -127,6 +122,74 @@ const DataManagementModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
     };
     reader.readAsText(file);
   };
+
+  const executeImport = (merge: boolean) => {
+    if (!pendingData) return;
+    setIsLoading(true);
+    
+    // 1. Always archive current data as requested
+    archiveCurrentData();
+
+    try {
+      if (merge) {
+        // MERGE LOGIC
+        const merged = { ...data };
+        const incoming = pendingData;
+        
+        const arrayKeys = [
+          'substitutions', 'dailyReports', 'violations', 'parentVisits', 
+          'teacherFollowUps', 'studentReports', 'absenceLogs', 'latenessLogs', 
+          'studentViolationLogs', 'exitLogs', 'damageLogs', 'parentVisitLogs', 
+          'examLogs', 'genericSpecialReports'
+        ];
+
+        arrayKeys.forEach(key => {
+          if (incoming[key] && Array.isArray(incoming[key])) {
+            const currentArray = (merged as any)[key] || [];
+            const combined = [...currentArray, ...incoming[key]];
+            
+            // Filter unique by ID to prevent duplicates if merging identical files
+            const seen = new Set();
+            (merged as any)[key] = combined.filter(item => {
+              const id = item.id || JSON.stringify(item);
+              if (seen.has(id)) return false;
+              seen.add(id);
+              return true;
+            });
+          }
+        });
+
+        // Merge custom violation elements if exist
+        if (incoming.customViolationElements) {
+          merged.customViolationElements = {
+            behavior: Array.from(new Set([...(merged.customViolationElements?.behavior || []), ...(incoming.customViolationElements.behavior || [])])),
+            duties: Array.from(new Set([...(merged.customViolationElements?.duties || []), ...(incoming.customViolationElements.duties || [])])),
+            achievement: Array.from(new Set([...(merged.customViolationElements?.achievement || []), ...(incoming.customViolationElements.achievement || [])])),
+          };
+        }
+
+        localStorage.setItem('rafiquk_data', JSON.stringify(merged));
+        showStatus('success', 'تم دمج البيانات بنجاح! جاري التحديث...');
+      } else {
+        // OVERRIDE LOGIC
+        // Clear current but preserve backups
+        const currentBackups = localStorage.getItem('app_history_backups');
+        localStorage.clear();
+        if (currentBackups) localStorage.setItem('app_history_backups', currentBackups);
+
+        // Set new data
+        localStorage.setItem('rafiquk_data', JSON.stringify(pendingData));
+        showStatus('success', 'تم استبدال البيانات بنجاح! جاري التحديث...');
+      }
+
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (e) {
+      showStatus('error', 'حدث خطأ أثناء معالجة البيانات');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  // END OF CHANGE
 
   const handleRestore = (backup: BackupVersion) => {
     if (!confirm('هل أنت متأكد من استعادة هذه النسخة؟ سيتم فقدان البيانات الحالية غير المحفوظة.')) return;
@@ -262,40 +325,93 @@ const DataManagementModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                 <Upload className="text-red-600" size={20} /> استيراد البيانات
               </h3>
               
-              <div 
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-                className={`relative border-4 border-dashed rounded-[2rem] p-8 flex flex-col items-center justify-center gap-4 transition-all ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-slate-50'}`}
-              >
-                <div className="p-5 bg-white rounded-full shadow-inner text-slate-400">
-                  <FileJson size={48} />
-                </div>
-                <div className="text-center space-y-1">
-                  <p className="font-black text-black">اسحب ملف النسخة الاحتياطية هنا</p>
-                  <p className="text-xs text-slate-500 font-bold">أو اضغط لاختيار ملف من جهازك</p>
-                </div>
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-6 py-2 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm hover:border-blue-400 transition-all"
+              {/* START OF CHANGE - Contextual Choice UI */}
+              {!showImportChoice ? (
+                <div 
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                  className={`relative border-4 border-dashed rounded-[2rem] p-8 flex flex-col items-center justify-center gap-4 transition-all ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-slate-50'}`}
                 >
-                  اختيار ملف
-                </button>
-                <input 
-                  type="file" 
-                  ref={fileInputRef}
-                  className="hidden" 
-                  accept=".json"
-                  onChange={(e) => e.target.files?.[0] && handleImport(e.target.files[0])}
-                />
-              </div>
+                  <div className="p-5 bg-white rounded-full shadow-inner text-slate-400">
+                    <FileJson size={48} />
+                  </div>
+                  <div className="text-center space-y-1">
+                    <p className="font-black text-black">اسحب ملف النسخة الاحتياطية هنا</p>
+                    <p className="text-xs text-slate-500 font-bold">أو اضغط لاختيار ملف من جهازك</p>
+                  </div>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-6 py-2 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm hover:border-blue-400 transition-all"
+                  >
+                    اختيار ملف
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    className="hidden" 
+                    accept=".json"
+                    onChange={(e) => e.target.files?.[0] && handleImport(e.target.files[0])}
+                  />
+                </div>
+              ) : (
+                <div className="bg-slate-50 border-4 border-blue-100 rounded-[2rem] p-6 space-y-4 animate-in zoom-in-95">
+                  <div className="text-center mb-4">
+                    <div className="inline-block p-3 bg-blue-600 text-white rounded-2xl mb-3 shadow-lg">
+                      <RefreshCcw size={24} />
+                    </div>
+                    <h4 className="font-black text-slate-800 text-lg">تم تحميل ملف البيانات</h4>
+                    <p className="text-xs text-slate-500 font-bold">يرجى اختيار طريقة معالجة البيانات المستوردة:</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    <button 
+                      onClick={() => executeImport(false)}
+                      className="p-5 bg-white border-2 border-slate-100 rounded-2xl hover:border-red-500 transition-all text-right group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-red-50 text-red-500 rounded-xl group-hover:bg-red-500 group-hover:text-white transition-all">
+                          <Trash2 size={18} />
+                        </div>
+                        <div>
+                          <div className="font-black text-slate-800 text-sm">استيراد مع إلغاء السابق</div>
+                          <div className="text-[10px] text-slate-400 font-bold">حذف البيانات الحالية واستبدالها كلياً بالجديدة</div>
+                        </div>
+                      </div>
+                    </button>
+
+                    <button 
+                      onClick={() => executeImport(true)}
+                      className="p-5 bg-white border-2 border-slate-100 rounded-2xl hover:border-green-500 transition-all text-right group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-green-50 text-green-500 rounded-xl group-hover:bg-green-500 group-hover:text-white transition-all">
+                          <Layers size={18} />
+                        </div>
+                        <div>
+                          <div className="font-black text-slate-800 text-sm">استيراد مع إضافة البيانات لما هو موجود</div>
+                          <div className="text-[10px] text-slate-400 font-bold">دمج الملف المستورد مع السجلات الحالية للمدرسة</div>
+                        </div>
+                      </div>
+                    </button>
+
+                    <button 
+                      onClick={() => setShowImportChoice(false)}
+                      className="w-full py-3 text-slate-400 font-black text-xs hover:text-slate-600"
+                    >
+                      إلغاء العملية
+                    </button>
+                  </div>
+                </div>
+              )}
+              {/* END OF CHANGE */}
 
               <div className="p-4 bg-red-50 rounded-2xl border border-red-100">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="text-red-600 flex-shrink-0" size={18} />
                   <p className="text-[10px] text-red-700 font-black leading-relaxed">
-                    تحذير: استيراد ملف جديد سيقوم باستبدال كافة البيانات الحالية. يتم أخذ نسخة احتياطية تلقائياً في السجل أدناه قبل أي تغيير.
+                    تحذير: سيتم أرشفة نسخة مؤرخة من بياناتك الحالية تلقائياً في السجل أدناه قبل تنفيذ أي عملية استيراد لضمان سلامة بياناتك.
                   </p>
                 </div>
               </div>

@@ -1084,12 +1084,31 @@ export const StudentsReportsPage: React.FC = () => {
   const [showSpecificFilterModal, setShowSpecificFilterModal] = useState(false);
   const [selectedSpecifics, setSelectedSpecifics] = useState<string[]>([]);
   
-  // START OF CHANGE - Requirement: Detail Modal Features
+  // Requirement: Detail Modal Features
   const [showIndividualReportModal, setShowIndividualReportModal] = useState(false);
   const [detailModalSearch, setDetailModalSearch] = useState('');
   const [currentDetailStudent, setCurrentDetailStudent] = useState<StudentReport | null>(null);
   const [activeDetailFields, setActiveDetailFields] = useState<string[]>(['name', 'grade', 'section', 'gender', 'healthStatus', 'guardianInfo', 'academic', 'behaviorLevel', 'mainNotes', 'guardianFollowUp', 'notes']);
-  // END OF CHANGE
+  
+  // Requirement: WhatsApp Selection Implementation
+  const [waSelector, setWaSelector] = useState<{ type: 'bulk' | 'single', student?: StudentReport } | null>(null);
+  const [waSelectedFields, setWaSelectedFields] = useState<string[]>(['all']);
+
+  const waFieldOptions = [
+    { key: 'all', label: 'جميع البيانات' },
+    { key: 'name', label: 'اسم الطالب' },
+    { key: 'grade', label: 'الصف' },
+    { key: 'section', label: 'الشعبة' },
+    { key: 'gender', label: 'النوع' },
+    { key: 'address_work', label: 'السكن/ العمل' },
+    { key: 'health', label: 'الحالة الصحية' },
+    { key: 'guardian', label: 'ولي الأمر (الاسم، الهاتف)' },
+    { key: 'academic', label: 'المستوى العلمي (قراءة، كتابة، مشاركة)' },
+    { key: 'behavior', label: 'المستوى السلوكي' },
+    { key: 'main_notes', label: 'الملاحظات الأساسية' },
+    { key: 'guardian_followup', label: 'ولي الأمر المتابع (تعليم، متابعة، تعاون)' },
+    { key: 'other_notes', label: 'ملاحظات أخرى' },
+  ];
 
   // New States for Blacklist and Excellence lists
   const [showListModal, setShowListModal] = useState<'blacklist' | 'excellence' | null>(null);
@@ -1316,50 +1335,82 @@ export const StudentsReportsPage: React.FC = () => {
     }
   };
 
-  const formatLevel = (val: string) => {
-    if (val === 'ضعيف' || val === 'ضعيف جداً' || val === 'مريض') return `❌ ${val}`;
-    if (val === 'ممتاز' || val === 'جيد جدا') return `✅ ${val}`;
-    return `🔹 ${val}`;
+  // START OF CHANGE - Surgical modification for WhatsApp Rich Formatting and Logic
+  const formatWAValue = (val: string) => {
+    const isWeak = val.includes('ضعيف') || val.includes('مريض') || val.includes('عدواني') || val.includes('مخالفة') || val.includes('مقبول');
+    return isWeak ? `🔴 *${val}*` : `🔹 ${val}`;
   };
 
-  const generateReportText = () => {
-    let text = `*📋 تقرير شؤون الطلاب (المفلتر)*\n`;
-    text += `*المدرسة:* ${data.profile.schoolName || 'غير محدد'}\n`;
+  const constructWAMessage = (studentsList: StudentReport[], fields: string[]) => {
+    let text = `*📋 تقرير شؤون الطلاب*\n`;
+    text += `*المدرسة:* ${data.profile.schoolName || '---'}\n`;
     text += `*التاريخ:* ${new Date().toLocaleDateString('ar-EG')}\n`;
     text += `----------------------------------\n\n`;
 
-    filteredData.forEach((s, i) => {
-      text += `*👤 الطالب (${i + 1}): ${s.name}*\n`;
-      text += `📍 *الصف/الشعبة:* ${s.grade} / ${s.section}\n`;
-      text += `🚻 *النوع:* ${s.gender}\n`;
-      text += `🏠 *السكن:* ${s.address || 'غير متوفر'}\n`;
-      text += `💼 *العمل:* ${s.workOutside}\n`;
-      text += `🏥 *الحالة الصحية:* ${formatLevel(s.healthStatus)}${s.healthDetails ? ` (${s.healthDetails})` : ''}\n`;
-      text += `👨‍👩‍👧 *ولي الأمر:* ${s.guardianName} | ${s.guardianPhones.join(' - ')}\n`;
-      text += `📚 *المستوى العلمي:*\n`;
-      text += `   📖 القراءة: ${formatLevel(s.academicReading)}\n`;
-      text += `   ✍️ الكتابة: ${formatLevel(s.academicWriting)}\n`;
-      text += `   🙋 المشاركة: ${formatLevel(s.academicParticipation)}\n`;
-      text += `🎭 *المستوى السلوكي:* ${formatLevel(s.behaviorLevel)}\n`;
+    studentsList.forEach((s, i) => {
+      text += `*🔹 الطالب (${i + 1}):*\n`;
+      const isAll = fields.includes('all');
       
-      if (s.mainNotes.length > 0) {
-        text += `⚠️ *الملاحظات الأساسية:*\n`;
-        s.mainNotes.forEach(note => {
-          text += `   🔴 ${note}\n`;
-        });
+      if (isAll || fields.includes('name')) text += `👤 *الاسم:* ${s.name}\n`;
+      if (isAll || fields.includes('grade')) text += `📍 *الصف:* ${s.grade}\n`;
+      if (isAll || fields.includes('section')) text += `🏁 *الشعبة:* ${s.section}\n`;
+      if (isAll || fields.includes('gender')) text += `🚻 *النوع:* ${s.gender}\n`;
+      if (isAll || fields.includes('address_work')) {
+        text += `🏠 *السكن:* ${s.address || '---'}\n`;
+        text += `💼 *العمل:* ${s.workOutside}\n`;
       }
-      
-      text += `🤝 *متابعة ولي الأمر:*\n`;
-      text += `   🎓 التعليم: ${s.guardianEducation}\n`;
-      text += `   📈 المتابعة: ${s.guardianFollowUp}\n`;
-      text += `   🤝 التعاون: ${s.guardianCooperation}\n`;
-      
-      if (s.notes) text += `📝 *ملاحظات أخرى:* ${s.notes}\n`;
+      if (isAll || fields.includes('health')) {
+        text += `🏥 *الحالة الصحية:* ${formatWAValue(s.healthStatus)}${s.healthDetails ? ` (${s.healthDetails})` : ''}\n`;
+      }
+      if (isAll || fields.includes('guardian')) {
+        text += `👨‍👩‍👧 *ولي الأمر:* ${s.guardianName || '---'}\n`;
+        text += `📞 *الهواتف:* ${s.guardianPhones.join(' - ')}\n`;
+      }
+      if (isAll || fields.includes('academic')) {
+        text += `📚 *المستوى العلمي:*\n`;
+        text += `   📖 قراءة: ${formatWAValue(s.academicReading)}\n`;
+        text += `   ✍️ الكتابة: ${formatWAValue(s.academicWriting)}\n`;
+        text += `   🙋 المشاركة: ${formatWAValue(s.academicParticipation)}\n`;
+      }
+      if (isAll || fields.includes('behavior')) {
+        text += `🎭 *المستوى السلوكي:* ${formatWAValue(s.behaviorLevel)}\n`;
+      }
+      if (isAll || fields.includes('main_notes')) {
+        if (s.mainNotes.length > 0) {
+          text += `⚠️ *الملاحظات الأساسية:*\n`;
+          s.mainNotes.forEach(n => text += `   🔴 ${n}\n`);
+        } else {
+          text += `⚠️ *الملاحظات الأساسية:* ---\n`;
+        }
+      }
+      if (isAll || fields.includes('guardian_followup')) {
+        text += `🤝 *متابعة ولي الأمر:*\n`;
+        text += `   🎓 التعليم: ${s.guardianEducation}\n`;
+        text += `   📈 المتابعة: ${formatWAValue(s.guardianFollowUp)}\n`;
+        text += `   🤝 التعاون: ${formatWAValue(s.guardianCooperation)}\n`;
+      }
+      if (isAll || fields.includes('other_notes')) {
+        if (s.notes) text += `📝 *ملاحظات أخرى:* ${s.notes}\n`;
+        if (s.otherNotesText) text += `🔖 *ملاحظات برمجية:* ${s.otherNotesText}\n`;
+      }
       text += `----------------------------------\n`;
     });
     
+    text += `\n*إعداد رفيق المشرف الإداري - إبراهيم دخان*`;
     return text;
   };
+
+  const finalSendWhatsApp = () => {
+    if (!waSelector) return;
+    const studentsList = waSelector.type === 'single' ? [waSelector.student!] : filteredData;
+    const fields = waSelectedFields;
+    
+    const text = constructWAMessage(studentsList, fields);
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+    setWaSelector(null);
+  };
+  // END OF CHANGE
 
   const exportToExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(filteredData.map(s => ({
@@ -1389,7 +1440,7 @@ export const StudentsReportsPage: React.FC = () => {
   };
 
   const exportToTxt = () => {
-    const text = generateReportText().replace(/\*/g, '');
+    const text = constructWAMessage(filteredData, ['all']).replace(/\*/g, '');
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -1398,12 +1449,10 @@ export const StudentsReportsPage: React.FC = () => {
   };
 
   const sendWhatsApp = () => {
-    const text = generateReportText();
-    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
+    setWaSelector({ type: 'bulk' });
   };
 
-  // START OF CHANGE - Requirement: Detail Modal Activation & Optimization
+  // Requirement: Detail Modal Activation & Optimization
   const handleDetailStudentSearch = (val: string) => {
     setDetailModalSearch(val);
     const found = studentData.find(s => s.name === val);
@@ -1430,56 +1479,10 @@ export const StudentsReportsPage: React.FC = () => {
   };
 
   const sendDetailWhatsApp = () => {
-    if (!currentDetailStudent) return;
-    const s = currentDetailStudent;
-    let msg = `*📋 تقرير شامل للطالب: ${s.name}*\n`;
-    msg += `----------------------------------\n\n`;
-    
-    msg += `📍 *البيانات الأساسية:*\n`;
-    msg += `▫️ الصف: ${s.grade} / الشعبة: ${s.section}\n`;
-    msg += `▫️ النوع: ${s.gender}\n`;
-    msg += `▫️ السكن: ${s.address || '---'} / العمل: ${s.workOutside}\n\n`;
-
-    const healthIcon = s.healthStatus === 'مريض' ? '🔴' : '🟢';
-    msg += `🏥 *الحالة الصحية:* ${healthIcon} ${s.healthStatus} ${s.healthDetails ? `(${s.healthDetails})` : ''}\n\n`;
-
-    msg += `👨‍👩‍👧 *ولي الأمر:*\n`;
-    msg += `▫️ الاسم: ${s.guardianName || '---'}\n`;
-    msg += `▫️ الهواتف: ${s.guardianPhones.join(' - ') || '---'}\n\n`;
-
-    msg += `📚 *المستوى العلمي:*\n`;
-    const getLevelIcon = (l: string) => (l.includes('ضعيف') || l.includes('مقبول')) ? '🔴' : '🟢';
-    msg += `${getLevelIcon(s.academicReading)} القراءة: ${s.academicReading}\n`;
-    msg += `${getLevelIcon(s.academicWriting)} الكتابة: ${s.academicWriting}\n`;
-    msg += `${getLevelIcon(s.academicParticipation)} المشاركة: ${s.academicParticipation}\n\n`;
-
-    const behaviorIcon = (s.behaviorLevel.includes('ضعيف') || s.behaviorLevel.includes('مقبول')) ? '🔴' : '🟢';
-    msg += `🎭 *المستوى السلوكي:* ${behaviorIcon} ${s.behaviorLevel}\n\n`;
-
-    if (s.mainNotes.length > 0) {
-      msg += `⚠️ *الملاحظات السلوكية الأساسية:*\n`;
-      s.mainNotes.forEach(n => msg += `   🔴 ${n}\n`);
-      msg += `\n`;
+    if (currentDetailStudent) {
+      setWaSelector({ type: 'single', student: currentDetailStudent });
     }
-
-    msg += `🤝 *متابعة ولي الأمر:*\n`;
-    msg += `▫️ التعليم: ${s.guardianEducation}\n`;
-    msg += `▫️ المتابعة: ${s.guardianFollowUp}\n`;
-    const coopIcon = s.guardianCooperation === 'عدواني' || s.guardianCooperation === 'ضعيفة' ? '🔴' : '▫️';
-    msg += `${coopIcon} التعاون: ${s.guardianCooperation}\n\n`;
-
-    if (s.notes || s.otherNotesText) {
-      msg += `📝 *ملاحظات إضافية:*\n`;
-      if (s.notes) msg += `▫️ ${s.notes}\n`;
-      if (s.otherNotesText) msg += `▫️ ${s.otherNotesText}\n`;
-    }
-
-    msg += `\n----------------------------------\n`;
-    msg += `*إعداد رفيق المشرف الإداري - إبراهيم دخان*`;
-    
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
-  // END OF CHANGE
 
   return (
     <div className="space-y-4 font-arabic animate-in fade-in duration-500">
@@ -1516,7 +1519,7 @@ export const StudentsReportsPage: React.FC = () => {
           </div>
         </div>
         
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap text-right">
           <button onClick={() => setShowListModal('excellence')} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl font-black text-sm hover:bg-green-700 transition-all shadow-sm">
             <Star className="w-4 h-4 fill-white" /> {lang === 'ar' ? 'قائمة التميز' : 'Excellence List'}
           </button>
@@ -1777,7 +1780,7 @@ export const StudentsReportsPage: React.FC = () => {
         </div>
       )}
 
-      {/* START OF CHANGE - Requirement: Detail Modal Implementation & Optimization */}
+      {/* Requirement: Detail Modal Implementation & Optimization */}
       {showIndividualReportModal && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 font-arabic">
           <div className="bg-white rounded-[2.5rem] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border-4 border-emerald-50 animate-in zoom-in-95 duration-300 text-right">
@@ -2053,6 +2056,70 @@ export const StudentsReportsPage: React.FC = () => {
                  <MessageCircle size={28}/>
                  <span className="font-black text-lg text-right">واتساب</span>
                </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* START OF CHANGE - Surgical Addition for WhatsApp Selector Modal */}
+      {waSelector && (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 font-arabic">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-300 border-4 border-green-50 text-right overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 bg-green-600 text-white flex justify-between items-center">
+              <h3 className="text-xl font-black flex items-center gap-3"><Share2 size={24}/> تخصيص بيانات الإرسال للواتساب</h3>
+              <button onClick={() => setWaSelector(null)} className="p-2 hover:bg-green-700 rounded-full transition-colors"><X size={24}/></button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-8 space-y-6">
+              <div className="bg-green-50 p-4 rounded-2xl border-2 border-green-100 mb-6">
+                <p className="text-sm font-bold text-green-800 leading-relaxed">
+                  سيتم الإرسال لـ <span className="font-black">({waSelector.type === 'single' ? 'طالب واحد' : `${filteredData.length} طالب`})</span>. 
+                  يرجى اختيار الحقول المراد تضمينها في الرسالة. سيتم تنسيق الرسالة برموز بصرية وتلوين للمشكلات.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {waFieldOptions.map(opt => {
+                  const isSelected = waSelectedFields.includes(opt.key);
+                  return (
+                    <button 
+                      key={opt.key}
+                      onClick={() => {
+                        if (opt.key === 'all') {
+                          setWaSelectedFields(['all']);
+                        } else {
+                          const withoutAll = waSelectedFields.filter(f => f !== 'all');
+                          if (isSelected) {
+                            const updated = withoutAll.filter(f => f !== opt.key);
+                            setWaSelectedFields(updated.length === 0 ? ['all'] : updated);
+                          } else {
+                            setWaSelectedFields([...withoutAll, opt.key]);
+                          }
+                        }
+                      }}
+                      className={`p-4 rounded-2xl border-2 text-right font-bold transition-all flex items-center justify-between ${isSelected ? 'bg-green-600 text-white border-green-700 shadow-md scale-102' : 'bg-slate-50 text-slate-500 border-slate-100 hover:border-green-300'}`}
+                    >
+                      <span className="text-xs">{opt.label}</span>
+                      {isSelected && <CheckCircle size={18}/>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="p-6 bg-slate-50 border-t flex flex-col sm:flex-row gap-4">
+              <button 
+                onClick={finalSendWhatsApp}
+                className="flex-1 bg-green-600 text-white p-5 rounded-2xl font-black text-xl hover:bg-green-700 shadow-xl shadow-green-100 transition-all active:scale-[0.98] flex items-center justify-center gap-4"
+              >
+                <MessageCircle size={28}/> إرسال إلى واتساب
+              </button>
+              <button 
+                onClick={() => setWaSelector(null)}
+                className="px-8 bg-white border-2 text-slate-400 rounded-2xl font-black hover:bg-slate-100 transition-all"
+              >
+                إلغاء
+              </button>
             </div>
           </div>
         </div>
