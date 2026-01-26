@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useGlobal } from '../context/GlobalState';
 import { 
-  Plus, Search, Trash2, Filter, ChevronDown, Check, Calendar, Percent, User, Target, Settings2, AlertCircle, X, ChevronRight, Zap, CheckCircle, FilePlus, FolderOpen, Save, ListOrdered, ArrowUpDown, ArrowUp, ArrowDown, SortAsc, Book, School, Type, Sparkles, FilterIcon, BarChart3, LayoutList, Upload, Download, Phone, UserCircle, Activity, Star, FileText, FileSpreadsheet, Share2, Edit, ChevronLeft, UserCheck, GraduationCap, MessageCircle
+  Plus, Search, Trash2, Filter, ChevronDown, Check, Calendar, Percent, User, Users, Target, Settings2, AlertCircle, X, ChevronRight, Zap, CheckCircle, FilePlus, FolderOpen, Save, ListOrdered, ArrowUpDown, ArrowUp, ArrowDown, SortAsc, Book, School, Type, Sparkles, FilterIcon, BarChart3, LayoutList, Upload, Download, Phone, UserCircle, Activity, Star, FileText, FileSpreadsheet, Share2, Edit, ChevronLeft, UserCheck, GraduationCap, MessageCircle
 } from 'lucide-react';
 import { TeacherFollowUp, DailyReportContainer, StudentReport } from '../types';
 import DynamicTable from '../components/DynamicTable';
@@ -89,9 +89,7 @@ export const DailyReportsPage: React.FC = () => {
   ];
 
   const subjects = ["القرآن الكريم", "التربية الإسلامية", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "العلوم", "الكيمياء", "الفيزياء", "الأحياء", "الاجتماعيات", "الحاسوب", "المكتبة", "الفنية", "المختص الاجتماعي", "الأنشطة", "غيرها"];
-  // START OF CHANGE
   const grades = ["تمهيدي", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
-  // END OF CHANGE
   const violationTypes = ["تأخر عن طابور", "تأخر عن حصة", "خروج من الحصة", "الإفراط في العقاب", "رفض القرارات الإدارية", "عدم تسليم ما كلف به"];
 
   const displayedMetrics = filterMode === 'metric' && selectedMetrics.length > 0 
@@ -337,7 +335,6 @@ export const DailyReportsPage: React.FC = () => {
                     )}
                     {displayedMetrics.map(m => (
                       <td key={m.key} className="p-1 border-e">
-                        {/* START OF CHANGE - Added onFocus select() */}
                         <input 
                             id={`input-${t.id}-${m.key}`}
                             type="number" 
@@ -350,7 +347,6 @@ export const DailyReportsPage: React.FC = () => {
                             onKeyDown={(e) => handleKeyDown(e, idx, m.key)}
                             onFocus={(e) => e.target.select()}
                         />
-                        {/* END OF CHANGE */}
                       </td>
                     ))}
                     <td 
@@ -358,7 +354,6 @@ export const DailyReportsPage: React.FC = () => {
                         onClick={() => setViolationModal({ id: t.id, notes: t.violations_notes })}
                     >
                       <div className="flex items-center justify-center gap-1">
-                          {/* START OF CHANGE - Added onFocus select() */}
                           <input 
                              type="number" 
                              className="w-full text-center text-red-600 font-bold outline-none bg-transparent text-xs" 
@@ -367,7 +362,6 @@ export const DailyReportsPage: React.FC = () => {
                              onClick={(e) => e.stopPropagation()}
                              onFocus={(e) => e.target.select()}
                           />
-                          {/* END OF CHANGE */}
                           {t.violations_notes.length > 0 && <div className="w-2 h-2 rounded-full bg-red-600 absolute top-1 right-1"></div>}
                       </div>
                     </td>
@@ -507,8 +501,6 @@ export const DailyReportsPage: React.FC = () => {
                 <textarea 
                     className="w-full p-3 border rounded-xl bg-slate-50 text-right text-sm font-bold min-h-[80px]" 
                     placeholder="ملاحظات إضافية..."
-                    onChange={(e) => {
-                    }}
                 ></textarea>
                 <button onClick={() => setViolationModal(null)} className="w-full mt-2 p-3 bg-slate-800 text-white rounded-xl font-bold">حفظ وإغلاق</button>
             </div>
@@ -518,7 +510,6 @@ export const DailyReportsPage: React.FC = () => {
   );
 };
 
-// --- START OF CHANGE - Requirement: Intelligent Autocomplete with Auto-fill ---
 export const ViolationsPage: React.FC = () => {
   const { lang, data, updateData } = useGlobal();
   const [activeMode, setActiveMode] = useState<'students' | 'teachers'>('students');
@@ -556,9 +547,7 @@ export const ViolationsPage: React.FC = () => {
   ];
 
   const subjects = ["القرآن الكريم", "التربية الإسلامية", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "العلوم", "الكيمياء", "الفيزياء", "الأحياء", "الاجتماعيات", "الحاسوب", "المكتبة", "الفنية", "المختص الاجتماعي", "الأنشطة", "غيرها"];
-  // START OF CHANGE
   const grades = ["تمهيدي", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
-  // END OF CHANGE
   const sections = ["أ", "ب", "ج", "د", "هـ", "و", "ز", "ح", "ط", "ي"];
 
   const handleAddRow = () => {
@@ -943,7 +932,7 @@ export const ViolationsPage: React.FC = () => {
                           </div>
                         ) : (
                           <button 
-                            onClick={() => handleSignature(v.id)}
+                            onClick={() => handleSignature(id)}
                             className="bg-slate-900 text-white px-4 py-1 rounded-lg text-[9px] font-black hover:bg-black transition-all"
                           >
                             توقيع البصمة
@@ -967,7 +956,6 @@ export const ViolationsPage: React.FC = () => {
     </div>
   );
 };
-// --- END OF CHANGE ---
 
 export const StudentsReportsPage: React.FC = () => {
   const { data, updateData, lang } = useGlobal();
@@ -982,6 +970,13 @@ export const StudentsReportsPage: React.FC = () => {
   const [showSpecificFilterModal, setShowSpecificFilterModal] = useState(false);
   const [selectedSpecifics, setSelectedSpecifics] = useState<string[]>([]);
   
+  // START OF CHANGE
+  const [showIndividualReportModal, setShowIndividualReportModal] = useState(false);
+  const [detailModalSearch, setDetailModalSearch] = useState('');
+  const [currentDetailStudent, setCurrentDetailStudent] = useState<StudentReport | null>(null);
+  const [activeDetailFields, setActiveDetailFields] = useState<string[]>(['name', 'grade', 'section', 'gender']);
+  // END OF CHANGE
+
   // New States for Blacklist and Excellence lists
   const [showListModal, setShowListModal] = useState<'blacklist' | 'excellence' | null>(null);
   const [listSearch, setListSearch] = useState('');
@@ -999,9 +994,7 @@ export const StudentsReportsPage: React.FC = () => {
     eduStatus: ["متعلم", "ضعيف", "أمي"],
     followUp: ["ممتازة", "متوسطة", "ضعيفة"],
     cooperation: ["ممتازة", "متوسطة", "ضعيفة", "متذمر", "كثير النقد", "عدواني"],
-    // START OF CHANGE
     grades: ["تمهيدي", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"],
-    // END OF CHANGE
     sections: ["أ", "ب", "ج", "د", "هـ", "و", "ز", "ح", "ط", "ي"]
   };
 
@@ -1046,6 +1039,23 @@ export const StudentsReportsPage: React.FC = () => {
     guardianFollowUp: "Guardian Follow-up",
     guardianCooperation: "Guardian Cooperation"
   };
+
+  // START OF CHANGE - Field definitions for the report modal
+  const detailFieldConfigs = [
+    { key: 'name', label: 'اسم الطالب', color: 'bg-blue-600' },
+    { key: 'grade', label: 'الصف', color: 'bg-indigo-600' },
+    { key: 'section', label: 'الشعبة', color: 'bg-purple-600' },
+    { key: 'gender', label: 'النوع', color: 'bg-pink-600' },
+    { key: 'address', label: 'السكن/ العمل', color: 'bg-orange-600' },
+    { key: 'healthStatus', label: 'الحالة الصحية', color: 'bg-red-600' },
+    { key: 'guardianInfo', label: 'ولي الأمر', color: 'bg-emerald-600' },
+    { key: 'academic', label: 'المستوى العلمي', color: 'bg-yellow-600' },
+    { key: 'behaviorLevel', label: 'المستوى السلوكي', color: 'bg-teal-600' },
+    { key: 'mainNotes', label: 'الملاحظات الأساسية', color: 'bg-rose-600' },
+    { key: 'guardianFollowUp', label: 'ولي الأمر المتابع', color: 'bg-cyan-600' },
+    { key: 'notes', label: 'ملاحظات أخرى', color: 'bg-slate-600' },
+  ];
+  // END OF CHANGE
 
   const updateStudent = (id: string, field: string, value: any) => {
     const updated = studentData.map(s => s.id === id ? { ...s, [field]: value } : s);
@@ -1281,6 +1291,84 @@ export const StudentsReportsPage: React.FC = () => {
     window.open(url, '_blank');
   };
 
+  // START OF CHANGE - Logic for Student Detail Modal
+  const handleDetailStudentSearch = (val: string) => {
+    setDetailModalSearch(val);
+    const found = studentData.find(s => s.name === val);
+    if (found) {
+        setCurrentDetailStudent({ ...found });
+    } else {
+        setCurrentDetailStudent(null);
+    }
+  };
+
+  const toggleDetailField = (key: string) => {
+    setActiveDetailFields(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  };
+
+  const saveDetailStudent = () => {
+    if (currentDetailStudent) {
+      const updated = studentData.map(s => s.id === currentDetailStudent.id ? currentDetailStudent : s);
+      updateData({ studentReports: updated });
+      setShowIndividualReportModal(false);
+      setCurrentDetailStudent(null);
+      setDetailModalSearch('');
+      alert('تم تحديث بيانات الطالب بنجاح');
+    }
+  };
+
+  const sendDetailWhatsApp = () => {
+    if (!currentDetailStudent) return;
+    const s = currentDetailStudent;
+    let msg = `*📋 تقرير شامل للطالب: ${s.name}*\n`;
+    msg += `----------------------------------\n\n`;
+    
+    msg += `📍 *البيانات الأساسية:*\n`;
+    msg += `▫️ الصف: ${s.grade} / الشعبة: ${s.section}\n`;
+    msg += `▫️ النوع: ${s.gender}\n`;
+    msg += `▫️ السكن: ${s.address || '---'} / العمل: ${s.workOutside}\n\n`;
+
+    const healthIcon = s.healthStatus === 'مريض' ? '🔴' : '🟢';
+    msg += `🏥 *الحالة الصحية:* ${healthIcon} ${s.healthStatus} ${s.healthDetails ? `(${s.healthDetails})` : ''}\n\n`;
+
+    msg += `👨‍👩‍👧 *ولي الأمر:*\n`;
+    msg += `▫️ الاسم: ${s.guardianName || '---'}\n`;
+    msg += `▫️ الهواتف: ${s.guardianPhones.join(' - ') || '---'}\n\n`;
+
+    msg += `📚 *المستوى العلمي:*\n`;
+    const getLevelIcon = (l: string) => l.includes('ضعيف') ? '🔴' : '🟢';
+    msg += `${getLevelIcon(s.academicReading)} القراءة: ${s.academicReading}\n`;
+    msg += `${getLevelIcon(s.academicWriting)} الكتابة: ${s.academicWriting}\n`;
+    msg += `${getLevelIcon(s.academicParticipation)} المشاركة: ${s.academicParticipation}\n\n`;
+
+    const behaviorIcon = s.behaviorLevel.includes('ضعيف') ? '🔴' : '🟢';
+    msg += `🎭 *المستوى السلوكي:* ${behaviorIcon} ${s.behaviorLevel}\n\n`;
+
+    if (s.mainNotes.length > 0) {
+      msg += `⚠️ *الملاحظات السلوكية الأساسية:*\n`;
+      s.mainNotes.forEach(n => msg += `   🔴 ${n}\n`);
+      msg += `\n`;
+    }
+
+    msg += `🤝 *متابعة ولي الأمر:*\n`;
+    msg += `▫️ التعليم: ${s.guardianEducation}\n`;
+    msg += `▫️ المتابعة: ${s.guardianFollowUp}\n`;
+    const coopIcon = s.guardianCooperation === 'عدواني' ? '🔴' : '▫️';
+    msg += `${coopIcon} التعاون: ${s.guardianCooperation}\n\n`;
+
+    if (s.notes || s.otherNotesText) {
+      msg += `📝 *ملاحظات إضافية:*\n`;
+      if (s.notes) msg += `▫️ ${s.notes}\n`;
+      if (s.otherNotesText) msg += `▫️ ${s.otherNotesText}\n`;
+    }
+
+    msg += `\n----------------------------------\n`;
+    msg += `*إعداد رفيق المشرف الإداري - إبراهيم دخان*`;
+    
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+  // END OF CHANGE
+
   return (
     <div className="space-y-4 font-arabic animate-in fade-in duration-500">
       <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm border">
@@ -1288,6 +1376,16 @@ export const StudentsReportsPage: React.FC = () => {
           <button onClick={addStudent} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl font-black text-sm hover:bg-blue-700 shadow-md transform active:scale-95 transition-all">
             <Plus className="w-4 h-4" /> {lang === 'ar' ? 'إضافة طالب' : 'Add Student'}
           </button>
+          
+          {/* START OF CHANGE - New Button */}
+          <button 
+            onClick={() => setShowIndividualReportModal(true)}
+            className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-black text-sm hover:bg-emerald-700 shadow-md transform active:scale-95 transition-all"
+          >
+            <FileText className="w-4 h-4" /> {lang === 'ar' ? 'تقرير طالب' : 'Student Report'}
+          </button>
+          {/* END OF CHANGE */}
+
           <label className="flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2.5 rounded-xl font-bold text-sm border border-green-200 cursor-pointer hover:bg-green-100 transition-all">
             <Upload className="w-4 h-4" /> {lang === 'ar' ? 'استيراد ملف' : 'Import File'}
             <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} />
@@ -1571,125 +1669,4 @@ export const StudentsReportsPage: React.FC = () => {
 
       {showListModal && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
-            <h3 className={`font-black text-right ${showListModal === 'blacklist' ? 'text-slate-800' : 'text-green-600'}`}>
-              {showListModal === 'blacklist' ? (lang === 'ar' ? 'القائمة السوداء' : 'Blacklist') : (lang === 'ar' ? 'قائمة التميز' : 'Excellence List')}
-            </h3>
-            <div className="relative">
-              <input 
-                className="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl text-right text-sm font-bold outline-none pr-10" 
-                placeholder={lang === 'ar' ? 'بحث عن اسم...' : 'Search for name...'} 
-                value={listSearch}
-                onChange={(e) => setListSearch(e.target.value)}
-              />
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-            </div>
-            <div className="max-h-64 overflow-y-auto space-y-2 border rounded-xl p-2">
-              {listItemsToDisplay.length === 0 ? (
-                <div className="p-4 text-center text-slate-400 italic text-xs">{lang === 'ar' ? 'لا توجد أسماء مضافة' : 'No names added'}</div>
-              ) : (
-                listItemsToDisplay.map(s => (
-                  <label key={s.id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 text-blue-600" 
-                      checked={tempListSelected.includes(s.name)}
-                      onChange={(e) => {
-                        if (e.target.checked) setTempListSelected([...tempListSelected, s.name]);
-                        else setTempListSelected(tempListSelected.filter(n => n !== s.name));
-                      }}
-                    />
-                    <span className="text-sm font-bold">{s.name}</span>
-                  </label>
-                ))
-              )}
-            </div>
-            <div className="flex gap-2">
-              <button onClick={handleListApply} className="flex-1 bg-blue-600 text-white p-3 rounded-2xl font-black">{lang === 'ar' ? 'موافق' : 'OK'}</button>
-              <button onClick={() => { setShowListModal(null); setTempListSelected([]); }} className="p-3 bg-slate-100 rounded-2xl font-black">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {metricFilterMode && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
-            <h3 className="font-black text-slate-800 text-right">{lang === 'ar' ? 'اختر المعايير المراد عرضها' : 'Choose Metrics to Show'}</h3>
-            <div className="grid grid-cols-2 gap-2 overflow-y-auto max-h-[60vh] p-1">
-              {Object.keys(metricLabels).map(m => (
-                <button key={m} onClick={() => setActiveMetricFilter(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m])} className={`p-2 rounded-xl text-xs font-bold border-2 transition-all ${activeMetricFilter.includes(m) ? 'border-blue-500 bg-blue-50' : 'border-slate-100 hover:border-blue-200'}`}>
-                  {metricLabels[m]}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => { setFilterMode('metric'); setMetricFilterMode(false); }} className="flex-1 bg-blue-600 text-white p-3 rounded-2xl font-black">{lang === 'ar' ? 'تطبيق' : 'Apply'}</button>
-              <button onClick={() => setMetricFilterMode(false)} className="bg-slate-100 text-slate-500 p-3 rounded-2xl font-black">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showSpecificFilterModal && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-2xl max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between border-b pb-2 mb-4">
-              <h3 className="font-black">{lang === 'ar' ? 'فلترة حسب صفة معينة' : 'Filter by Specific Feature'}</h3>
-              <button onClick={() => setShowSpecificFilterModal(false)} className="hover:bg-slate-100 p-1 rounded-full transition-colors"><X/></button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-right">
-              {Object.entries(optionsAr).map(([key, vals]) => {
-                const label = key === 'gender' ? (lang === 'ar' ? 'النوع' : 'Gender') : 
-                              key === 'workOutside' ? (lang === 'ar' ? 'العمل' : 'Work') : 
-                              key === 'health' ? (lang === 'ar' ? 'الصحة' : 'Health') :
-                              key === 'level' ? (lang === 'ar' ? 'المستوى' : 'Level') :
-                              key === 'behavior' ? (lang === 'ar' ? 'السلوك' : 'Behavior') :
-                              key === 'mainNotes' ? (lang === 'ar' ? 'الملاحظات' : 'Notes') :
-                              key === 'eduStatus' ? (lang === 'ar' ? 'التعليم' : 'Education') :
-                              key === 'followUp' ? (lang === 'ar' ? 'المتابعة' : 'Follow-up') :
-                              key === 'cooperation' ? (lang === 'ar' ? 'التعاون' : 'Cooperation') :
-                              key === 'grades' ? (lang === 'ar' ? 'الصفوف' : 'Grades') :
-                              key === 'sections' ? (lang === 'ar' ? 'الشعب' : 'Sections') : key;
-
-                return (
-                  <div key={key} className="space-y-1">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase">{label}</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {vals.map((v, vIdx) => (
-                        <button key={v} onClick={() => {
-                          setFilterMode('specific');
-                          setSelectedSpecifics(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]);
-                        }} className={`text-right px-2 py-1.5 rounded-lg text-[9px] font-bold border transition-all ${selectedSpecifics.includes(v) ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-slate-50 border-slate-100 hover:border-blue-200'}`}>
-                          {lang === 'ar' ? v : (optionsEn as any)[key]?.[vIdx] || v}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex flex-wrap gap-2 mt-6 sticky bottom-0 bg-white pt-2 border-t">
-              <button onClick={() => setShowSpecificFilterModal(false)} className="flex-1 bg-slate-900 text-white p-4 rounded-2xl font-black shadow-xl">{lang === 'ar' ? 'تطبيق الفلتر' : 'Apply Filter'}</button>
-              <button onClick={() => setSelectedSpecifics([])} className="bg-slate-100 text-slate-500 p-4 rounded-2xl font-black">{lang === 'ar' ? 'إعادة ضبط' : 'Reset'}</button>
-              <button onClick={() => setShowSpecificFilterModal(false)} className="bg-red-50 text-red-500 p-4 rounded-2xl font-black">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showNotesModal && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
-            <h3 className="font-black text-slate-800 text-right">{lang === 'ar' ? 'ملاحظات إضافية' : 'Extra Notes'}</h3>
-            <textarea className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold outline-none h-48 text-right" value={showNotesModal.text} onChange={(e) => setShowNotesModal({...showNotesModal, text: e.target.value})} placeholder="..." />
-            <div className="flex gap-2">
-              <button onClick={() => { updateStudent(showNotesModal.id, 'notes', showNotesModal.text); setShowNotesModal(null); }} className="flex-1 bg-blue-600 text-white p-3 rounded-2xl font-black">{lang === 'ar' ? 'موافق' : 'OK'}</button>
-              <button onClick={() => setShowNotesModal(null)} className="p-3 bg-slate-100 rounded-2xl font-black">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y
