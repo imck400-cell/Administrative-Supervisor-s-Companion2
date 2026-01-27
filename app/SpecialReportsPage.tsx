@@ -1,5 +1,4 @@
-
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { useGlobal } from '../context/GlobalState';
 import { 
   Briefcase, Users, FileText, GraduationCap, 
@@ -53,7 +52,6 @@ const exportTxtFiltered = (title: string, list: any[], columns: { label: string,
   link.click();
 };
 
-// START OF CHANGE
 interface CategoryMember {
   id: string;
   name: string;
@@ -61,7 +59,6 @@ interface CategoryMember {
   section: string;
   isAuto: boolean;
 }
-// END OF CHANGE
 
 // Moved outside to prevent Hook mismatch error 310
 const FrequentNamesPicker = ({ logs, onSelectQuery, isOpen, onClose }: { logs: any[], onSelectQuery: (name: string) => void, isOpen: boolean, onClose: () => void }) => {
@@ -105,9 +102,7 @@ const FrequentNamesPicker = ({ logs, onSelectQuery, isOpen, onClose }: { logs: a
   );
 };
 
-// START OF CHANGE - Requirement: Navigate Function from App
 const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id: string) => void, onNavigate?: (v: string) => void }> = ({ initialSubTab, onSubTabOpen, onNavigate }) => {
-// END OF CHANGE
   const { lang, data, updateData } = useGlobal();
   const [activeTab, setActiveTab] = useState<MainTab>('supervisor');
   const [activeSubTab, setActiveSubTab] = useState<SubTab | null>(null);
@@ -130,6 +125,9 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
   const [attendanceMap, setAttendanceMap] = useState<Record<string, 'present' | 'absent'>>({});
   const [presenceDate, setPresenceDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedForWA, setSelectedForWA] = useState<string[]>([]);
+  // START OF CHANGE - Selected Row Highlighting
+  const [selectedPresenceRowId, setSelectedPresenceRowId] = useState<string | null>(null);
+  // END OF CHANGE
 
   const today = new Date().toISOString().split('T')[0];
   const gradeOptions = ["تمهيدي", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
@@ -142,7 +140,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
 
   const students = data.studentReports || [];
 
-  // FIXED TypeError: ensures field conversion to string before .trim()
   const filteredPresence = useMemo(() => {
     return students.filter(s => {
       const studentGender = String(s.gender || "").trim();
@@ -729,7 +726,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
       { label: 'المجيب', key: 'replier' }, { label: 'ملاحظات', key: 'notes' }
     ];
 
-    // START OF CHANGE - Requirement Logic for Smart Lists
     const isNextDay = (d1: string, d2: string) => {
       const date1 = new Date(d1);
       const date2 = new Date(d2);
@@ -823,7 +819,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
         });
       }
     };
-    // END OF CHANGE
 
     return (
       <div className="bg-white p-4 md:p-8 rounded-[2.5rem] border shadow-2xl animate-in fade-in zoom-in duration-300 font-arabic text-right relative overflow-hidden">
@@ -910,18 +905,19 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                 <p className="text-slate-500 font-bold">تفاصيل الجدول حسب الفلتر للصف: <span className="text-slate-800">{presenceGrade || '---'}</span> والشعبة <span className="text-slate-800">{presenceSection || '---'}</span></p>
             </div>
 
-            <div className="overflow-x-auto rounded-[2.5rem] border-[3px] border-blue-100 shadow-xl bg-white">
+            {/* START OF CHANGE - Sticky Header and Scrollable Body */}
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto rounded-[2.5rem] border-[3px] border-blue-100 shadow-xl bg-white scrollbar-hide">
                 <table className="w-full text-center border-collapse min-w-[1000px]">
-                    <thead className="bg-[#FFD966] text-slate-800 font-black border-b-2 border-blue-100">
+                    <thead className="bg-[#FFD966] text-slate-800 font-black border-b-2 border-blue-100 sticky top-0 z-[30]">
                         <tr>
-                            <th className="p-4 border-e border-blue-50 w-12">م</th>
-                            <th className="p-4 border-e border-blue-50 w-12"><CheckSquare size={16}/></th>
-                            <th className="p-4 border-e border-blue-50 text-right">اسم الطالب</th>
-                            <th className="p-4 border-e border-blue-50 w-24">الصف</th>
-                            <th className="p-4 border-e border-blue-50 w-24">الشعبة</th>
-                            <th className="p-4 border-e border-blue-50 w-32">حالة الغياب</th>
-                            <th className="p-4 border-e border-blue-50 w-48">هاتف ولي الأمر</th>
-                            <th className="p-4 w-32">إجراءات</th>
+                            <th className="p-4 border-e border-blue-50 w-12 bg-[#FFD966]">م</th>
+                            <th className="p-4 border-e border-blue-50 w-12 bg-[#FFD966]"><CheckSquare size={16}/></th>
+                            <th className="p-4 border-e border-blue-50 text-right bg-[#FFD966]">اسم الطالب</th>
+                            <th className="p-4 border-e border-blue-50 w-24 bg-[#FFD966]">الصف</th>
+                            <th className="p-4 border-e border-blue-50 w-24 bg-[#FFD966]">الشعبة</th>
+                            <th className="p-4 border-e border-blue-50 w-32 bg-[#FFD966]">حالة الغياب</th>
+                            <th className="p-4 border-e border-blue-50 w-48 bg-[#FFD966]">هاتف ولي الأمر</th>
+                            <th className="p-4 w-32 bg-[#FFD966]">إجراءات</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -930,8 +926,15 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                         ) : filteredPresence.map((s, idx) => {
                             const status = attendanceMap[s.id] || 'present';
                             const isSelected = selectedForWA.includes(s.id);
+                            // START OF CHANGE - Highlight Selected Row
+                            const isRowHighlighted = selectedPresenceRowId === s.id;
                             return (
-                                <tr key={s.id} className="hover:bg-slate-50/50 transition-colors h-14">
+                                <tr 
+                                  key={s.id} 
+                                  onClick={() => setSelectedPresenceRowId(s.id)}
+                                  className={`hover:bg-slate-50/50 transition-colors h-14 cursor-pointer ${isRowHighlighted ? 'bg-orange-50' : ''}`}
+                                >
+                            {/* END OF CHANGE */}
                                     <td className="p-2 border-e border-slate-50 font-black text-blue-600">{idx + 1}</td>
                                     <td className="p-2 border-e border-slate-50">
                                         <input type="checkbox" checked={isSelected} onChange={() => setSelectedForWA(prev => isSelected ? prev.filter(id => id !== s.id) : [...prev, s.id])} className="w-5 h-5 rounded cursor-pointer" />
@@ -941,7 +944,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                                     <td className="p-2 border-e border-slate-50 font-bold text-slate-500">{s.section}</td>
                                     <td className="p-2 border-e border-slate-50">
                                         <button 
-                                            onClick={() => setAttendanceMap(prev => ({...prev, [s.id]: status === 'present' ? 'absent' : 'present'}))}
+                                            onClick={(e) => { e.stopPropagation(); setAttendanceMap(prev => ({...prev, [s.id]: status === 'present' ? 'absent' : 'present'})); }}
                                             className={`px-6 py-2 rounded-full text-xs font-black transition-all shadow-sm ${status === 'present' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}
                                         >
                                             {status === 'present' ? 'حاضر' : 'غائب'}
@@ -950,8 +953,8 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                                     <td className="p-2 border-e border-slate-50 font-bold text-slate-600">{s.guardianPhones[0] || '---'}</td>
                                     <td className="p-2">
                                         <div className="flex justify-center gap-2">
-                                            <a href={`sms:${s.guardianPhones[0]}?body=${encodeURIComponent(`السلام عليكم، نبلغكم بغياب ${s.name} لهذا اليوم، مدارس الرائد.`)}`} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"><MessageSquare size={18}/></a>
-                                            <a href={`tel:${s.guardianPhones[0]}`} className="p-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-all"><PhoneCall size={18}/></a>
+                                            <a onClick={e => e.stopPropagation()} href={`sms:${s.guardianPhones[0]}?body=${encodeURIComponent(`السلام عليكم، نبلغكم بغياب ${s.name} لهذا اليوم، مدارس الرائد.`)}`} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"><MessageSquare size={18}/></a>
+                                            <a onClick={e => e.stopPropagation()} href={`tel:${s.guardianPhones[0]}`} className="p-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-all"><PhoneCall size={18}/></a>
                                         </div>
                                     </td>
                                 </tr>
@@ -960,6 +963,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                     </tbody>
                 </table>
             </div>
+            {/* END OF CHANGE */}
 
             <div className="bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100 flex flex-wrap gap-3 items-center justify-center">
                 <span className="font-black text-slate-400 ml-4">تصدير التحضير للواتساب:</span>
@@ -977,7 +981,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
         ) : !showTable ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
             <div className="space-y-6">
-               {/* START OF CHANGE - Enhanced Status Buttons with Popover List */}
+               {/* Enhanced Status Buttons with Popover List */}
                <div className="flex flex-wrap gap-1.5 md:gap-2 justify-end">
                   {statusOptions.map(opt => (
                     <div key={opt.id} className="relative group">
@@ -1034,7 +1038,6 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                     </div>
                   ))}
                </div>
-               {/* END OF CHANGE */}
                <div className="relative">
                   <label className="text-xs font-black text-slate-400 mb-2 block mr-2">اسم الطالب</label>
                   <div className="flex items-center gap-3 bg-white border-2 rounded-2xl p-3 md:p-4 focus-within:border-blue-500 shadow-sm transition-all">
@@ -1620,7 +1623,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
             <FilterSection suggestions={nameSugg} values={filterValues} setValues={setFilterValues} tempNames={tempNames} setTempNames={setTempNames} appliedNames={appliedNames} setAppliedNames={setAppliedNames} nameInput={nameInput} setNameInput={setNameInput} onExportExcel={() => exportExcelFiltered('خروج_الطلاب', filtered, cols)} onExportTxt={() => exportTxtFiltered('خروج_الطلاب', filtered, cols)} onExportWA={() => shareWhatsAppRich('سجل خروج الطلاب المفلتر', filtered, cols)} />
             <div className="overflow-x-auto rounded-[1.5rem] border shadow-inner">
               <table className="w-full text-center text-[10px] md:text-sm border-collapse min-w-[1000px]"><thead className="bg-[#FFD966] text-slate-800 font-black"><tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e border-blue-200">{c.label}</th>)}</tr></thead>
-              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد بيانات خروج.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-blue-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-50 text-blue-600 text-lg">{l.prevExitCount + 1}</td><td className="p-3 md:p-5 border-e border-slate-50 text-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.status}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.action}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
+              <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد بيانات خروج.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-blue-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-50 text-blue-600 text-lg">{l.prevExitCount + 1}</td><td className="p-3 md:p-5 border-e border-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.status}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.action}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
             </div>
           </div>
         )}
