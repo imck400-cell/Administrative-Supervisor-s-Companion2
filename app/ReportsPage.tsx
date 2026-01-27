@@ -1607,7 +1607,7 @@ export const StudentsReportsPage: React.FC = () => {
           <table className={`w-full text-center border-collapse table-auto ${isOnlyMetricView ? 'min-w-[700px]' : 'min-w-[1600px]'}`}>
             <thead className="bg-[#FFD966] text-slate-800 sticky top-0 z-[40] shadow-sm">
               <tr className="border-b border-slate-300 h-12">
-                <th rowSpan={2} className="px-3 border-e border-slate-300 w-[160px] text-xs font-black sticky right-0 bg-[#FFD966] z-[50]">{lang === 'ar' ? 'اسم الطالب' : 'Student Name'}</th>
+                <th rowSpan={2} className="px-3 border-e border-slate-300 w-[160px] text-xs font-black sticky right-0 bg-[#FFD966] z-[50] top-0">{lang === 'ar' ? 'اسم الطالب' : 'Student Name'}</th>
                 <th rowSpan={2} className="px-1 border-e border-slate-300 w-20 text-xs font-black bg-[#FFD966] sticky top-0">{lang === 'ar' ? 'الصف' : 'Grade'}</th>
                 <th rowSpan={2} className="px-1 border-e border-slate-300 w-16 text-xs font-black bg-[#FFD966] sticky top-0">{lang === 'ar' ? 'الشعبة' : 'Section'}</th>
                 
@@ -1628,23 +1628,24 @@ export const StudentsReportsPage: React.FC = () => {
                 {isOnlyMetricView && activeMetricFilter.map(mKey => (
                   <th key={mKey} className="px-4 border-e border-slate-300 text-xs font-black bg-[#FFD966] sticky top-0">{metricLabels[mKey]}</th>
                 ))}
+                <th rowSpan={2} className="px-1 border-s border-slate-300 w-12 bg-[#FFD966] sticky top-0"></th>
               </tr>
               
               {!isOnlyMetricView && (
                 <tr className="bg-[#F2F2F2] text-[9px] h-8 sticky top-12 z-[40]">
-                  <th className="border-e border-slate-300 bg-[#FFF2CC]">{lang === 'ar' ? 'قراءة' : 'Read'}</th>
-                  <th className="border-e border-slate-300 bg-[#FFF2CC]">{lang === 'ar' ? 'كتابة' : 'Write'}</th>
-                  <th className="border-e border-slate-300 bg-[#FFF2CC]">{lang === 'ar' ? 'مشاركة' : 'Part'}</th>
-                  <th className="border-e border-slate-300 bg-[#DDEBF7]">{lang === 'ar' ? 'تعليم' : 'Edu'}</th>
-                  <th className="border-e border-slate-300 bg-[#DDEBF7]">{lang === 'ar' ? 'متابعة' : 'Follow'}</th>
-                  <th className="border-e border-slate-300 bg-[#DDEBF7]">{lang === 'ar' ? 'تعاون' : 'Coop'}</th>
+                  <th className="border-e border-slate-300 bg-[#FFF2CC] sticky top-12">{lang === 'ar' ? 'قراءة' : 'Read'}</th>
+                  <th className="border-e border-slate-300 bg-[#FFF2CC] sticky top-12">{lang === 'ar' ? 'كتابة' : 'Write'}</th>
+                  <th className="border-e border-slate-300 bg-[#FFF2CC] sticky top-12">{lang === 'ar' ? 'مشاركة' : 'Part'}</th>
+                  <th className="border-e border-slate-300 bg-[#DDEBF7] sticky top-12">{lang === 'ar' ? 'تعليم' : 'Edu'}</th>
+                  <th className="border-e border-slate-300 bg-[#DDEBF7] sticky top-12">{lang === 'ar' ? 'متابعة' : 'Follow'}</th>
+                  <th className="border-e border-slate-300 bg-[#DDEBF7] sticky top-12">{lang === 'ar' ? 'تعاون' : 'Coop'}</th>
                 </tr>
               )}
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={isOnlyMetricView ? 3 + activeMetricFilter.length : 15} className="py-10 text-slate-400 italic text-sm">
+                  <td colSpan={isOnlyMetricView ? 4 + activeMetricFilter.length : 16} className="py-10 text-slate-400 italic text-sm">
                     {(filterMode === 'student' || filterMode === 'blacklist' || filterMode === 'excellence') && selectedStudentNames.length === 0 
                       ? (lang === 'ar' ? 'يرجى اختيار أسماء الطلاب من القائمة للعرض' : 'Please select student names to display')
                       : (lang === 'ar' ? 'لا توجد بيانات تطابق هذا البحث' : 'No data matching this search')}
