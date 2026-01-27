@@ -125,7 +125,8 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
   const [attendanceMap, setAttendanceMap] = useState<Record<string, 'present' | 'absent'>>({});
   const [presenceDate, setPresenceDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedForWA, setSelectedForWA] = useState<string[]>([]);
-  // START OF CHANGE - Selected Row Highlighting
+  
+  // START OF CHANGE - Highlighting logic
   const [selectedPresenceRowId, setSelectedPresenceRowId] = useState<string | null>(null);
   // END OF CHANGE
 
@@ -905,19 +906,19 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                 <p className="text-slate-500 font-bold">تفاصيل الجدول حسب الفلتر للصف: <span className="text-slate-800">{presenceGrade || '---'}</span> والشعبة <span className="text-slate-800">{presenceSection || '---'}</span></p>
             </div>
 
-            {/* START OF CHANGE - Sticky Header and Scrollable Body */}
+            {/* START OF CHANGE - Sticky Header and Enhanced Interaction Table */}
             <div className="overflow-x-auto max-h-[600px] overflow-y-auto rounded-[2.5rem] border-[3px] border-blue-100 shadow-xl bg-white scrollbar-hide">
                 <table className="w-full text-center border-collapse min-w-[1000px]">
-                    <thead className="bg-[#FFD966] text-slate-800 font-black border-b-2 border-blue-100 sticky top-0 z-[30]">
+                    <thead className="text-slate-800 font-black sticky top-0 z-[30]">
                         <tr>
-                            <th className="p-4 border-e border-blue-50 w-12 bg-[#FFD966]">م</th>
-                            <th className="p-4 border-e border-blue-50 w-12 bg-[#FFD966]"><CheckSquare size={16}/></th>
-                            <th className="p-4 border-e border-blue-50 text-right bg-[#FFD966]">اسم الطالب</th>
-                            <th className="p-4 border-e border-blue-50 w-24 bg-[#FFD966]">الصف</th>
-                            <th className="p-4 border-e border-blue-50 w-24 bg-[#FFD966]">الشعبة</th>
-                            <th className="p-4 border-e border-blue-50 w-32 bg-[#FFD966]">حالة الغياب</th>
-                            <th className="p-4 border-e border-blue-50 w-48 bg-[#FFD966]">هاتف ولي الأمر</th>
-                            <th className="p-4 w-32 bg-[#FFD966]">إجراءات</th>
+                            <th className="p-4 border-e border-blue-50 w-12 bg-[#FFD966] sticky top-0">م</th>
+                            <th className="p-4 border-e border-blue-50 w-12 bg-[#FFD966] sticky top-0"><CheckSquare size={16}/></th>
+                            <th className="p-4 border-e border-blue-50 text-right bg-[#FFD966] sticky top-0">اسم الطالب</th>
+                            <th className="p-4 border-e border-blue-50 w-24 bg-[#FFD966] sticky top-0">الصف</th>
+                            <th className="p-4 border-e border-blue-50 w-24 bg-[#FFD966] sticky top-0">الشعبة</th>
+                            <th className="p-4 border-e border-blue-50 w-32 bg-[#FFD966] sticky top-0">حالة الغياب</th>
+                            <th className="p-4 border-e border-blue-50 w-48 bg-[#FFD966] sticky top-0">هاتف ولي الأمر</th>
+                            <th className="p-4 w-32 bg-[#FFD966] sticky top-0">إجراءات</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -926,15 +927,14 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                         ) : filteredPresence.map((s, idx) => {
                             const status = attendanceMap[s.id] || 'present';
                             const isSelected = selectedForWA.includes(s.id);
-                            // START OF CHANGE - Highlight Selected Row
                             const isRowHighlighted = selectedPresenceRowId === s.id;
+                            
                             return (
                                 <tr 
                                   key={s.id} 
-                                  onClick={() => setSelectedPresenceRowId(s.id)}
-                                  className={`hover:bg-slate-50/50 transition-colors h-14 cursor-pointer ${isRowHighlighted ? 'bg-orange-50' : ''}`}
+                                  onMouseDown={() => setSelectedPresenceRowId(s.id)}
+                                  className={`h-14 cursor-pointer ${isRowHighlighted ? 'bg-orange-50' : 'hover:bg-slate-50/50 transition-colors'}`}
                                 >
-                            {/* END OF CHANGE */}
                                     <td className="p-2 border-e border-slate-50 font-black text-blue-600">{idx + 1}</td>
                                     <td className="p-2 border-e border-slate-50">
                                         <input type="checkbox" checked={isSelected} onChange={() => setSelectedForWA(prev => isSelected ? prev.filter(id => id !== s.id) : [...prev, s.id])} className="w-5 h-5 rounded cursor-pointer" />
@@ -944,7 +944,7 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                                     <td className="p-2 border-e border-slate-50 font-bold text-slate-500">{s.section}</td>
                                     <td className="p-2 border-e border-slate-50">
                                         <button 
-                                            onClick={(e) => { e.stopPropagation(); setAttendanceMap(prev => ({...prev, [s.id]: status === 'present' ? 'absent' : 'present'})); }}
+                                            onMouseDown={(e) => { e.stopPropagation(); setSelectedPresenceRowId(s.id); setAttendanceMap(prev => ({...prev, [s.id]: status === 'present' ? 'absent' : 'present'})); }}
                                             className={`px-6 py-2 rounded-full text-xs font-black transition-all shadow-sm ${status === 'present' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}
                                         >
                                             {status === 'present' ? 'حاضر' : 'غائب'}
@@ -953,8 +953,8 @@ const SpecialReportsPage: React.FC<{ initialSubTab?: string, onSubTabOpen?: (id:
                                     <td className="p-2 border-e border-slate-50 font-bold text-slate-600">{s.guardianPhones[0] || '---'}</td>
                                     <td className="p-2">
                                         <div className="flex justify-center gap-2">
-                                            <a onClick={e => e.stopPropagation()} href={`sms:${s.guardianPhones[0]}?body=${encodeURIComponent(`السلام عليكم، نبلغكم بغياب ${s.name} لهذا اليوم، مدارس الرائد.`)}`} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"><MessageSquare size={18}/></a>
-                                            <a onClick={e => e.stopPropagation()} href={`tel:${s.guardianPhones[0]}`} className="p-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-all"><PhoneCall size={18}/></a>
+                                            <a onMouseDown={e => e.stopPropagation()} href={`sms:${s.guardianPhones[0]}?body=${encodeURIComponent(`السلام عليكم، نبلغكم بغياب ${s.name} لهذا اليوم، مدارس الرائد.`)}`} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"><MessageSquare size={18}/></a>
+                                            <a onMouseDown={e => e.stopPropagation()} href={`tel:${s.guardianPhones[0]}`} className="p-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-all"><PhoneCall size={18}/></a>
                                         </div>
                                     </td>
                                 </tr>
