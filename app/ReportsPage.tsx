@@ -319,7 +319,7 @@ export const DailyReportsPage: React.FC = () => {
                     {!filterMode.includes('metric') && (
                         <>
                             <td className="p-1 border-e">
-                            <select className="w-full bg-transparent outline-none text-[10px] text-center" value={t.subjectCode} onChange={e => updateTeacher(t.id, 'subjectCode', e.target.value)}>
+                            <select className="w-full bg-transparent outline-none text-center" value={t.subjectCode} onChange={e => updateTeacher(t.id, 'subjectCode', e.target.value)}>
                                 <option value="">اختر..</option>
                                 {subjects.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
@@ -957,10 +957,13 @@ export const ViolationsPage: React.FC = () => {
 };
 
 // Memoized Row for performance optimization
-const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShowNotesModal, toggleStar }: any) => {
+const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShowNotesModal, toggleStar, isSelected, onSelect }: any) => {
   return (
-    <tr className="hover:bg-blue-50/20 transition-colors h-10 group">
-      <td className="p-1 border-e border-slate-100 sticky right-0 bg-white z-10 group-hover:bg-blue-50 transition-colors shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
+    <tr 
+      onClick={() => onSelect(s.id)}
+      className={`hover:bg-blue-50/20 transition-colors h-10 group cursor-pointer ${isSelected ? 'bg-orange-100/50' : ''}`}
+    >
+      <td className={`p-1 border-e border-slate-100 sticky right-0 z-10 group-hover:bg-blue-50 transition-colors shadow-[2px_0_5px_rgba(0,0,0,0.05)] ${isSelected ? 'bg-orange-100' : 'bg-white'}`}>
         <div className="flex items-center gap-1 h-full">
           <button onClick={() => toggleStar(s.id, 'isExcellent')} title={lang === 'ar' ? 'إضافة للتميز' : 'Add to Excellence'}>
             <Star className={`w-3.5 h-3.5 ${s.isExcellent ? 'fill-green-500 text-green-500' : 'text-slate-300'}`} />
@@ -1084,6 +1087,9 @@ export const StudentsReportsPage: React.FC = () => {
   const [showSpecificFilterModal, setShowSpecificFilterModal] = useState(false);
   const [selectedSpecifics, setSelectedSpecifics] = useState<string[]>([]);
   
+  // Requirement: Row Highlighting State
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+
   // Requirement: Detail Modal Features
   const [showIndividualReportModal, setShowIndividualReportModal] = useState(false);
   const [detailModalSearch, setDetailModalSearch] = useState('');
@@ -1410,7 +1416,6 @@ export const StudentsReportsPage: React.FC = () => {
     window.open(url, '_blank');
     setWaSelector(null);
   };
-  // END OF CHANGE
 
   const exportToExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(filteredData.map(s => ({
@@ -1591,42 +1596,42 @@ export const StudentsReportsPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-[1.5rem] shadow-xl border border-slate-100 overflow-hidden">
-        <div className="overflow-x-auto scroll-smooth">
+      <div className="bg-white rounded-[1.5rem] shadow-xl border border-slate-100 overflow-hidden h-[70vh]">
+        <div className="overflow-auto h-full scroll-smooth">
           <table className={`w-full text-center border-collapse table-auto ${isOnlyMetricView ? 'min-w-[700px]' : 'min-w-[1600px]'}`}>
-            <thead className="bg-[#FFD966] text-slate-800 sticky top-0 z-20">
+            <thead className="bg-[#FFD966] text-slate-800 sticky top-0 z-[40] shadow-sm">
               <tr className="border-b border-slate-300 h-12">
-                <th rowSpan={2} className="px-3 border-e border-slate-300 w-[160px] text-xs font-black sticky right-0 bg-[#FFD966] z-30">{lang === 'ar' ? 'اسم الطالب' : 'Student Name'}</th>
-                <th rowSpan={2} className="px-1 border-e border-slate-300 w-20 text-xs font-black">{lang === 'ar' ? 'الصف' : 'Grade'}</th>
-                <th rowSpan={2} className="px-1 border-e border-slate-300 w-16 text-xs font-black">{lang === 'ar' ? 'الشعبة' : 'Section'}</th>
+                <th rowSpan={2} className="px-3 border-e border-slate-300 w-[160px] text-xs font-black sticky right-0 bg-[#FFD966] z-[50]">{lang === 'ar' ? 'اسم الطالب' : 'Student Name'}</th>
+                <th rowSpan={2} className="px-1 border-e border-slate-300 w-20 text-xs font-black bg-[#FFD966]">{lang === 'ar' ? 'الصف' : 'Grade'}</th>
+                <th rowSpan={2} className="px-1 border-e border-slate-300 w-16 text-xs font-black bg-[#FFD966]">{lang === 'ar' ? 'الشعبة' : 'Section'}</th>
                 
                 {!isOnlyMetricView && (
                   <>
-                    <th rowSpan={2} className="px-1 border-e border-slate-300 w-16 text-xs font-black">{lang === 'ar' ? 'النوع' : 'Gender'}</th>
-                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black">{lang === 'ar' ? 'السكن / العمل' : 'Residence / Work'}</th>
-                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black">{lang === 'ar' ? 'الحالة الصحية' : 'Health Status'}</th>
-                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-32 text-xs font-black">{lang === 'ar' ? 'ولي الأمر (الاسم/الهواتف)' : 'Guardian (Name/Phones)'}</th>
+                    <th rowSpan={2} className="px-1 border-e border-slate-300 w-16 text-xs font-black bg-[#FFD966]">{lang === 'ar' ? 'النوع' : 'Gender'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black bg-[#FFD966]">{lang === 'ar' ? 'السكن / العمل' : 'Residence / Work'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black bg-[#FFD966]">{lang === 'ar' ? 'الحالة الصحية' : 'Health Status'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-32 text-xs font-black bg-[#FFD966]">{lang === 'ar' ? 'ولي الأمر (الاسم/الهواتف)' : 'Guardian (Name/Phones)'}</th>
                     <th colSpan={3} className="px-1 border-e border-slate-300 bg-[#FFF2CC] text-xs font-black">{lang === 'ar' ? 'المستوى العلمي' : 'Academic Level'}</th>
-                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black">{lang === 'ar' ? 'المستوى السلوكي' : 'Behavior Level'}</th>
-                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-44 text-xs font-black">{lang === 'ar' ? 'الملاحظات الأساسية' : 'Main Notes'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black bg-[#FFD966]">{lang === 'ar' ? 'المستوى السلوكي' : 'Behavior Level'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-44 text-xs font-black bg-[#FFD966]">{lang === 'ar' ? 'الملاحظات الأساسية' : 'Main Notes'}</th>
                     <th colSpan={3} className="px-1 border-e border-slate-300 bg-[#DDEBF7] text-xs font-black">{lang === 'ar' ? 'ولي الأمر المتابع' : 'Guardian Follow-up'}</th>
-                    <th rowSpan={2} className="px-2 w-10 text-xs font-black">{lang === 'ar' ? 'ملاحظات أخرى' : 'Other Notes'}</th>
+                    <th rowSpan={2} className="px-2 w-10 text-xs font-black bg-[#FFD966]">{lang === 'ar' ? 'ملاحظات أخرى' : 'Other Notes'}</th>
                   </>
                 )}
                 
                 {isOnlyMetricView && activeMetricFilter.map(mKey => (
-                  <th key={mKey} className="px-4 border-e border-slate-300 text-xs font-black">{metricLabels[mKey]}</th>
+                  <th key={mKey} className="px-4 border-e border-slate-300 text-xs font-black bg-[#FFD966]">{metricLabels[mKey]}</th>
                 ))}
               </tr>
               
               {!isOnlyMetricView && (
                 <tr className="bg-[#F2F2F2] text-[9px] h-8">
-                  <th className="border-e border-slate-300 bg-[#FFF2CC]/50">{lang === 'ar' ? 'قراءة' : 'Read'}</th>
-                  <th className="border-e border-slate-300 bg-[#FFF2CC]/50">{lang === 'ar' ? 'كتابة' : 'Write'}</th>
-                  <th className="border-e border-slate-300 bg-[#FFF2CC]/50">{lang === 'ar' ? 'مشاركة' : 'Part'}</th>
-                  <th className="border-e border-slate-300 bg-[#DDEBF7]/50">{lang === 'ar' ? 'تعليم' : 'Edu'}</th>
-                  <th className="border-e border-slate-300 bg-[#DDEBF7]/50">{lang === 'ar' ? 'متابعة' : 'Follow'}</th>
-                  <th className="border-e border-slate-300 bg-[#DDEBF7]/50">{lang === 'ar' ? 'تعاون' : 'Coop'}</th>
+                  <th className="border-e border-slate-300 bg-[#FFF2CC]">{lang === 'ar' ? 'قراءة' : 'Read'}</th>
+                  <th className="border-e border-slate-300 bg-[#FFF2CC]">{lang === 'ar' ? 'كتابة' : 'Write'}</th>
+                  <th className="border-e border-slate-300 bg-[#FFF2CC]">{lang === 'ar' ? 'مشاركة' : 'Part'}</th>
+                  <th className="border-e border-slate-300 bg-[#DDEBF7]">{lang === 'ar' ? 'تعليم' : 'Edu'}</th>
+                  <th className="border-e border-slate-300 bg-[#DDEBF7]">{lang === 'ar' ? 'متابعة' : 'Follow'}</th>
+                  <th className="border-e border-slate-300 bg-[#DDEBF7]">{lang === 'ar' ? 'تعاون' : 'Coop'}</th>
                 </tr>
               )}
             </thead>
@@ -1650,6 +1655,8 @@ export const StudentsReportsPage: React.FC = () => {
                     updateStudent={updateStudent} 
                     setShowNotesModal={setShowNotesModal} 
                     toggleStar={toggleStar} 
+                    isSelected={selectedRowId === s.id}
+                    onSelect={setSelectedRowId}
                   />
                 ))
               )}
