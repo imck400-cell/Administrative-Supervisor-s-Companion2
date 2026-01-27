@@ -258,22 +258,30 @@ export const ViolationsPage: React.FC = () => {
   );
 };
 
-// Memoized Row with Optimized Selectors and immediate highlight trigger
+// Memoized Row with Optimized Selectors and instantaneous highlight trigger
 const StudentRow = memo(({ s, lang, updateStudent, setShowNotesModal, toggleStar, isSelected, onSelect }: any) => {
+  // START OF CHANGE: Instant response logic
   const triggerSelect = () => onSelect(s.id);
   
   return (
     <tr 
-      onClick={triggerSelect}
-      className={`hover:bg-blue-50/20 transition-colors h-10 group cursor-pointer ${isSelected ? 'bg-orange-50' : ''}`}
+      onMouseDown={triggerSelect} // Use onMouseDown instead of onClick for immediate trigger
+      className={`hover:bg-blue-50/20 h-10 group cursor-pointer ${isSelected ? 'bg-orange-50' : 'transition-colors'}`}
     >
-      <td className={`p-1 border-e border-slate-100 sticky right-0 z-10 group-hover:bg-blue-50 transition-colors shadow-[2px_0_5px_rgba(0,0,0,0.05)] ${isSelected ? 'bg-orange-50' : 'bg-white'}`}>
+      <td className={`p-1 border-e border-slate-100 sticky right-0 z-10 group-hover:bg-blue-50 shadow-[2px_0_5px_rgba(0,0,0,0.05)] ${isSelected ? 'bg-orange-50' : 'bg-white transition-colors'}`}>
         <div className="flex items-center gap-1 h-full">
-          <button onClick={(e) => { e.stopPropagation(); toggleStar(s.id, 'isExcellent'); }}><Star className={`w-3.5 h-3.5 ${s.isExcellent ? 'fill-green-500 text-green-500' : 'text-slate-300'}`} /></button>
-          <button onClick={(e) => { e.stopPropagation(); toggleStar(s.id, 'isBlacklisted'); }}><Star className={`w-3.5 h-3.5 ${s.isBlacklisted ? 'fill-slate-900 text-slate-900' : 'text-slate-300'}`} /></button>
-          <input onFocus={triggerSelect} className="flex-1 bg-transparent border-none outline-none font-bold text-[10px] text-right" value={s.name} onChange={(e) => updateStudent(s.id, 'name', e.target.value)} />
+          <button onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); toggleStar(s.id, 'isExcellent'); }}><Star className={`w-3.5 h-3.5 ${s.isExcellent ? 'fill-green-500 text-green-500' : 'text-slate-300'}`} /></button>
+          <button onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); toggleStar(s.id, 'isBlacklisted'); }}><Star className={`w-3.5 h-3.5 ${s.isBlacklisted ? 'fill-slate-900 text-slate-900' : 'text-slate-300'}`} /></button>
+          <input 
+            onMouseDown={triggerSelect} // Trigger on mouse down for the name field specifically
+            onFocus={triggerSelect} 
+            className="flex-1 bg-transparent border-none outline-none font-bold text-[10px] text-right" 
+            value={s.name} 
+            onChange={(e) => updateStudent(s.id, 'name', e.target.value)} 
+          />
         </div>
       </td>
+      {/* END OF CHANGE */}
       <td className="p-1 border-e border-slate-100">
         <select onFocus={triggerSelect} className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.grade} onChange={(e) => updateStudent(s.id, 'grade', e.target.value)}>
           {optionsAr.grades.map(o => <option key={o} value={o}>{lang === 'ar' ? o : o}</option>)}
