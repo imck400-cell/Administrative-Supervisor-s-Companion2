@@ -62,14 +62,18 @@ export const DailyReportsPage: React.FC = () => {
       if (sortConfig.criteria === 'name') {
         res = a.teacherName.localeCompare(b.teacherName);
       } else if (sortConfig.criteria === 'subject') {
-        const idxA = subjectOrder.indexOf(a.subjectCode);
-        const idxB = subjectOrder.indexOf(b.subjectCode);
+        const firstA = a.subjectCode.split(', ')[0] || '';
+        const firstB = b.subjectCode.split(', ')[0] || '';
+        const idxA = subjectOrder.indexOf(firstA);
+        const idxB = subjectOrder.indexOf(firstB);
         if (idxA !== -1 && idxB !== -1) res = idxA - idxB;
         else if (idxA !== -1) res = -1;
         else if (idxB !== -1) res = 1;
-        else res = a.subjectCode.localeCompare(b.subjectCode);
+        else res = firstA.localeCompare(firstB);
       } else if (sortConfig.criteria === 'class') {
-        res = a.className.localeCompare(b.className);
+        const firstA = a.className.split(', ')[0] || '';
+        const firstB = b.className.split(', ')[0] || '';
+        res = firstA.localeCompare(firstB);
       } else if (sortConfig.criteria === 'manual') {
         res = (a.order || 0) - (b.order || 0);
       }
@@ -125,7 +129,7 @@ export const DailyReportsPage: React.FC = () => {
       id: Date.now().toString(),
       dayName: new Intl.DateTimeFormat('ar-EG', { weekday: 'long' }).format(new Date()),
       dateStr: new Date().toISOString().split('T')[0],
-      teachersData: newTeachers as any
+      teachersData: newTeachers as TeacherFollowUp[]
     };
     updateData({ dailyReports: [...reports, newReport] });
     setActiveReportId(newReport.id);
@@ -167,8 +171,8 @@ export const DailyReportsPage: React.FC = () => {
         return {
           ...r,
           teachersData: r.teachersData.map(t => {
-            const filled: any = { ...t };
-            metricsConfig.forEach(m => filled[m.key] = m.max);
+            const filled = { ...t } as TeacherFollowUp;
+            metricsConfig.forEach(m => (filled as any)[m.key] = m.max);
             return filled;
           })
         };
@@ -196,11 +200,57 @@ export const DailyReportsPage: React.FC = () => {
   };
 
   const calculateTotal = (t: TeacherFollowUp) => {
-    let sum = metricsConfig.reduce((acc, m) => acc + (Number((t as any)[m.key]) || 0), 0);
+    const unaccredited = t.unaccreditedMetrics || [];
+    let sum = metricsConfig.reduce((acc, m) => {
+      if (m.key === 'violations_score' || unaccredited.includes(m.key)) return acc;
+      return acc + (Number((t as any)[m.key]) || 0);
+    }, 0);
     return Math.max(0, sum - (t.violations_score || 0));
   };
 
-  const totalMaxScore = metricsConfig.reduce((acc, m) => acc + m.max, 0);
+  const calculateMaxTotal = (t: TeacherFollowUp) => {
+    const unaccredited = t.unaccreditedMetrics || [];
+    return metricsConfig.reduce((acc, m) => {
+      if (m.key === 'violations_score' || unaccredited.includes(m.key)) return acc;
+      return acc + m.max;
+    }, 0);
+  };
+
+  const toggleAccreditation = (teacherId: string | 'bulk', metricKey: string) => {
+    if (!activeReportId) return;
+    const updatedReports = reports.map(r => {
+      if (r.id === activeReportId) {
+        let newTeachers = [...r.teachersData];
+        if (teacherId === 'bulk') {
+          // Check if at least one is NOT unaccredited
+          const allCurrentlyUnaccredited = newTeachers.every(t => (t.unaccreditedMetrics || []).includes(metricKey));
+          newTeachers = newTeachers.map(t => {
+            const current = t.unaccreditedMetrics || [];
+            if (allCurrentlyUnaccredited) {
+              return { ...t, unaccreditedMetrics: current.filter(k => k !== metricKey) };
+            } else {
+              if (current.includes(metricKey)) return t;
+              return { ...t, unaccreditedMetrics: [...current, metricKey] };
+            }
+          });
+        } else {
+          newTeachers = newTeachers.map(t => {
+            if (t.id === teacherId) {
+              const current = t.unaccreditedMetrics || [];
+              const updated = current.includes(metricKey)
+                ? current.filter(k => k !== metricKey)
+                : [...current, metricKey];
+              return { ...t, unaccreditedMetrics: updated };
+            }
+            return t;
+          });
+        }
+        return { ...r, teachersData: newTeachers };
+      }
+      return r;
+    });
+    updateData({ dailyReports: updatedReports });
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent, teacherIdx: number, metricKey: string) => {
     if (e.key === 'Enter') {
@@ -213,13 +263,79 @@ export const DailyReportsPage: React.FC = () => {
     }
   };
 
-  const getColSum = (key: string) => teachers.reduce((acc, t) => acc + (Number((t as any)[key]) || 0), 0);
+  const getColSum = (key: string) => teachers.reduce((acc, t) => {
+    const isUnaccredited = (t.unaccreditedMetrics || []).includes(key);
+    if (isUnaccredited) return acc;
+    return acc + (Number((t as any)[key]) || 0);
+  }, 0);
+
   const getColPercent = (key: string, max: number) => {
     const sum = getColSum(key);
-    return teachers.length ? ((sum / (teachers.length * max)) * 100).toFixed(1) : '0';
+    const accreditedCount = teachers.filter(t => !(t.unaccreditedMetrics || []).includes(key)).length;
+    return accreditedCount > 0 ? ((sum / (accreditedCount * max)) * 100).toFixed(1) : '0';
   };
 
-  // Helper for Teacher Report
+  // MultiSelect Component
+  const MultiSelectDropDown = ({ label, options, selected, onChange, emoji }: { label: string, options: string[], selected: string[], onChange: (vals: string[]) => void, emoji?: string }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (containerRef.current && !containerRef.current.contains(event.target as Node)) setIsOpen(false);
+      };
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    return (
+      <div className="relative" ref={containerRef}>
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full text-right bg-transparent outline-none text-[10px] font-bold flex items-center justify-between gap-1 p-1 hover:bg-slate-50 rounded min-h-[32px]"
+        >
+          <div className="flex flex-wrap gap-0.5 flex-1 items-center">
+            {selected.length === 0 ? (
+              <span className="text-slate-400">اختر..</span>
+            ) : (
+              selected.map(s => (
+                <span key={s} className="bg-blue-100 text-blue-700 px-1 rounded text-[8px] whitespace-nowrap">{s}</span>
+              ))
+            )}
+          </div>
+          <ChevronDown size={12} className={`text-slate-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {isOpen && (
+          <div className="absolute z-50 mt-1 w-48 bg-white border rounded-xl shadow-xl p-2 animate-in fade-in zoom-in duration-150 right-0">
+            <div className="text-[10px] font-black text-slate-400 mb-2 px-1 flex items-center gap-1 border-b pb-1">
+              {emoji && <span>{emoji}</span>}
+              <span>{label}</span>
+            </div>
+            <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-0.5">
+              {options.map(opt => {
+                const isSelected = selected.includes(opt);
+                return (
+                  <button
+                    key={opt}
+                    onClick={() => {
+                      const newSelected = isSelected ? selected.filter(s => s !== opt) : [...selected, opt];
+                      onChange(newSelected);
+                    }}
+                    className={`w-full text-right p-2 rounded-lg text-[10px] font-bold transition-colors flex items-center justify-between ${isSelected ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-600'}`}
+                  >
+                    <span>{opt}</span>
+                    {isSelected && <Check size={12} />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const fieldsConfig = [
     { key: 'teacherName', label: 'اسم المعلم', emoji: '👤', color: 'bg-blue-600' },
     { key: 'subjectCode', label: 'المادة', emoji: '📚', color: 'bg-indigo-600' },
@@ -249,28 +365,41 @@ export const DailyReportsPage: React.FC = () => {
   };
 
   const handleWhatsAppExport = (selectedForExport: string[]) => {
-    const teacher = teachers.find(t => t.id === reportTeacherId);
-    if (!teacher) return;
+    const exportTeachers = reportTeacherId === 'bulk' ? teachers : teachers.filter(t => t.id === reportTeacherId);
+    if (exportTeachers.length === 0) return;
 
-    let msg = `*📋 تقرير متابعة معلم 📋*\n\n`;
-    msg += `👤 *الاسم:* ${teacher.teacherName}\n`;
+    let msg = `*📋 تقرير متابعة معلمين 📋*\n\n`;
+    if (exportTeachers.length === 1) msg = `*📋 تقرير متابعة معلم 📋*\n\n`;
+
     msg += `📅 *التاريخ:* ${currentReport?.dateStr || ''} (${currentReport?.dayName || ''})\n`;
     msg += `------------------------------\n`;
 
-    fieldsConfig.forEach(f => {
-      if (selectedForExport.includes(f.key) && !['teacherName'].includes(f.key)) {
-        let val = (teacher as any)[f.key];
-        if (f.key === 'total') val = calculateTotal(teacher);
-        if (f.key === 'percent') val = ((calculateTotal(teacher) / totalMaxScore) * 100).toFixed(1) + '%';
-
-        if (val !== undefined && val !== null && val !== '') {
-          msg += `${f.emoji} *${f.label}:* ${val}\n`;
-        }
+    exportTeachers.forEach((teacher, tIdx) => {
+      if (exportTeachers.length > 1) {
+        msg += `\n👤 *${tIdx + 1}- ${teacher.teacherName}*\n`;
+      } else {
+        msg += `👤 *الاسم:* ${teacher.teacherName}\n`;
       }
+
+      fieldsConfig.forEach(f => {
+        if (selectedForExport.includes(f.key) && !['teacherName'].includes(f.key)) {
+          let val = (teacher as any)[f.key];
+          if (f.key === 'total') val = calculateTotal(teacher);
+          if (f.key === 'percent') {
+            const mTotal = calculateMaxTotal(teacher);
+            val = mTotal > 0 ? ((calculateTotal(teacher) / mTotal) * 100).toFixed(1) + '%' : '0%';
+          }
+
+          if (val !== undefined && val !== null && val !== '') {
+            const isUnaccredited = (teacher.unaccreditedMetrics || []).includes(f.key);
+            msg += `${f.emoji} *${f.label}:* ${isUnaccredited ? '_غير معتمد_' : val}\n`;
+          }
+        }
+      });
+      msg += `------------------------------\n`;
     });
 
-    msg += `------------------------------\n`;
-    msg += `*رفيق المشرف الإداري 🚀*`;
+    msg += `\n*رفيق المشرف الإداري 🚀*`;
 
     const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
@@ -318,7 +447,7 @@ export const DailyReportsPage: React.FC = () => {
                 <th rowSpan={2} className="p-2 border-e border-slate-300 w-44 sticky right-10 bg-[#FFD966] z-20">اسم المعلم</th>
                 {!filterMode.includes('metric') && (
                   <>
-                    <th rowSpan={2} className="p-2 border-e border-slate-300 w-24 sticky top-0 bg-[#FFD966] z-10">النوع</th>
+                    <th rowSpan={2} className="p-2 border-e border-slate-300 w-20 sticky top-0 bg-[#FFD966] z-10">النوع</th>
                     <th rowSpan={2} className="p-2 border-e border-slate-300 w-28 sticky top-0 bg-[#FFD966] z-10">المادة</th>
                     <th rowSpan={2} className="p-2 border-e border-slate-300 w-24 sticky top-0 bg-[#FFD966] z-10">الصف</th>
                   </>
@@ -332,19 +461,22 @@ export const DailyReportsPage: React.FC = () => {
                   </div>
                 </th>
                 <th rowSpan={2} className="p-2 border-e border-slate-300 w-24 sticky top-0 bg-[#C6E0B4] z-10">المخالفات</th>
-                <th rowSpan={2} className="p-2 border-e border-slate-300 w-20 sticky top-0 bg-[#C6E0B4] z-10 font-sans">المجموع</th>
-                <th rowSpan={2} className="p-2 w-20 sticky top-0 bg-[#FFD966] z-10 font-sans">النسبة</th>
-                <th rowSpan={2} className="p-2 w-12 sticky top-0 bg-[#FFD966] z-10">
-                  <button
-                    onClick={() => {
-                      setReportTeacherId('bulk'); // Special ID for bulk
-                      setShowWhatsAppSelect(true);
-                    }}
-                    className="p-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors shadow-sm"
-                    title="تصدير الكل للواتساب"
-                  >
-                    <MessageCircle size={14} />
-                  </button>
+                <th rowSpan={2} className="p-2 border-e border-slate-300 w-16 sticky top-0 bg-[#C6E0B4] z-10 font-sans">المجموع</th>
+                <th rowSpan={2} className="p-2 w-16 sticky top-0 bg-[#FFD966] z-10 font-sans">النسبة</th>
+                <th rowSpan={2} className="p-1 w-10 sticky top-0 bg-[#FFD966] z-10">
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[10px] font-black">واتساب</span>
+                    <button
+                      onClick={() => {
+                        setReportTeacherId('bulk');
+                        setShowWhatsAppSelect(true);
+                      }}
+                      className="p-1 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors shadow-sm"
+                      title="تصدير الكل للواتساب"
+                    >
+                      <MessageCircle size={12} />
+                    </button>
+                  </div>
                 </th>
               </tr>
               <tr className="text-[10px] sticky top-[45px] z-10">
@@ -352,6 +484,22 @@ export const DailyReportsPage: React.FC = () => {
                   <th key={m.key} className={`p-1 border-e border-slate-300 min-w-[70px] align-bottom ${getMetricColor(m.key)}`}>
                     <div className="flex flex-col items-center justify-end gap-1 pb-1 h-full w-full">
                       <div className="vertical-text font-bold text-slate-800 h-20 mb-auto text-[11px]">{m.label}</div>
+
+                      {/* Accreditation Toggle logic in Header */}
+                      <div className="flex flex-col items-center gap-0.5 mb-1 h-8 justify-center">
+                        <button
+                          onClick={() => toggleAccreditation('bulk', m.key)}
+                          className={`p-0.5 rounded-full transition-all flex items-center justify-center ${teachers.every(t => (t.unaccreditedMetrics || []).includes(m.key)) ? 'text-red-500 bg-red-50' : 'text-green-500 bg-green-50'}`}
+                          title={teachers.every(t => (t.unaccreditedMetrics || []).includes(m.key)) ? 'تفعيل للجميع' : 'إستبعاد الجميع'}
+                        >
+                          <Star size={10} className={teachers.every(t => (t.unaccreditedMetrics || []).includes(m.key)) ? 'fill-red-500' : 'fill-green-500'} />
+                          {teachers.every(t => (t.unaccreditedMetrics || []).includes(m.key)) && <X size={8} />}
+                        </button>
+                        {teachers.every(t => (t.unaccreditedMetrics || []).includes(m.key)) && (
+                          <span className="text-[7px] text-red-500 font-black leading-tight">غير معتمد</span>
+                        )}
+                      </div>
+
                       <div className="w-full px-1">
                         <input
                           type="number"
@@ -407,7 +555,8 @@ export const DailyReportsPage: React.FC = () => {
                 <tr><td colSpan={20} className="p-8 text-slate-400">لا توجد بيانات.. أضف معلمين أو أنشئ جدولاً جديداً</td></tr>
               ) : teachers.map((t, idx) => {
                 const total = calculateTotal(t);
-                const percent = totalMaxScore > 0 ? ((total / totalMaxScore) * 100).toFixed(1) : '0';
+                const maxTotal = calculateMaxTotal(t);
+                const percent = maxTotal > 0 ? ((total / maxTotal) * 100).toFixed(1) : '0';
                 return (
                   <tr
                     key={t.id}
@@ -427,35 +576,59 @@ export const DailyReportsPage: React.FC = () => {
                           </select>
                         </td>
                         <td className="p-1 border-e">
-                          <select className="w-full bg-transparent outline-none text-[10px] text-center" value={t.subjectCode} onChange={e => updateTeacher(t.id, 'subjectCode', e.target.value)}>
-                            <option value="">اختر..</option>
-                            {subjects.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
+                          <MultiSelectDropDown
+                            label="المواد"
+                            options={subjects}
+                            selected={t.subjectCode ? t.subjectCode.split(', ') : []}
+                            onChange={(vals) => updateTeacher(t.id, 'subjectCode', vals.join(', '))}
+                            emoji="📚"
+                          />
                         </td>
                         <td className="p-1 border-e">
-                          <select className="w-full bg-transparent outline-none text-[10px] text-center" value={t.className} onChange={e => updateTeacher(t.id, 'className', e.target.value)}>
-                            <option value="">اختر..</option>
-                            {grades.map(g => <option key={g} value={g}>{g}</option>)}
-                          </select>
+                          <MultiSelectDropDown
+                            label="الصفوف"
+                            options={grades}
+                            selected={t.className ? t.className.split(', ') : []}
+                            onChange={(vals) => updateTeacher(t.id, 'className', vals.join(', '))}
+                            emoji="🎓"
+                          />
                         </td>
                       </>
                     )}
-                    {displayedMetrics.filter(m => m.key !== 'violations_score').map(m => (
-                      <td key={m.key} className="p-1 border-e">
-                        <input
-                          id={`input-${t.id}-${m.key}`}
-                          type="number"
-                          className="w-full text-center outline-none bg-transparent font-bold text-xs focus:bg-blue-50 focus:ring-1 focus:ring-blue-200 rounded font-sans"
-                          value={(t as any)[m.key]}
-                          onChange={e => {
-                            const val = Math.min(m.max, Math.max(0, parseInt(e.target.value) || 0));
-                            updateTeacher(t.id, m.key, val);
-                          }}
-                          onKeyDown={(e) => handleKeyDown(e, idx, m.key)}
-                          onFocus={(e) => e.target.select()}
-                        />
-                      </td>
-                    ))}
+                    {displayedMetrics.filter(m => m.key !== 'violations_score').map(m => {
+                      const isUnaccredited = (t.unaccreditedMetrics || []).includes(m.key);
+                      return (
+                        <td key={m.key} className={`p-1 border-e relative group ${isUnaccredited ? 'bg-red-50/30' : ''}`}>
+                          <div className="flex flex-col items-center gap-0.5 h-full">
+                            <input
+                              id={`input-${t.id}-${m.key}`}
+                              type="number"
+                              disabled={isUnaccredited}
+                              className={`w-full text-center outline-none bg-transparent font-bold text-xs focus:bg-blue-50 focus:ring-1 focus:ring-blue-200 rounded font-sans ${isUnaccredited ? 'opacity-30 pointer-events-none' : ''} ${!isUnaccredited && (Number((t as any)[m.key]) || 0) <= m.max * 0.25 ? 'text-red-600' : 'text-slate-800'}`}
+                              value={(t as any)[m.key]}
+                              onChange={e => {
+                                const val = Math.min(m.max, Math.max(0, parseInt(e.target.value) || 0));
+                                updateTeacher(t.id, m.key as keyof TeacherFollowUp, val);
+                              }}
+                              onKeyDown={(e) => handleKeyDown(e, idx, m.key)}
+                              onFocus={(e) => e.target.select()}
+                            />
+                            {/* Toggle Button */}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleAccreditation(t.id, m.key); }}
+                              className={`transition-all flex items-center justify-center p-0.5 rounded ${isUnaccredited ? 'text-red-500 hover:scale-110' : 'text-green-500 hover:scale-110 opacity-20 group-hover:opacity-100'}`}
+                              title={isUnaccredited ? 'اعتماد الدرجة' : 'استبعاد من الحساب'}
+                            >
+                              <Star size={10} className={isUnaccredited ? 'fill-red-500' : 'fill-green-500'} />
+                              {isUnaccredited && <X size={8} className="absolute mb-4 mr-4" />}
+                            </button>
+                            {isUnaccredited && (
+                              <div className="text-[7px] text-red-500 font-bold whitespace-nowrap">غير معتمد</div>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
                     <td
                       className="p-1 border-e cursor-pointer hover:bg-red-50 transition-colors relative group"
                       onClick={() => setViolationModal({ id: t.id, notes: t.violations_notes })}
@@ -481,8 +654,21 @@ export const DailyReportsPage: React.FC = () => {
                         </button>
                       </div>
                     </td>
-                    <td className="p-1 border-e font-black text-blue-600 text-xs">{total}</td>
-                    <td className="p-1 font-black text-slate-800 text-xs">{percent}%</td>
+                    <td className="p-1 border-e font-black text-xs font-sans text-blue-700">{total}</td>
+                    <td className="p-1 border-e font-black text-xs font-sans text-blue-700">{percent}%</td>
+                    <td className="p-1 border-e">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReportTeacherId(t.id);
+                          setShowWhatsAppSelect(true);
+                        }}
+                        className="p-1 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors shadow-sm"
+                        title="تصدير للواتساب"
+                      >
+                        <MessageCircle size={12} />
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -500,8 +686,12 @@ export const DailyReportsPage: React.FC = () => {
                   ))}
                   <td className="p-2 border-e"></td>
                   <td className="p-2 border-e text-blue-700">{teachers.reduce((acc, t) => acc + calculateTotal(t), 0)}</td>
-                  <td className="p-2 border-e">
-                    {((teachers.reduce((acc, t) => acc + calculateTotal(t), 0) / (teachers.length * totalMaxScore)) * 100).toFixed(1)}%
+                  <td className="p-2 border-e font-sans">
+                    {(() => {
+                      const totalSum = teachers.reduce((acc, t) => acc + calculateTotal(t), 0);
+                      const totalMax = teachers.reduce((acc, t) => acc + calculateMaxTotal(t), 0);
+                      return totalMax > 0 ? ((totalSum / totalMax) * 100).toFixed(1) : '0';
+                    })()}%
                   </td>
                 </tr>
                 <tr>
@@ -666,8 +856,8 @@ export const DailyReportsPage: React.FC = () => {
                   >
                     <div className="text-right">
                       <div className="font-black text-sm">{t.teacherName || 'معلم جديد'}</div>
-                      <div className={`text-[10px] font-bold ${reportTeacherId === t.id ? 'text-blue-100' : 'text-slate-400'}`}>
-                        {t.subjectCode} - {t.className}
+                      <div className={`text-[10px] font-bold truncate ${reportTeacherId === t.id ? 'text-blue-100' : 'text-slate-400'}`}>
+                        {t.subjectCode || 'بدون مادة'} - {t.className || 'بدون صف'}
                       </div>
                     </div>
                     {reportTeacherId === t.id && <Check size={18} />}
@@ -732,13 +922,14 @@ export const DailyReportsPage: React.FC = () => {
                         return (
                           <div key={fieldKey} className="flex items-center gap-4 bg-slate-100 p-3 rounded-xl border border-slate-200 text-right font-sans" dir="rtl">
                             <span className="font-black text-slate-600 w-1/3 font-arabic">{field.emoji} {field.label}</span>
-                            <span className="font-black text-blue-600 text-lg">{calculateTotal(teacher)} / {totalMaxScore}</span>
+                            <span className="font-black text-blue-600 text-lg">{calculateTotal(teacher)} / {calculateMaxTotal(teacher)}</span>
                           </div>
                         );
                       }
                       if (fieldKey === 'percent') {
                         const score = calculateTotal(teacher);
-                        const percent = totalMaxScore > 0 ? ((score / totalMaxScore) * 100).toFixed(1) : '0';
+                        const mTotal = calculateMaxTotal(teacher);
+                        const percent = mTotal > 0 ? ((score / mTotal) * 100).toFixed(1) : '0';
                         return (
                           <div key={fieldKey} className="flex items-center gap-4 bg-slate-100 p-3 rounded-xl border border-slate-200 text-right font-sans" dir="rtl">
                             <span className="font-black text-slate-600 w-1/3 font-arabic">{field.emoji} {field.label}</span>
@@ -755,15 +946,21 @@ export const DailyReportsPage: React.FC = () => {
                           </label>
                           <div className="flex-1">
                             {fieldKey === 'subjectCode' ? (
-                              <select className="w-full p-2 bg-slate-50 rounded-lg font-bold text-center outline-none focus:ring-2 ring-blue-100" value={teacher.subjectCode} onChange={e => updateTeacher(teacher.id, 'subjectCode', e.target.value)}>
-                                <option value="">اختر المادة..</option>
-                                {subjects.map(s => <option key={s} value={s}>{s}</option>)}
-                              </select>
+                              <MultiSelectDropDown
+                                label="المواد"
+                                options={subjects}
+                                selected={teacher.subjectCode ? teacher.subjectCode.split(', ') : []}
+                                onChange={(vals) => updateTeacher(teacher.id, 'subjectCode', vals.join(', '))}
+                                emoji="📚"
+                              />
                             ) : fieldKey === 'className' ? (
-                              <select className="w-full p-2 bg-slate-50 rounded-lg font-bold text-center outline-none focus:ring-2 ring-blue-100" value={teacher.className} onChange={e => updateTeacher(teacher.id, 'className', e.target.value)}>
-                                <option value="">اختر الصف..</option>
-                                {grades.map(g => <option key={g} value={g}>{g}</option>)}
-                              </select>
+                              <MultiSelectDropDown
+                                label="الصفوف"
+                                options={grades}
+                                selected={teacher.className ? teacher.className.split(', ') : []}
+                                onChange={(vals) => updateTeacher(teacher.id, 'className', vals.join(', '))}
+                                emoji="🎓"
+                              />
                             ) : fieldKey === 'gender' ? (
                               <select className="w-full p-2 bg-slate-50 rounded-lg font-bold text-center outline-none focus:ring-2 ring-blue-100" value={teacher.gender || 'ذكر'} onChange={e => updateTeacher(teacher.id, 'gender', e.target.value)}>
                                 <option value="ذكر">ذكر</option>
@@ -780,7 +977,8 @@ export const DailyReportsPage: React.FC = () => {
                               <div className="flex items-center gap-2">
                                 <input
                                   type="number"
-                                  className="flex-1 p-2 bg-slate-50 rounded-lg font-bold text-center outline-none focus:ring-2 ring-blue-100 font-sans"
+                                  disabled={(teacher.unaccreditedMetrics || []).includes(fieldKey)}
+                                  className={`flex-1 p-2 bg-slate-50 rounded-lg font-bold text-center outline-none focus:ring-2 ring-blue-100 font-sans ${(teacher.unaccreditedMetrics || []).includes(fieldKey) ? 'opacity-30' : ''}`}
                                   value={(teacher as any)[fieldKey]}
                                   onChange={e => {
                                     const metric = metricsConfig.find(m => m.key === fieldKey);
@@ -789,8 +987,18 @@ export const DailyReportsPage: React.FC = () => {
                                     updateTeacher(teacher.id, fieldKey, val);
                                   }}
                                 />
+                                <button
+                                  onClick={() => toggleAccreditation(teacher.id, fieldKey)}
+                                  className={`p-2 rounded-lg transition-all flex items-center gap-1 ${(teacher.unaccreditedMetrics || []).includes(fieldKey) ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'}`}
+                                  title={(teacher.unaccreditedMetrics || []).includes(fieldKey) ? 'اعتماد' : 'استبعاد'}
+                                >
+                                  <Star size={16} className={(teacher.unaccreditedMetrics || []).includes(fieldKey) ? 'fill-red-500' : 'fill-green-500'} />
+                                  {(teacher.unaccreditedMetrics || []).includes(fieldKey) && <X size={12} />}
+                                </button>
                                 {metricsConfig.find(m => m.key === fieldKey) && (
-                                  <span className="text-[10px] font-black text-slate-400 font-sans">/ {metricsConfig.find(m => m.key === fieldKey)?.max}</span>
+                                  <span className={`text-[10px] font-black font-sans ${(teacher.unaccreditedMetrics || []).includes(fieldKey) ? 'text-red-500' : 'text-slate-400'} whitespace-nowrap`}>
+                                    / {metricsConfig.find(m => m.key === fieldKey)?.max}
+                                  </span>
                                 )}
                               </div>
                             )}
@@ -856,9 +1064,15 @@ export const DailyReportsPage: React.FC = () => {
                 ))}
               </div>
 
-              <div className="flex gap-3">
-                <button onClick={() => setShowWhatsAppSelect(false)} className="flex-1 p-3 bg-slate-100 text-slate-600 font-bold rounded-xl">إلغاء</button>
-                <button onClick={() => handleWhatsAppExport(reportSelectedFields)} className="flex-1 p-3 bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-200">إرسال</button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleWhatsAppExport(reportSelectedFields)}
+                  className="flex-1 p-3 bg-green-600 text-white rounded-xl font-black hover:bg-green-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-100"
+                >
+                  <MessageCircle size={20} />
+                  إرسال للواتساب
+                </button>
+                <button onClick={() => setShowWhatsAppSelect(false)} className="px-6 p-3 bg-slate-100 text-slate-500 rounded-xl font-bold hover:bg-slate-200">إلغاء</button>
               </div>
             </div>
           </div>
@@ -1317,7 +1531,17 @@ export const ViolationsPage: React.FC = () => {
 };
 
 // Memoized Row for performance optimization
-const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShowNotesModal, toggleStar, isHighlighted, onRowClick }: any) => {
+const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShowNotesModal, toggleStar, isHighlighted, onRowClick }: {
+  s: StudentReport;
+  optionsAr: any;
+  optionsEn: any;
+  lang: string;
+  updateStudent: (id: string, field: string, value: any) => void;
+  setShowNotesModal: (s: any) => void;
+  toggleStar: (id: string, type: any) => void;
+  isHighlighted: boolean;
+  onRowClick: (id: any) => void;
+}) => {
   return (
     <tr onClick={() => onRowClick(s.id)} className={`transition-colors h-10 group cursor-pointer ${isHighlighted ? 'bg-cyan-50' : 'hover:bg-blue-50/20'}`}>
       <td className={`p-1 border-e border-slate-100 sticky right-0 z-10 transition-colors shadow-[2px_0_5px_rgba(0,0,0,0.05)] ${isHighlighted ? 'bg-cyan-50' : 'bg-white group-hover:bg-blue-50'}`}>
