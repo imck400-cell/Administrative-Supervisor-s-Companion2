@@ -319,7 +319,7 @@ export const DailyReportsPage: React.FC = () => {
                     {!filterMode.includes('metric') && (
                         <>
                             <td className="p-1 border-e">
-                            <select className="w-full bg-transparent outline-none text-center" value={t.subjectCode} onChange={e => updateTeacher(t.id, 'subjectCode', e.target.value)}>
+                            <select className="w-full bg-transparent outline-none text-[10px] text-center" value={t.subjectCode} onChange={e => updateTeacher(t.id, 'subjectCode', e.target.value)}>
                                 <option value="">اختر..</option>
                                 {subjects.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
@@ -957,13 +957,10 @@ export const ViolationsPage: React.FC = () => {
 };
 
 // Memoized Row for performance optimization
-const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShowNotesModal, toggleStar, isSelected, onSelect }: any) => {
+const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShowNotesModal, toggleStar }: any) => {
   return (
-    <tr 
-      onClick={() => onSelect(s.id)}
-      className={`hover:bg-blue-50/20 transition-colors h-10 group cursor-pointer ${isSelected ? 'bg-orange-50' : ''}`}
-    >
-      <td className={`p-1 border-e border-slate-100 sticky right-0 z-10 group-hover:bg-blue-50 transition-colors shadow-[2px_0_5px_rgba(0,0,0,0.05)] ${isSelected ? 'bg-orange-50' : 'bg-white'}`}>
+    <tr className="hover:bg-blue-50/20 transition-colors h-10 group">
+      <td className="p-1 border-e border-slate-100 sticky right-0 bg-white z-10 group-hover:bg-blue-50 transition-colors shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
         <div className="flex items-center gap-1 h-full">
           <button onClick={() => toggleStar(s.id, 'isExcellent')} title={lang === 'ar' ? 'إضافة للتميز' : 'Add to Excellence'}>
             <Star className={`w-3.5 h-3.5 ${s.isExcellent ? 'fill-green-500 text-green-500' : 'text-slate-300'}`} />
@@ -971,51 +968,46 @@ const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShow
           <button onClick={() => toggleStar(s.id, 'isBlacklisted')} title={lang === 'ar' ? 'إضافة للقائمة السوداء' : 'Add to Blacklist'}>
             <Star className={`w-3.5 h-3.5 ${s.isBlacklisted ? 'fill-slate-900 text-slate-900' : 'text-slate-300'}`} />
           </button>
-          <input 
-            className="flex-1 bg-transparent border-none outline-none font-bold text-[10px] text-right" 
-            value={s.name} 
-            onChange={(e) => updateStudent(s.id, 'name', e.target.value)} 
-            onFocus={() => onSelect(s.id)}
-          />
+          <input className="flex-1 bg-transparent border-none outline-none font-bold text-[10px] text-right" value={s.name} onChange={(e) => updateStudent(s.id, 'name', e.target.value)} />
         </div>
       </td>
       <td className="p-1 border-e border-slate-100">
-        <select onFocus={() => onSelect(s.id)} className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.grade} onChange={(e) => updateStudent(s.id, 'grade', e.target.value)}>
+        <select className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.grade} onChange={(e) => updateStudent(s.id, 'grade', e.target.value)}>
           {optionsAr.grades.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.grades[optionsAr.grades.indexOf(o)]}</option>)}
         </select>
       </td>
       <td className="p-1 border-e border-slate-100">
-        <select onFocus={() => onSelect(s.id)} className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.section} onChange={(e) => updateStudent(s.id, 'section', e.target.value)}>
+        <select className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.section} onChange={(e) => updateStudent(s.id, 'section', e.target.value)}>
           {optionsAr.sections.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.sections[optionsAr.sections.indexOf(o)]}</option>)}
         </select>
       </td>
       <td className="p-1 border-e border-slate-100">
-        <select onFocus={() => onSelect(s.id)} className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.gender} onChange={(e) => updateStudent(s.id, 'gender', e.target.value)}>
+        <select className="bg-transparent font-bold text-[9px] outline-none w-full appearance-none text-center" value={s.gender} onChange={(e) => updateStudent(s.id, 'gender', e.target.value)}>
           {optionsAr.gender.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.gender[optionsAr.gender.indexOf(o)]}</option>)}
         </select>
       </td>
       <td className="p-1 border-e border-slate-100">
         <div className="flex flex-col gap-0.5">
-          <input onFocus={() => onSelect(s.id)} className="w-full text-[9px] text-right bg-transparent outline-none" value={s.address} onChange={(e) => updateStudent(s.id, 'address', e.target.value)} placeholder="..." />
-          <select onFocus={() => onSelect(s.id)} className="text-[8px] bg-slate-50/50 appearance-none text-center" value={s.workOutside} onChange={(e) => updateStudent(s.id, 'workOutside', e.target.value)}>
+          <input className="w-full text-[9px] text-right bg-transparent outline-none" value={s.address} onChange={(e) => updateStudent(s.id, 'address', e.target.value)} placeholder="..." />
+          <select className="text-[8px] bg-slate-50/50 appearance-none text-center" value={s.workOutside} onChange={(e) => updateStudent(s.id, 'workOutside', e.target.value)}>
             {optionsAr.workOutside.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.workOutside[optionsAr.workOutside.indexOf(o)]}</option>)}
           </select>
         </div>
       </td>
       <td className="p-1 border-e border-slate-100">
         <div className="flex flex-col gap-0.5">
-          <select onFocus={() => onSelect(s.id)} className={`text-[9px] font-bold appearance-none text-center outline-none bg-transparent ${s.healthStatus === 'مريض' ? 'text-red-600' : ''}`} value={s.healthStatus} onChange={(e) => updateStudent(s.id, 'healthStatus', e.target.value)}>
+          <select className={`text-[9px] font-bold appearance-none text-center outline-none bg-transparent ${s.healthStatus === 'مريض' ? 'text-red-600' : ''}`} value={s.healthStatus} onChange={(e) => updateStudent(s.id, 'healthStatus', e.target.value)}>
             {optionsAr.health.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.health[optionsAr.health.indexOf(o)]}</option>)}
           </select>
-          {s.healthStatus === 'مريض' && <input onFocus={() => onSelect(s.id)} className="text-[8px] text-center border-b outline-none text-red-500" value={s.healthDetails} onChange={(e) => updateStudent(s.id, 'healthDetails', e.target.value)} />}
+          {s.healthStatus === 'مريض' && <input className="text-[8px] text-center border-b outline-none text-red-500" value={s.healthDetails} onChange={(e) => updateStudent(s.id, 'healthDetails', e.target.value)} />}
         </div>
       </td>
       <td className="p-1 border-e border-slate-100">
         <div className="flex flex-col gap-0.5">
-          <input onFocus={() => onSelect(s.id)} className="text-[9px] font-bold text-right outline-none bg-transparent" value={s.guardianName} onChange={(e) => updateStudent(s.id, 'guardianName', e.target.value)} />
+          <input className="text-[9px] font-bold text-right outline-none bg-transparent" value={s.guardianName} onChange={(e) => updateStudent(s.id, 'guardianName', e.target.value)} />
           {s.guardianPhones.map((p: any, i: any) => (
             <div key={i} className="flex gap-0.5 items-center">
-              <input onFocus={() => onSelect(s.id)} className="text-[8px] w-full text-center bg-slate-50/50 outline-none" value={p} onChange={(e) => {
+              <input className="text-[8px] w-full text-center bg-slate-50/50 outline-none" value={p} onChange={(e) => {
                 const newP = [...s.guardianPhones]; newP[i] = e.target.value; updateStudent(s.id, 'guardianPhones', newP);
               }} />
             </div>
@@ -1023,22 +1015,22 @@ const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShow
         </div>
       </td>
       <td className="p-1 border-e border-slate-100 bg-[#FFF2CC]/5">
-        <select onFocus={() => onSelect(s.id)} className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicReading.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicReading} onChange={(e) => updateStudent(s.id, 'academicReading', e.target.value)}>
+        <select className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicReading.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicReading} onChange={(e) => updateStudent(s.id, 'academicReading', e.target.value)}>
           {optionsAr.level.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.level[optionsAr.level.indexOf(o)]}</option>)}
         </select>
       </td>
       <td className="p-1 border-e border-slate-100 bg-[#FFF2CC]/5">
-        <select onFocus={() => onSelect(s.id)} className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicWriting.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicWriting} onChange={(e) => updateStudent(s.id, 'academicWriting', e.target.value)}>
+        <select className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicWriting.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicWriting} onChange={(e) => updateStudent(s.id, 'academicWriting', e.target.value)}>
           {optionsAr.level.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.level[optionsAr.level.indexOf(o)]}</option>)}
         </select>
       </td>
       <td className="p-1 border-e border-slate-100 bg-[#FFF2CC]/5">
-        <select onFocus={() => onSelect(s.id)} className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicParticipation.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicParticipation} onChange={(e) => updateStudent(s.id, 'academicParticipation', e.target.value)}>
+        <select className={`text-[9px] w-full appearance-none text-center outline-none bg-transparent ${s.academicParticipation.includes('ضعيف') ? 'text-red-600 font-black' : ''}`} value={s.academicParticipation} onChange={(e) => updateStudent(s.id, 'academicParticipation', e.target.value)}>
           {optionsAr.level.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.level[optionsAr.level.indexOf(o)]}</option>)}
         </select>
       </td>
       <td className="p-1 border-e border-slate-100">
-        <select onFocus={() => onSelect(s.id)} className={`text-[9px] font-bold w-full appearance-none text-center outline-none bg-transparent ${s.behaviorLevel.includes('ضعيف') ? 'text-red-600' : ''}`} value={s.behaviorLevel} onChange={(e) => updateStudent(s.id, 'behaviorLevel', e.target.value)}>
+        <select className={`text-[9px] font-bold w-full appearance-none text-center outline-none bg-transparent ${s.behaviorLevel.includes('ضعيف') ? 'text-red-600' : ''}`} value={s.behaviorLevel} onChange={(e) => updateStudent(s.id, 'behaviorLevel', e.target.value)}>
           {optionsAr.behavior.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.behavior[optionsAr.behavior.indexOf(o)]}</option>)}
         </select>
       </td>
@@ -1048,31 +1040,30 @@ const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShow
             <button key={n} onClick={() => {
               const newN = s.mainNotes.includes(n) ? s.mainNotes.filter((x: any) => x !== n) : [...s.mainNotes, n];
               updateStudent(s.id, 'mainNotes', newN);
-              onSelect(s.id);
             }} className={`text-[7px] px-1 py-0.5 rounded border leading-none ${s.mainNotes.includes(n) ? 'bg-red-500 text-white' : 'bg-slate-50 text-slate-400'}`}>
               {lang === 'ar' ? n : optionsEn.mainNotes[nIdx]}
             </button>
           ))}
-          <input onFocus={() => onSelect(s.id)} className="text-[8px] border-b w-full mt-0.5 text-center outline-none" value={s.otherNotesText} onChange={(e) => updateStudent(s.id, 'otherNotesText', e.target.value)} />
+          <input className="text-[8px] border-b w-full mt-0.5 text-center outline-none" value={s.otherNotesText} onChange={(e) => updateStudent(s.id, 'otherNotesText', e.target.value)} />
         </div>
       </td>
       <td className="p-1 border-e border-slate-100 bg-[#DDEBF7]/5">
-        <select onFocus={() => onSelect(s.id)} className="text-[8px] w-full appearance-none text-center outline-none bg-transparent" value={s.guardianEducation} onChange={(e) => updateStudent(s.id, 'guardianEducation', e.target.value)}>
+        <select className="text-[8px] w-full appearance-none text-center outline-none bg-transparent" value={s.guardianEducation} onChange={(e) => updateStudent(s.id, 'guardianEducation', e.target.value)}>
           {optionsAr.eduStatus.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.eduStatus[optionsAr.eduStatus.indexOf(o)]}</option>)}
         </select>
       </td>
       <td className="p-1 border-e border-slate-100 bg-[#DDEBF7]/5">
-        <select onFocus={() => onSelect(s.id)} className={`text-[8px] w-full appearance-none text-center outline-none bg-transparent ${s.guardianFollowUp === 'ضعيفة' ? 'text-red-600 font-bold' : ''}`} value={s.guardianFollowUp} onChange={(e) => updateStudent(s.id, 'guardianFollowUp', e.target.value)}>
+        <select className={`text-[8px] w-full appearance-none text-center outline-none bg-transparent ${s.guardianFollowUp === 'ضعيفة' ? 'text-red-600 font-bold' : ''}`} value={s.guardianFollowUp} onChange={(e) => updateStudent(s.id, 'guardianFollowUp', e.target.value)}>
           {optionsAr.followUp.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.followUp[optionsAr.followUp.indexOf(o)]}</option>)}
         </select>
       </td>
       <td className="p-1 border-e border-slate-100 bg-[#DDEBF7]/5">
-        <select onFocus={() => onSelect(s.id)} className={`text-[8px] w-full appearance-none text-center outline-none bg-transparent ${s.guardianCooperation === 'عدواني' || s.guardianCooperation === 'ضعيفة' ? 'text-red-600 font-bold' : ''}`} value={s.guardianCooperation} onChange={(e) => updateStudent(s.id, 'guardianCooperation', e.target.value)}>
+        <select className={`text-[8px] w-full appearance-none text-center outline-none bg-transparent ${s.guardianCooperation === 'عدواني' || s.guardianCooperation === 'ضعيفة' ? 'text-red-600 font-bold' : ''}`} value={s.guardianCooperation} onChange={(e) => updateStudent(s.id, 'guardianCooperation', e.target.value)}>
           {optionsAr.cooperation.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.cooperation[optionsAr.cooperation.indexOf(o)]}</option>)}
         </select>
       </td>
-      <td className="p-1 text-center">
-        <button onClick={() => { setShowNotesModal({id: s.id, text: s.notes}); onSelect(s.id); }} className="p-1.5 bg-slate-100 hover:bg-blue-100 rounded-lg transition-all mx-auto block">
+      <td className="p-1">
+        <button onClick={() => setShowNotesModal({id: s.id, text: s.notes})} className="p-1.5 bg-slate-100 hover:bg-blue-100 rounded-lg transition-all">
           {s.notes ? <CheckCircle size={14} className="text-green-500" /> : <Settings2 size={14} className="text-slate-400" />}
         </button>
       </td>
@@ -1093,9 +1084,6 @@ export const StudentsReportsPage: React.FC = () => {
   const [showSpecificFilterModal, setShowSpecificFilterModal] = useState(false);
   const [selectedSpecifics, setSelectedSpecifics] = useState<string[]>([]);
   
-  // Requirement: Row Highlighting State
-  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
-
   // Requirement: Detail Modal Features
   const [showIndividualReportModal, setShowIndividualReportModal] = useState(false);
   const [detailModalSearch, setDetailModalSearch] = useState('');
@@ -1347,7 +1335,7 @@ export const StudentsReportsPage: React.FC = () => {
     }
   };
 
-  // Surgical modification for WhatsApp Rich Formatting and Logic
+  // START OF CHANGE - Surgical modification for WhatsApp Rich Formatting and Logic
   const formatWAValue = (val: string) => {
     const isWeak = val.includes('ضعيف') || val.includes('مريض') || val.includes('عدواني') || val.includes('مخالفة') || val.includes('مقبول');
     return isWeak ? `🔴 *${val}*` : `🔹 ${val}`;
@@ -1422,6 +1410,7 @@ export const StudentsReportsPage: React.FC = () => {
     window.open(url, '_blank');
     setWaSelector(null);
   };
+  // END OF CHANGE
 
   const exportToExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(filteredData.map(s => ({
@@ -1602,50 +1591,49 @@ export const StudentsReportsPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-[1.5rem] shadow-xl border border-slate-100 overflow-hidden h-[70vh]">
-        <div className="overflow-auto h-full scroll-smooth">
+      <div className="bg-white rounded-[1.5rem] shadow-xl border border-slate-100 overflow-hidden">
+        <div className="overflow-x-auto scroll-smooth">
           <table className={`w-full text-center border-collapse table-auto ${isOnlyMetricView ? 'min-w-[700px]' : 'min-w-[1600px]'}`}>
-            <thead className="bg-[#FFD966] text-slate-800 sticky top-0 z-[40] shadow-sm">
+            <thead className="bg-[#FFD966] text-slate-800 sticky top-0 z-20">
               <tr className="border-b border-slate-300 h-12">
-                <th rowSpan={2} className="px-3 border-e border-slate-300 w-[160px] text-xs font-black sticky right-0 bg-[#FFD966] z-[50] top-0">{lang === 'ar' ? 'اسم الطالب' : 'Student Name'}</th>
-                <th rowSpan={2} className="px-1 border-e border-slate-300 w-20 text-xs font-black bg-[#FFD966] sticky top-0">{lang === 'ar' ? 'الصف' : 'Grade'}</th>
-                <th rowSpan={2} className="px-1 border-e border-slate-300 w-16 text-xs font-black bg-[#FFD966] sticky top-0">{lang === 'ar' ? 'الشعبة' : 'Section'}</th>
+                <th rowSpan={2} className="px-3 border-e border-slate-300 w-[160px] text-xs font-black sticky right-0 bg-[#FFD966] z-30">{lang === 'ar' ? 'اسم الطالب' : 'Student Name'}</th>
+                <th rowSpan={2} className="px-1 border-e border-slate-300 w-20 text-xs font-black">{lang === 'ar' ? 'الصف' : 'Grade'}</th>
+                <th rowSpan={2} className="px-1 border-e border-slate-300 w-16 text-xs font-black">{lang === 'ar' ? 'الشعبة' : 'Section'}</th>
                 
                 {!isOnlyMetricView && (
                   <>
-                    <th rowSpan={2} className="px-1 border-e border-slate-300 w-16 text-xs font-black bg-[#FFD966] sticky top-0">{lang === 'ar' ? 'النوع' : 'Gender'}</th>
-                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black bg-[#FFD966] sticky top-0">{lang === 'ar' ? 'السكن / العمل' : 'Residence / Work'}</th>
-                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black bg-[#FFD966] sticky top-0">{lang === 'ar' ? 'الحالة الصحية' : 'Health Status'}</th>
-                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-32 text-xs font-black bg-[#FFD966] sticky top-0">{lang === 'ar' ? 'ولي الأمر (الاسم/الهواتف)' : 'Guardian (Name/Phones)'}</th>
-                    <th colSpan={3} className="px-1 border-e border-slate-300 bg-[#FFF2CC] text-xs font-black sticky top-0">{lang === 'ar' ? 'المستوى العلمي' : 'Academic Level'}</th>
-                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black bg-[#FFD966] sticky top-0">{lang === 'ar' ? 'المستوى السلوكي' : 'Behavior Level'}</th>
-                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-44 text-xs font-black bg-[#FFD966] sticky top-0">{lang === 'ar' ? 'الملاحظات الأساسية' : 'Main Notes'}</th>
-                    <th colSpan={3} className="px-1 border-e border-slate-300 bg-[#DDEBF7] text-xs font-black sticky top-0">{lang === 'ar' ? 'ولي الأمر المتابع' : 'Guardian Follow-up'}</th>
-                    <th rowSpan={2} className="px-2 w-10 text-xs font-black bg-[#FFD966] sticky top-0">{lang === 'ar' ? 'ملاحظات أخرى' : 'Other Notes'}</th>
+                    <th rowSpan={2} className="px-1 border-e border-slate-300 w-16 text-xs font-black">{lang === 'ar' ? 'النوع' : 'Gender'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black">{lang === 'ar' ? 'السكن / العمل' : 'Residence / Work'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black">{lang === 'ar' ? 'الحالة الصحية' : 'Health Status'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-32 text-xs font-black">{lang === 'ar' ? 'ولي الأمر (الاسم/الهواتف)' : 'Guardian (Name/Phones)'}</th>
+                    <th colSpan={3} className="px-1 border-e border-slate-300 bg-[#FFF2CC] text-xs font-black">{lang === 'ar' ? 'المستوى العلمي' : 'Academic Level'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black">{lang === 'ar' ? 'المستوى السلوكي' : 'Behavior Level'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-44 text-xs font-black">{lang === 'ar' ? 'الملاحظات الأساسية' : 'Main Notes'}</th>
+                    <th colSpan={3} className="px-1 border-e border-slate-300 bg-[#DDEBF7] text-xs font-black">{lang === 'ar' ? 'ولي الأمر المتابع' : 'Guardian Follow-up'}</th>
+                    <th rowSpan={2} className="px-2 w-10 text-xs font-black">{lang === 'ar' ? 'ملاحظات أخرى' : 'Other Notes'}</th>
                   </>
                 )}
                 
                 {isOnlyMetricView && activeMetricFilter.map(mKey => (
-                  <th key={mKey} className="px-4 border-e border-slate-300 text-xs font-black bg-[#FFD966] sticky top-0">{metricLabels[mKey]}</th>
+                  <th key={mKey} className="px-4 border-e border-slate-300 text-xs font-black">{metricLabels[mKey]}</th>
                 ))}
-                <th rowSpan={2} className="px-1 border-s border-slate-300 w-12 bg-[#FFD966] sticky top-0"></th>
               </tr>
               
               {!isOnlyMetricView && (
-                <tr className="bg-[#F2F2F2] text-[9px] h-8 sticky top-12 z-[40]">
-                  <th className="border-e border-slate-300 bg-[#FFF2CC] sticky top-12">{lang === 'ar' ? 'قراءة' : 'Read'}</th>
-                  <th className="border-e border-slate-300 bg-[#FFF2CC] sticky top-12">{lang === 'ar' ? 'كتابة' : 'Write'}</th>
-                  <th className="border-e border-slate-300 bg-[#FFF2CC] sticky top-12">{lang === 'ar' ? 'مشاركة' : 'Part'}</th>
-                  <th className="border-e border-slate-300 bg-[#DDEBF7] sticky top-12">{lang === 'ar' ? 'تعليم' : 'Edu'}</th>
-                  <th className="border-e border-slate-300 bg-[#DDEBF7] sticky top-12">{lang === 'ar' ? 'متابعة' : 'Follow'}</th>
-                  <th className="border-e border-slate-300 bg-[#DDEBF7] sticky top-12">{lang === 'ar' ? 'تعاون' : 'Coop'}</th>
+                <tr className="bg-[#F2F2F2] text-[9px] h-8">
+                  <th className="border-e border-slate-300 bg-[#FFF2CC]/50">{lang === 'ar' ? 'قراءة' : 'Read'}</th>
+                  <th className="border-e border-slate-300 bg-[#FFF2CC]/50">{lang === 'ar' ? 'كتابة' : 'Write'}</th>
+                  <th className="border-e border-slate-300 bg-[#FFF2CC]/50">{lang === 'ar' ? 'مشاركة' : 'Part'}</th>
+                  <th className="border-e border-slate-300 bg-[#DDEBF7]/50">{lang === 'ar' ? 'تعليم' : 'Edu'}</th>
+                  <th className="border-e border-slate-300 bg-[#DDEBF7]/50">{lang === 'ar' ? 'متابعة' : 'Follow'}</th>
+                  <th className="border-e border-slate-300 bg-[#DDEBF7]/50">{lang === 'ar' ? 'تعاون' : 'Coop'}</th>
                 </tr>
               )}
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={isOnlyMetricView ? 4 + activeMetricFilter.length : 16} className="py-10 text-slate-400 italic text-sm">
+                  <td colSpan={isOnlyMetricView ? 3 + activeMetricFilter.length : 15} className="py-10 text-slate-400 italic text-sm">
                     {(filterMode === 'student' || filterMode === 'blacklist' || filterMode === 'excellence') && selectedStudentNames.length === 0 
                       ? (lang === 'ar' ? 'يرجى اختيار أسماء الطلاب من القائمة للعرض' : 'Please select student names to display')
                       : (lang === 'ar' ? 'لا توجد بيانات تطابق هذا البحث' : 'No data matching this search')}
@@ -1662,8 +1650,6 @@ export const StudentsReportsPage: React.FC = () => {
                     updateStudent={updateStudent} 
                     setShowNotesModal={setShowNotesModal} 
                     toggleStar={toggleStar} 
-                    isSelected={selectedRowId === s.id}
-                    onSelect={setSelectedRowId}
                   />
                 ))
               )}
@@ -2075,7 +2061,7 @@ export const StudentsReportsPage: React.FC = () => {
         </div>
       )}
 
-      {/* WhatsApp Selector Modal */}
+      {/* START OF CHANGE - Surgical Addition for WhatsApp Selector Modal */}
       {waSelector && (
         <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 font-arabic">
           <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-300 border-4 border-green-50 text-right overflow-hidden flex flex-col max-h-[90vh]">
@@ -2138,6 +2124,7 @@ export const StudentsReportsPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* END OF CHANGE */}
     </div>
   );
 };

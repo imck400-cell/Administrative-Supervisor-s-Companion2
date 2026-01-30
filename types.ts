@@ -18,6 +18,18 @@ export interface SchoolProfile {
   managerName?: string;
 }
 
+export interface TimetableEntry {
+  id: string;
+  teacherName: string;
+  subject: string;
+  days: {
+    [key: string]: { // Saturday, Sunday...
+      [key: string]: string; // p0, p1, p2... value is Class/Section
+    }
+  };
+  notes: string;
+}
+
 export interface ExamLog {
   id: string;
   studentId: string;
@@ -37,6 +49,10 @@ export interface SubstitutionEntry {
   class: string;
   date: string;
   paymentStatus: 'pending' | 'paid';
+  // Existing specific fields for periods
+  p1?: string; p2?: string; p3?: string; p4?: string; p5?: string; p6?: string; p7?: string;
+  sig1?: string; sig2?: string; sig3?: string; sig4?: string; sig5?: string; sig6?: string; sig7?: string;
+  signature?: string;
 }
 
 export interface TeacherFollowUp {
@@ -220,6 +236,7 @@ export interface GenericSpecialReport {
 export interface AppData {
   profile: SchoolProfile;
   substitutions: SubstitutionEntry[];
+  timetable: TimetableEntry[];
   dailyReports: DailyReportContainer[];
   violations: any[];
   parentVisits: any[];
@@ -245,8 +262,6 @@ export interface AppData {
     duties: string[];
     achievement: string[];
   };
-  // START OF CHANGE
   absenceManualAdditions?: Record<string, string[]>;
   absenceExclusions?: Record<string, string[]>;
-  // END OF CHANGE
 }

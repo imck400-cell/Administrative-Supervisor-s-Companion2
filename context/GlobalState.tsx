@@ -42,6 +42,7 @@ const defaultData: AppData = {
     customFields: [] 
   },
   substitutions: [],
+  timetable: [],
   dailyReports: [],
   violations: [],
   parentVisits: [],

@@ -9,7 +9,7 @@ import {
   UserCheck as UserPlusIcon, CalendarDays, Activity, Medal, School, User,
   FileSpreadsheet, Share2, ChevronLeft, ChevronRight, Triangle,
   ArrowLeftRight, History, Home, MapPin, Briefcase, HeartPulse, UserPlus, Hammer, MessageSquare,
-  FileSearch
+  FileSearch, X
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -20,7 +20,7 @@ interface CardConfig {
   id: number;
   category: DataCategory;
   subType: string;
-  subSubType: string; // START OF CHANGE - Support for 3rd level hierarchy
+  subSubTypes: string[];
 }
 
 const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[] }> = ({ setView, recentActions = [] }) => {
@@ -53,7 +53,8 @@ const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[]
           { id: 'academicReading', label: 'القراءة', icon: <BookOpen size={12} /> },
           { id: 'academicWriting', label: 'الكتابة', icon: <FileText size={12} /> },
           { id: 'behaviorLevel', label: 'المستوى السلوكي', icon: <Activity size={12} /> },
-          { id: 'mainNotes', label: 'الملاحظات السلوكية', icon: <AlertTriangle size={12} /> },
+          { id: 'mainNotes', label: 'الملاحظات الأساسية', icon: <AlertTriangle size={12} /> },
+          { id: 'guardianFollowUp', label: 'متابعة ولي الأمر', icon: <UserPlus size={12} /> },
           { id: 'guardianCooperation', label: 'تعاون ولي الأمر', icon: <UserPlus size={12} /> },
           { id: 'notes', label: 'ملاحظات أخرى', icon: <MessageSquare size={12} /> },
         ];
@@ -62,11 +63,11 @@ const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[]
           { id: 'all', label: 'الكل', icon: <Users size={12} /> },
           { id: 'attendance', label: 'الحضور', icon: <Clock size={12} /> },
           { id: 'preparation', label: 'التحضير', icon: <CheckCircle2 size={12} /> },
-          { id: 'supervision', label: 'الإشراف', icon: <UserCheck size={12} /> },
-          { id: 'violations', label: 'المخالفات', icon: <AlertCircle size={12} /> },
+          { id: 'supervision_queue', label: 'طابور الصباح', icon: <UserCheck size={12} /> },
+          { id: 'supervision_rest', label: 'إشراف الراحة', icon: <UserCheck size={12} /> },
+          { id: 'violations_score', label: 'المخالفات', icon: <AlertCircle size={12} /> },
         ];
       case 'special_reports':
-        // START OF CHANGE - Updated Hierarchy for Special Reports
         return [
           { id: 'all', label: 'جميع التقارير', icon: <History size={12} /> },
           { id: 'supervisor', label: 'المشرف الإداري', icon: <Briefcase size={12} /> },
@@ -85,47 +86,62 @@ const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[]
     }
   };
 
-  // START OF CHANGE - Helper for 3rd level sub-sub-categories
   const getSubSubTypes = (subType: string) => {
+    const commonRatings = [
+      { id: 'ممتاز', label: 'ممتاز' },
+      { id: 'جيد جدا', label: 'جيد جداً' },
+      { id: 'جيد', label: 'جيد' },
+      { id: 'متوسط', label: 'متوسط' },
+      { id: 'مقبول', label: 'مقبول' },
+      { id: 'ضعيف', label: 'ضعيف' },
+      { id: 'ضعيف جدا', label: 'ضعيف جداً' },
+    ];
+
+    if (['behaviorLevel', 'academicReading', 'academicWriting', 'academicParticipation'].includes(subType)) {
+      return commonRatings;
+    }
+    
+    if (subType === 'healthStatus') {
+        return [{ id: 'ممتاز', label: 'ممتاز' }, { id: 'مريض', label: 'مريض' }];
+    }
+    if (subType === 'workOutside') {
+        return [{ id: 'لا يعمل', label: 'لا يعمل' }, { id: 'يعمل', label: 'يعمل' }];
+    }
+    if (['guardianFollowUp', 'guardianCooperation'].includes(subType)) {
+        return [
+            { id: 'ممتازة', label: 'ممتازة' },
+            { id: 'متوسطة', label: 'متوسطة' },
+            { id: 'ضعيفة', label: 'ضعيفة' },
+            { id: 'عدواني', label: 'عدواني' }
+        ];
+    }
+
     switch (subType) {
       case 'supervisor':
         return [
-          { id: 'all', label: 'الكل' },
           { id: 'الخطة الفصلية', label: 'الخطة الفصلية' },
           { id: 'الخلاصة الشهرية', label: 'الخلاصة الشهرية' },
           { id: 'المهام اليومية', label: 'المهام اليومية' },
-          { id: 'المهام المضافة', label: 'المهام المضافة' },
-          { id: 'المهام المرحلة', label: 'المهام المرحلة' },
           { id: 'أهم المشكلات اليومية', label: 'أهم المشكلات اليومية' },
-          { id: 'التوصيات العامة', label: 'التوصيات العامة' },
           { id: 'احتياجات الدور', label: 'احتياجات الدور' },
           { id: 'سجل متابعة الدفاتر والتصحيح', label: 'سجل متابعة الدفاتر والتصحيح' },
-          { id: 'الجرد العام للعهد', label: 'الجرد العام للعهد' },
-          { id: 'ملاحظات عامة', label: 'ملاحظات عامة' },
         ];
       case 'staff':
         return [
-          { id: 'all', label: 'الكل' },
           { id: 'سجل الإبداع والتميز', label: 'سجل الإبداع والتميز' },
-          { id: 'كشف الاستلام والتسليم', label: 'كشف الاستلام والتسليم' },
           { id: 'المخالفات', label: 'المخالفات' },
           { id: 'التعميمات', label: 'التعميمات' },
         ];
       case 'students_sr':
         return [
-          { id: 'all', label: 'الكل' },
           { id: 'الغياب اليومي', label: 'الغياب اليومي' },
           { id: 'التأخر', label: 'التأخر' },
           { id: 'خروج طالب أثناء الدراسة', label: 'خروج طالب أثناء الدراسة' },
           { id: 'المخالفات الطلابية', label: 'المخالفات الطلابية' },
           { id: 'سجل الإتلاف المدرسي', label: 'سجل الإتلاف المدرسي' },
-          { id: 'سجل الحالات الخاصة', label: 'سجل الحالات الخاصة' },
-          { id: 'سجل الحالة الصحية', label: 'سجل الحالة الصحية' },
-          { id: 'سجل زيارة أولياء الأمور والتواصل بهم', label: 'سجل زيارة أولياء الأمور والتواصل بهم' },
         ];
       case 'tests':
         return [
-          { id: 'all', label: 'الكل' },
           { id: 'الاختبار الشهري', label: 'الاختبار الشهري' },
           { id: 'الاختبار الفصلي', label: 'الاختبار الفصلي' },
         ];
@@ -175,7 +191,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[]
 
   const [cards, setCards] = useState<CardConfig[]>(() => {
     const cats: DataCategory[] = ['students', 'teachers', 'violations', 'special_reports', 'substitutions', 'students', 'teachers', 'special_reports'];
-    return cats.map((cat, i) => ({ id: i + 1, category: cat, subType: 'all', subSubType: 'all' }));
+    return cats.map((cat, i) => ({ id: i + 1, category: cat, subType: 'all', subSubTypes: [] }));
   });
 
   useEffect(() => {
@@ -183,18 +199,47 @@ const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[]
     return () => clearInterval(timer);
   }, [cycleDuration]);
 
+  const getFilteredListForCard = (card: CardConfig) => {
+    let list = processedData[card.category] || [];
+    const subSubOptions = getSubSubTypes(card.subType);
+    
+    if (card.category === 'special_reports') {
+      if (card.subType !== 'all') {
+          list = list.filter(i => i.cat === card.subType);
+          if (subSubOptions.length > 0) {
+              if (card.subSubTypes.length > 0) {
+                  list = list.filter(i => card.subSubTypes.includes(i.sub));
+              } else {
+                  return []; // START OF CHANGE: Hide list if sub-options exist but none selected
+              }
+          }
+      }
+    } else if (card.subType !== 'all') {
+      if (card.category === 'substitutions') {
+          list = list.filter(i => i.paymentStatus === card.subType);
+      } else if (card.category === 'students' || card.category === 'teachers') {
+          list = list.filter(i => (i as any)[card.subType] !== undefined && (i as any)[card.subType] !== '');
+          
+          if (subSubOptions.length > 0) {
+              if (card.subSubTypes.length > 0) {
+                list = list.filter(i => {
+                  const val = String((i as any)[card.subType]);
+                  return card.subSubTypes.some(selected => val.includes(selected));
+                });
+              } else {
+                return []; // START OF CHANGE: Hide list if sub-options exist but none selected
+              }
+          }
+      }
+    }
+    return list;
+  };
+
   useEffect(() => {
     setCardOffsets(prev => {
       const nextOffsets = { ...prev };
       cards.forEach(card => {
-        let list = processedData[card.category] || [];
-        if (card.category === 'special_reports') {
-          if (card.subType !== 'all') list = list.filter(i => i.cat === card.subType);
-          if (card.subSubType !== 'all') list = list.filter(i => i.sub === card.subSubType);
-        } else if (card.subType !== 'all') {
-          if (card.category === 'substitutions') list = list.filter(i => i.paymentStatus === card.subType);
-          else if (card.category === 'students') list = list.filter(i => (i as any)[card.subType]);
-        }
+        const list = getFilteredListForCard(card);
         if (list.length > 3) {
           const current = nextOffsets[card.id] || 0;
           let next = current + 3;
@@ -204,10 +249,21 @@ const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[]
       });
       return nextOffsets;
     });
-  }, [cycleIndex, processedData]);
+  }, [cycleIndex, processedData, cards]);
 
   const updateCard = (id: number, updates: Partial<CardConfig>) => {
     setCards(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+  };
+
+  const toggleSubSubValue = (cardId: number, value: string) => {
+    setCards(prev => prev.map(c => {
+        if (c.id === cardId) {
+            const current = c.subSubTypes;
+            const updated = current.includes(value) ? current.filter(v => v !== value) : [...current, value];
+            return { ...c, subSubTypes: updated };
+        }
+        return c;
+    }));
   };
 
   const shiftCardData = (cardId: number, direction: 'prev' | 'next', max: number) => {
@@ -227,7 +283,6 @@ const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[]
     XLSX.writeFile(workbook, `${title}_Report.xlsx`);
   };
 
-  // START OF CHANGE - WhatsApp Rich Sharing Logic
   const handleExportWhatsApp = (title: string, list: any[]) => {
     let msg = `*📋 تقرير داشبورد: ${title}*\n`;
     msg += `*التاريخ:* ${new Date().toLocaleDateString('ar-EG')}\n`;
@@ -307,15 +362,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[]
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {cards.map((card, idx) => {
-          let list = processedData[card.category] || [];
-          if (card.category === 'special_reports') {
-            if (card.subType !== 'all') list = list.filter(i => i.cat === card.subType);
-            if (card.subSubType !== 'all') list = list.filter(i => i.sub === card.subSubType);
-          } else if (card.subType !== 'all') {
-            if (card.category === 'substitutions') list = list.filter(i => i.paymentStatus === card.subType);
-            else if (card.category === 'students') list = list.filter(i => (i as any)[card.subType]);
-          }
-
+          const list = getFilteredListForCard(card);
           const count = list.length;
           const currentCat = mainCategories.find(c => c.id === card.category);
           const currentSub = getSubTypes(card.category).find(s => s.id === card.subType);
@@ -327,7 +374,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[]
           return (
             <div 
                 key={card.id} 
-                className={`rounded-[2.5rem] border-2 ${design.border} p-4 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group flex flex-col gap-1.5 relative overflow-visible h-[310px] mt-6`}
+                className={`rounded-[2.5rem] border-2 ${design.border} p-4 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group flex flex-col gap-1.5 relative overflow-visible h-[340px] mt-6`}
                 style={{ background: design.gradient }}
             >
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-30">
@@ -336,7 +383,6 @@ const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[]
                  </div>
               </div>
 
-              {/* START OF CHANGE - Export Icons in corner */}
               <div className="absolute top-4 left-4 z-40 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={() => handleExportWhatsApp(currentSub?.label || currentCat?.label || 'تقرير', list)} className="p-1 bg-white/80 rounded-lg text-green-600 shadow-sm hover:bg-white"><Share2 size={12}/></button>
                 <button onClick={() => handleExportExcel(currentSub?.label || currentCat?.label || 'تقرير', list)} className="p-1 bg-white/80 rounded-lg text-blue-600 shadow-sm hover:bg-white"><FileSpreadsheet size={12}/></button>
@@ -350,7 +396,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[]
                         </div>
                         <select 
                             value={card.category}
-                            onChange={(e) => updateCard(card.id, { category: e.target.value as DataCategory, subType: 'all', subSubType: 'all' })}
+                            onChange={(e) => updateCard(card.id, { category: e.target.value as DataCategory, subType: 'all', subSubTypes: [] })}
                             className={`text-[9px] font-black bg-white ${design.text} rounded-lg px-2 py-1 outline-none border-none cursor-pointer shadow-sm hover:bg-slate-50 transition-colors uppercase tracking-wider`}
                         >
                             {mainCategories.map(cat => <option key={cat.id} value={cat.id}>{cat.label}</option>)}
@@ -363,30 +409,30 @@ const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[]
                       <div className={`p-1 rounded bg-white shadow-sm`}>{currentSub?.icon}</div>
                       <select 
                           value={card.subType}
-                          onChange={(e) => updateCard(card.id, { subType: e.target.value, subSubType: 'all' })}
+                          onChange={(e) => updateCard(card.id, { subType: e.target.value, subSubTypes: [] })}
                           className={`text-[9px] font-bold ${design.text} bg-transparent outline-none w-full cursor-pointer`}
                       >
                           {getSubTypes(card.category).map(sub => <option key={sub.id} value={sub.id}>{sub.label}</option>)}
                       </select>
                   </div>
                   
-                  {/* START OF CHANGE - Support for 3rd level sub-sub-type select */}
                   {subSubOptions.length > 0 && (
-                    <div className="flex items-center gap-1.5 bg-white/40 backdrop-blur-md p-0.5 rounded-lg border border-white/20 shadow-inner animate-in slide-in-from-top-1">
-                      <div className={`p-1 rounded bg-white/50 shadow-sm`}><Filter size={10} className="text-slate-400" /></div>
-                      <select 
-                          value={card.subSubType}
-                          onChange={(e) => updateCard(card.id, { subSubType: e.target.value })}
-                          className={`text-[8px] font-bold ${design.text} bg-transparent outline-none w-full cursor-pointer`}
-                      >
-                          {subSubOptions.map(ss => <option key={ss.id} value={ss.id}>{ss.label}</option>)}
-                      </select>
+                    <div className="flex flex-wrap gap-1 mt-1 p-1 bg-white/30 rounded-xl max-h-12 overflow-y-auto scrollbar-hide">
+                      {subSubOptions.map(ss => (
+                        <button 
+                            key={ss.id} 
+                            onClick={() => toggleSubSubValue(card.id, ss.id)}
+                            className={`px-2 py-0.5 rounded-full text-[7px] font-black transition-all border ${card.subSubTypes.includes(ss.id) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white/50 text-slate-500 border-white/20 hover:bg-white'}`}
+                        >
+                            {ss.label}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="flex-1 flex flex-col gap-1 py-1 relative z-10 overflow-hidden">
+              <div className="flex-1 flex flex-col gap-1.5 py-1.5 relative z-10 overflow-hidden">
                  {count === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-1">
                       <History size={20} className="opacity-20" />
@@ -397,18 +443,22 @@ const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[]
                         <div 
                           key={`${card.id}-${offset}-${i}`}
                           onClick={() => setView?.(currentCat?.view || 'dashboard')}
-                          className="bg-white/90 backdrop-blur-sm p-1 rounded-xl border border-white shadow-sm flex items-center gap-2 hover:bg-white hover:shadow-lg hover:-translate-x-1 cursor-pointer transition-all animate-in slide-in-from-right-2 fade-in duration-300 h-[38px]"
+                          className="bg-white/95 backdrop-blur-sm px-3 rounded-2xl border border-white shadow-sm flex items-center gap-3 hover:bg-white hover:shadow-xl hover:-translate-x-1 cursor-pointer transition-all animate-in slide-in-from-right-2 fade-in duration-300 h-[60px]"
                         >
-                           <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs bg-slate-50 border`}>
-                             {item.icon || <User size={12} />}
+                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm bg-slate-50 border-2 border-slate-100 flex-shrink-0`}>
+                             {item.icon || <User size={20} />}
                            </div>
-                           <div className="flex-1 overflow-hidden">
-                              <div className="font-black text-[9px] text-slate-800 truncate leading-none">{item.displayName}</div>
-                              <div className="text-[7px] text-slate-500 font-bold truncate">
-                                {item.grade ? `${item.grade} - ${item.section || ''}` : item.sub || item.subjectCode || item.date || '---'}
+                           {/* START OF CHANGE: Enlarged Name and Inline Data */}
+                           <div className="flex-1 flex items-center gap-3 overflow-hidden">
+                              <div className="font-black text-[19px] text-slate-900 truncate leading-none flex-shrink-0">
+                                {item.displayName}
+                              </div>
+                              <div className="text-[11px] text-blue-600 font-black truncate bg-blue-50/90 px-2.5 py-1.5 rounded-xl border border-blue-100/50 whitespace-nowrap min-w-0">
+                                {item.grade ? `${item.grade}-${item.section || ''}` : item.sub || item.subjectCode || item.date || '---'}
                               </div>
                            </div>
-                           <ChevronLeft size={10} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
+                           <ChevronLeft size={18} className="text-slate-300 group-hover:text-blue-500 transition-colors flex-shrink-0" />
+                           {/* END OF CHANGE */}
                         </div>
                     ))
                  )}
