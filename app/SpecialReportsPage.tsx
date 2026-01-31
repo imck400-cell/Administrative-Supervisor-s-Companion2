@@ -676,9 +676,16 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
 
     const handleWhatsAppAttendance = (mode: 'all' | 'present' | 'absent' | 'selected') => {
       let list = filteredPresence;
-      if (mode === 'present') list = list.filter(s => (attendanceMap[s.id] || 'present') === 'present');
-      if (mode === 'absent') list = list.filter(s => (attendanceMap[s.id] || 'present') === 'absent');
-      if (mode === 'selected') list = list.filter(s => selectedForWA.includes(s.id));
+      if (mode === 'present') {
+        list = list.filter(s => (attendanceMap[s.id] || 'present') === 'present');
+      } else if (mode === 'absent') {
+        list = list.filter(s => {
+          const status = attendanceMap[s.id] || 'present';
+          return status === 'absent_excused' || status === 'absent_unexcused';
+        });
+      } else if (mode === 'selected') {
+        list = list.filter(s => selectedForWA.includes(s.id));
+      }
 
       let msg = `*📋 حضور وغياب يوم: ${getDayName(presenceDate)}*\n`;
       msg += `*بتاريخ:* ${presenceDate}\n`;
@@ -687,13 +694,18 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
 
       list.forEach((s, idx) => {
         const status = attendanceMap[s.id] || 'present';
-        const statusIcon = status === 'present' ? '✅' : '❌';
-        const statusText = status === 'present' ? 'حاضر' : 'غائب';
+        const statusIcon = status === 'present' ? '✅' : status === 'absent_excused' ? '🟠' : '❌';
+        const statusText = status === 'present' ? 'حاضر' : status === 'absent_excused' ? 'غائب بعذر' : 'غائب بدون عذر';
         msg += `*${idx + 1}* 👤 *الاسم:* ${s.name}\n`;
         msg += `📍 *الصف:* ${s.grade} / ${s.section}\n`;
         msg += `🏷️ *الحالة:* ${statusIcon} ${statusText}\n`;
         msg += `📞 *ولي الأمر:* ${s.guardianPhones[0] || '---'}\n\n`;
       });
+
+      if (list.length === 0) {
+        alert('لا يوجد طلاب لإرسالهم في هذه الفئة.');
+        return;
+      }
 
       msg += `----------------------------------\n`;
       const profile = data.profile;
