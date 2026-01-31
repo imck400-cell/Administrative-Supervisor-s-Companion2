@@ -1458,8 +1458,8 @@ export const ViolationsPage: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white rounded-[2.5rem] shadow-xl border overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-[2.5rem] shadow-xl border overflow-visible">
+        <div className="overflow-x-auto overflow-y-visible">
           <table className="w-full text-center text-sm border-collapse min-w-[1200px]">
             <thead className="bg-[#FFD966] text-slate-800 font-black">
               {activeMode === 'teachers' ? (
@@ -1503,7 +1503,7 @@ export const ViolationsPage: React.FC = () => {
                   <tr key={v.id} className="hover:bg-slate-50 transition-colors font-bold group">
                     <td className="p-4 border-e border-slate-100 bg-slate-50/50">{idx + 1}</td>
 
-                    <td className="p-2 border-e border-slate-100 relative">
+                    <td className="p-2 border-e border-slate-100 relative overflow-visible">
                       <input
                         className="w-full text-right bg-transparent outline-none focus:ring-1 ring-blue-200 rounded p-1"
                         value={activeMode === 'students' ? v.studentName : v.teacherName}
@@ -1513,7 +1513,7 @@ export const ViolationsPage: React.FC = () => {
                         placeholder="اكتب الاسم..."
                       />
                       {activeSearchId === v.id && (activeMode === 'students' ? v.studentName : v.teacherName).trim() !== '' && (
-                        <div className="absolute top-full left-0 right-0 z-[100] bg-white border-2 shadow-2xl rounded-xl max-h-48 overflow-y-auto block mt-1 border-blue-100">
+                        <div className="absolute bottom-full left-0 right-0 z-[9999] bg-white border-2 shadow-2xl rounded-xl max-h-48 overflow-y-auto block mb-1 border-blue-100" style={{ position: 'absolute', zIndex: 9999 }}>
                           {(activeMode === 'students' ? studentList.map(s => s.name) : teacherList)
                             .filter(n => n.includes(activeMode === 'students' ? v.studentName : v.teacherName))
                             .filter(n => n !== (activeMode === 'students' ? v.studentName : v.teacherName))
