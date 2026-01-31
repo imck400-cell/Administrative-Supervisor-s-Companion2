@@ -383,7 +383,7 @@ export const DailyReportsPage: React.FC = () => {
 
       fieldsConfig.forEach(f => {
         if (selectedForExport.includes(f.key) && !['teacherName'].includes(f.key)) {
-          let val = (teacher as any)[f.key];
+          let val = teacher[f.key as keyof TeacherFollowUp];
           if (f.key === 'total') val = calculateTotal(teacher);
           if (f.key === 'percent') {
             const mTotal = calculateMaxTotal(teacher);
@@ -399,7 +399,13 @@ export const DailyReportsPage: React.FC = () => {
       msg += `------------------------------\n`;
     });
 
-    msg += `\n*رفيق المشرف الإداري 🚀*`;
+    // START OF CHANGE - Requirement: Footer with School Name and Branch
+    const profile = data.profile;
+    if (profile.schoolName || profile.branch) {
+      msg += `\n🏫 *${profile.schoolName || ''}${profile.branch ? `، فرع ${profile.branch}` : ''}*\n`;
+    }
+
+    // END OF CHANGE
 
     const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
@@ -1222,7 +1228,11 @@ export const ViolationsPage: React.FC = () => {
     });
 
     msg += `----------------------------------\n`;
-    msg += `*رفيق المشرف الإداري - إبراهيم دخان*`;
+    const profile = data.profile;
+    if (profile.schoolName || profile.branch) {
+      msg += `🏫 *${profile.schoolName || ''}${profile.branch ? `، فرع ${profile.branch}` : ''}*\n`;
+    }
+
     return msg;
   };
 
@@ -1680,6 +1690,9 @@ export const StudentsReportsPage: React.FC = () => {
   const [waSelector, setWaSelector] = useState<{ type: 'bulk' | 'single', student?: StudentReport } | null>(null);
   const [waSelectedFields, setWaSelectedFields] = useState<string[]>(['all']);
 
+  const [showImportConfirmModal, setShowImportConfirmModal] = useState(false);
+  const [pendingImportData, setPendingImportData] = useState<StudentReport[]>([]);
+
   const waFieldOptions = [
     { key: 'all', label: 'جميع البيانات' },
     { key: 'name', label: 'اسم الطالب' },
@@ -1807,6 +1820,33 @@ export const StudentsReportsPage: React.FC = () => {
     updateData({ studentReports: [...studentData, newStudent] });
   };
 
+  const handleDeleteDuplicates = () => {
+    if (!confirm(lang === 'ar' ? 'سيتم حذف جميع السجلات المكررة (الاسم، الصف، الشعبة) والإبقاء على الأقدم فقط. هل أنت متأكد؟' : 'All duplicate records (Name, Grade, Section) will be deleted, keeping only the oldest. Are you sure?')) return;
+
+    const seen = new Map<string, StudentReport>();
+    const toKeep: StudentReport[] = [];
+
+    const sortedData = [...studentData].sort((a, b) =>
+      new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+    );
+
+    sortedData.forEach(s => {
+      const key = `${s.name.trim()}-${s.grade}-${s.section}`;
+      if (!seen.has(key)) {
+        seen.set(key, s);
+        toKeep.push(s);
+      }
+    });
+
+    if (toKeep.length === studentData.length) {
+      alert(lang === 'ar' ? 'لا يوجد تكرار لحذفه' : 'No duplicates found to delete');
+      return;
+    }
+
+    updateData({ studentReports: toKeep });
+    alert(lang === 'ar' ? `تم حذف ${studentData.length - toKeep.length} سجل مكرر` : `Deleted ${studentData.length - toKeep.length} duplicate records`);
+  };
+
   const bulkAutoFill = () => {
     if (!confirm(lang === 'ar' ? 'سيتم تعبئة الخيار الأول لجميع الحقول في كافة الطلاب. استمرار؟' : 'Auto-fill first option for all students?')) return;
     const updated = studentData.map(s => ({
@@ -1849,9 +1889,26 @@ export const StudentsReportsPage: React.FC = () => {
         behaviorLevel: optionsAr.behavior[0], mainNotes: [], otherNotesText: '', guardianEducation: optionsAr.eduStatus[0],
         guardianFollowUp: optionsAr.followUp[0], guardianCooperation: optionsAr.cooperation[0], notes: '', createdAt: new Date().toISOString()
       }));
-      updateData({ studentReports: [...studentData, ...imported as any] });
+
+      // Check for duplicates
+      const duplicates = (imported as any[]).filter(imp =>
+        studentData.some(existing =>
+          existing.name.trim() === imp.name.trim() &&
+          existing.grade === imp.grade &&
+          existing.section === imp.section
+        )
+      );
+
+      if (duplicates.length > 0) {
+        setPendingImportData(imported as any);
+        setShowImportConfirmModal(true);
+      } else {
+        updateData({ studentReports: [...studentData, ...imported as any] });
+        alert(lang === 'ar' ? 'تم استيراد البيانات بنجاح' : 'Data imported successfully');
+      }
     };
     reader.readAsBinaryString(file);
+    if (e.target) e.target.value = '';
   };
 
   const filteredData = useMemo(() => {
@@ -1982,7 +2039,11 @@ export const StudentsReportsPage: React.FC = () => {
       text += `----------------------------------\n`;
     });
 
-    text += `\n*إعداد رفيق المشرف الإداري - إبراهيم دخان*`;
+    const profile = data.profile;
+    if (profile.schoolName || profile.branch) {
+      text += `🏫 *${profile.schoolName || ''}${profile.branch ? `، فرع ${profile.branch}` : ''}*\n`;
+    }
+
     return text;
   };
 
@@ -2089,6 +2150,14 @@ export const StudentsReportsPage: React.FC = () => {
             <Upload className="w-4 h-4" /> {lang === 'ar' ? 'استيراد ملف' : 'Import File'}
             <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} />
           </label>
+
+          <button
+            onClick={handleDeleteDuplicates}
+            className="flex items-center gap-2 bg-red-50 text-red-700 px-4 py-2.5 rounded-xl font-bold text-sm border border-red-200 hover:bg-red-100 transition-all"
+          >
+            <Trash2 size={16} /> {lang === 'ar' ? 'حذف التكرار' : 'Delete Duplicates'}
+          </button>
+
           <button onClick={bulkAutoFill} className="flex items-center gap-2 bg-purple-50 text-purple-700 px-4 py-2.5 rounded-xl font-bold text-sm border border-purple-200 hover:bg-purple-100 transition-all">
             <Sparkles className="w-4 h-4" /> {lang === 'ar' ? 'التعبئة التلقائية' : 'Auto Fill'}
           </button>
@@ -2713,6 +2782,71 @@ export const StudentsReportsPage: React.FC = () => {
         </div>
       )}
       {/* END OF CHANGE */}
+
+      {showImportConfirmModal && (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 font-arabic">
+          <div className="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl border-4 border-blue-50 animate-in zoom-in-95 duration-300 text-right">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl mb-4">
+                <AlertCircle size={32} />
+              </div>
+              <h3 className="text-xl font-black text-slate-800">بيانات مكررة مكتشفة</h3>
+              <p className="text-slate-500 font-medium mt-2">لقد تم العثور على طلاب موجودين مسبقاً في الملف المرفوع. كيف تود المتابعة؟</p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  updateData({ studentReports: [...studentData, ...pendingImportData] });
+                  setShowImportConfirmModal(false);
+                  setPendingImportData([]);
+                  alert(lang === 'ar' ? 'تم استيراد كافة البيانات بنجاح' : 'All data imported successfully');
+                }}
+                className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-blue-50 border-2 border-slate-100 hover:border-blue-200 rounded-2xl transition-all group"
+              >
+                <ChevronLeft className="text-slate-300 group-hover:text-blue-500" size={20} />
+                <div className="text-right">
+                  <div className="font-black text-slate-800">استيراد الكل</div>
+                  <div className="text-[10px] text-slate-500">إضافة كافة البيانات بما فيها المكرر</div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  const filtered = pendingImportData.filter(imp =>
+                    !studentData.some(existing =>
+                      existing.name.trim() === imp.name.trim() &&
+                      existing.grade === imp.grade &&
+                      existing.section === imp.section
+                    )
+                  );
+                  updateData({ studentReports: [...studentData, ...filtered] });
+                  setShowImportConfirmModal(false);
+                  setPendingImportData([]);
+                  alert(lang === 'ar' ? `تم استيراد ${filtered.length} سجل جديد وتجاهل المكرر` : `Imported ${filtered.length} new records and skipped duplicates`);
+                }}
+                className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-emerald-50 border-2 border-slate-100 hover:border-emerald-200 rounded-2xl transition-all group"
+              >
+                <ChevronLeft className="text-slate-300 group-hover:text-emerald-500" size={20} />
+                <div className="text-right">
+                  <div className="font-black text-slate-800">استيراد غير المكرر فقط</div>
+                  <div className="text-[10px] text-slate-500">تجاهل الطلاب الموجودين مسبقاً</div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowImportConfirmModal(false);
+                  setPendingImportData([]);
+                }}
+                className="w-full p-4 text-slate-400 font-bold hover:text-slate-600 transition-colors"
+              >
+                إلغاء العملية
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
