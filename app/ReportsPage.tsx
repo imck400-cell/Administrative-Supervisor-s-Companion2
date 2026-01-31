@@ -149,19 +149,48 @@ export const DailyReportsPage: React.FC = () => {
     updateData({ dailyReports: updatedReports });
   };
 
-  const updateTeacher = (teacherId: string, field: string, value: any) => {
+  const updateTeacher = (teacherId: string, updates: Record<string, any>) => {
     if (!activeReportId) return;
     const updatedReports = reports.map(r => {
       if (r.id === activeReportId) {
         return {
           ...r,
-          teachersData: r.teachersData.map(t => t.id === teacherId ? { ...t, [field]: value } : t)
+          teachersData: r.teachersData.map(t => t.id === teacherId ? { ...t, ...updates } : t)
         };
       }
       return r;
     });
     updateData({ dailyReports: updatedReports });
   };
+
+  // Map teacher names to their profiles for quick lookup and auto-fill
+  const teacherProfiles = useMemo(() => {
+    const profiles: Record<string, { subject: string, class: string }> = {};
+
+    // 1. Get from timetable (base list)
+    (data.timetable || []).forEach(t => {
+      if (t.teacherName) {
+        const name = t.teacherName.trim();
+        profiles[name] = { subject: t.subject || '', class: '' };
+      }
+    });
+
+    // 2. Supplement from dailyReports (natural order: newest at end will win)
+    (data.dailyReports || []).forEach(r => {
+      r.teachersData.forEach(t => {
+        if (t.teacherName) {
+          const name = t.teacherName.trim();
+          profiles[name] = {
+            subject: t.subjectCode || profiles[name]?.subject || '',
+            class: t.className || profiles[name]?.class || ''
+          };
+        }
+      });
+    });
+    return profiles;
+  }, [data.dailyReports, data.timetable]);
+
+  const allTeacherNames = useMemo(() => Object.keys(teacherProfiles).sort(), [teacherProfiles]);
 
   const fillAllMax = () => {
     if (!activeReportId) return;
@@ -571,70 +600,90 @@ export const DailyReportsPage: React.FC = () => {
                   >
                     <td className="p-1 border-e sticky right-0 bg-white group-hover:bg-slate-50 font-bold text-xs font-sans">{idx + 1}</td>
                     <td className="p-1 border-e sticky right-10 bg-white group-hover:bg-slate-50">
-                      <input className="w-full text-right font-bold outline-none bg-transparent text-xs" value={t.teacherName} onChange={e => updateTeacher(t.id, 'teacherName', e.target.value)} placeholder="اسم المعلم.." />
+                      <input
+                        list="teacher-names-list"
+                        className="w-full text-right font-bold outline-none bg-transparent text-xs"
+                        value={t.teacherName}
+                        onChange={e => {
+                          const newName = e.target.value;
+                          const trimmed = newName.trim();
+                          const updates: any = { teacherName: newName };
+                          if (trimmed && teacherProfiles[trimmed]) {
+                            const p = teacherProfiles[trimmed];
+                            if (p.subject) updates.subjectCode = p.subject;
+                            if (p.class) updates.className = p.class;
+                          }
+                          updateTeacher(t.id, updates);
+                        }}
+                        placeholder="اسم المعلم.."
+                      />
                     </td>
-                    {!filterMode.includes('metric') && (
-                      <>
-                        <td className="p-1 border-e">
-                          <select className="w-full bg-transparent outline-none text-[10px] text-center font-bold" value={t.gender || 'ذكر'} onChange={e => updateTeacher(t.id, 'gender', e.target.value)}>
-                            <option value="ذكر">ذكر</option>
-                            <option value="أنثى">أنثى</option>
-                          </select>
-                        </td>
-                        <td className="p-1 border-e">
-                          <MultiSelectDropDown
-                            label="المواد"
-                            options={subjects}
-                            selected={t.subjectCode ? t.subjectCode.split(', ') : []}
-                            onChange={(vals) => updateTeacher(t.id, 'subjectCode', vals.join(', '))}
-                            emoji="📚"
-                          />
-                        </td>
-                        <td className="p-1 border-e">
-                          <MultiSelectDropDown
-                            label="الصفوف"
-                            options={grades}
-                            selected={t.className ? t.className.split(', ') : []}
-                            onChange={(vals) => updateTeacher(t.id, 'className', vals.join(', '))}
-                            emoji="🎓"
-                          />
-                        </td>
-                      </>
-                    )}
-                    {displayedMetrics.filter(m => m.key !== 'violations_score').map(m => {
-                      const isUnaccredited = (t.unaccreditedMetrics || []).includes(m.key);
-                      return (
-                        <td key={m.key} className={`p-1 border-e relative group ${isUnaccredited ? 'bg-red-50/30' : ''}`}>
-                          <div className="flex flex-col items-center gap-0.5 h-full">
-                            <input
-                              id={`input-${t.id}-${m.key}`}
-                              type="number"
-                              disabled={isUnaccredited}
-                              className={`w-full text-center outline-none bg-transparent font-bold text-xs focus:bg-blue-50 focus:ring-1 focus:ring-blue-200 rounded font-sans ${isUnaccredited ? 'opacity-30 pointer-events-none' : ''} ${!isUnaccredited && (Number((t as any)[m.key]) || 0) <= m.max * 0.25 ? 'text-red-600' : 'text-slate-800'}`}
-                              value={(t as any)[m.key]}
-                              onChange={e => {
-                                const val = Math.min(m.max, Math.max(0, parseInt(e.target.value) || 0));
-                                updateTeacher(t.id, m.key as keyof TeacherFollowUp, val);
-                              }}
-                              onKeyDown={(e) => handleKeyDown(e, idx, m.key)}
-                              onFocus={(e) => e.target.select()}
+                    {
+                      !filterMode.includes('metric') && (
+                        <>
+                          <td className="p-1 border-e">
+                            <select className="w-full bg-transparent outline-none text-[10px] text-center font-bold" value={t.gender || 'ذكر'} onChange={e => updateTeacher(t.id, { gender: e.target.value })}>
+                              <option value="ذكر">ذكر</option>
+                              <option value="أنثى">أنثى</option>
+                            </select>
+                          </td>
+                          <td className="p-1 border-e">
+                            <MultiSelectDropDown
+                              label="المواد"
+                              options={subjects}
+                              selected={t.subjectCode ? t.subjectCode.split(', ') : []}
+                              onChange={(vals) => updateTeacher(t.id, { subjectCode: vals.join(', ') })}
+                              emoji="📚"
                             />
-                            {/* Toggle Button */}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); toggleAccreditation(t.id, m.key); }}
-                              className={`transition-all flex items-center justify-center p-0.5 rounded ${isUnaccredited ? 'text-red-500 hover:scale-110' : 'text-green-500 hover:scale-110 opacity-20 group-hover:opacity-100'}`}
-                              title={isUnaccredited ? 'اعتماد الدرجة' : 'استبعاد من الحساب'}
-                            >
-                              <Star size={10} className={isUnaccredited ? 'fill-red-500' : 'fill-green-500'} />
-                              {isUnaccredited && <X size={8} className="absolute mb-4 mr-4" />}
-                            </button>
-                            {isUnaccredited && (
-                              <div className="text-[7px] text-red-500 font-bold whitespace-nowrap">غير معتمد</div>
-                            )}
-                          </div>
-                        </td>
-                      );
-                    })}
+                          </td>
+                          <td className="p-1 border-e">
+                            <MultiSelectDropDown
+                              label="الصفوف"
+                              options={grades}
+                              selected={t.className ? t.className.split(', ') : []}
+                              onChange={(vals) => updateTeacher(t.id, { className: vals.join(', ') })}
+                              emoji="🎓"
+                            />
+                          </td>
+                        </>
+                      )
+                    }
+                    {
+                      displayedMetrics.filter(m => m.key !== 'violations_score').map(m => {
+                        const isUnaccredited = (t.unaccreditedMetrics || []).includes(m.key);
+                        return (
+                          <td key={m.key} className={`p-1 border-e relative group ${isUnaccredited ? 'bg-red-50/30' : ''}`}>
+                            <div className="flex flex-col items-center gap-0.5 h-full">
+                              <input
+                                id={`input-${t.id}-${m.key}`}
+                                type="number"
+                                disabled={isUnaccredited}
+                                className={`w-full text-center outline-none bg-transparent font-bold text-xs focus:bg-blue-50 focus:ring-1 focus:ring-blue-200 rounded font-sans ${isUnaccredited ? 'opacity-30 pointer-events-none' : ''} ${!isUnaccredited && (Number((t as any)[m.key]) || 0) <= m.max * 0.25 ? 'text-red-600' : 'text-slate-800'}`}
+                                value={(t as any)[m.key]}
+                                onChange={e => {
+                                  const val = Math.min(m.max, Math.max(0, parseInt(e.target.value) || 0));
+                                  updateTeacher(t.id, { [m.key]: val });
+                                }}
+                                onKeyDown={(e) => handleKeyDown(e, idx, m.key)}
+                                onFocus={(e) => e.target.select()}
+                              />
+                              {/* Toggle Button */}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleAccreditation(t.id, m.key); }}
+                                className={`transition-all flex items-center justify-center p-0.5 rounded ${isUnaccredited ? 'text-red-500 hover:scale-110' : 'text-green-500 hover:scale-110 opacity-20 group-hover:opacity-100'}`}
+                                title={isUnaccredited ? 'اعتماد الدرجة' : 'استبعاد من الحساب'}
+                              >
+                                <Star size={10} className={isUnaccredited ? 'fill-red-500' : 'fill-green-500'} />
+                                {isUnaccredited && <X size={8} className="absolute mb-4 mr-4" />}
+                              </button>
+                              {isUnaccredited && (
+                                <div className="text-[7px] text-red-500 font-bold whitespace-nowrap">غير معتمد</div>
+                              )}
+                            </div>
+                          </td>
+                        );
+                      })
+                    }
                     <td
                       className="p-1 border-e cursor-pointer hover:bg-red-50 transition-colors relative group"
                       onClick={() => setViolationModal({ id: t.id, notes: t.violations_notes })}
@@ -808,7 +857,7 @@ export const DailyReportsPage: React.FC = () => {
                       const exists = violationModal.notes.includes(v);
                       const newNotes = exists ? violationModal.notes.filter(n => n !== v) : [...violationModal.notes, v];
                       setViolationModal({ ...violationModal, notes: newNotes });
-                      updateTeacher(violationModal.id, 'violations_notes', newNotes);
+                      updateTeacher(violationModal.id, { violations_notes: newNotes });
                     }}
                     className={`w-full p-3 rounded-xl text-right font-bold border transition-all flex justify-between ${violationModal.notes.includes(v) ? 'bg-red-50 border-red-500 text-red-700' : 'bg-slate-50 border-slate-100'}`}
                   >
@@ -829,225 +878,226 @@ export const DailyReportsPage: React.FC = () => {
 
       {/* Teacher Report Modal */}
       {/* Teacher Report Modal */}
-      {showTeacherReport && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-2xl border border-slate-100 flex flex-col md:flex-row">
-            {/* Left Panel: Search & Select */}
-            <div className="md:w-1/3 bg-slate-50 p-8 border-e border-slate-100 flex flex-col overflow-hidden">
-              <div className="mb-6">
-                <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
-                  <Search size={20} className="text-blue-600" />
-                  <span>البحث عن معلم</span>
-                </h3>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="ابحث بالاسم أو المادة.."
-                    className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 focus:border-blue-500 outline-none transition-all pr-12 font-bold shadow-sm"
-                    value={reportTeacherSearch}
-                    onChange={e => setReportTeacherSearch(e.target.value)}
-                  />
-                  <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+      {
+        showTeacherReport && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="bg-white rounded-[2.5rem] w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-2xl border border-slate-100 flex flex-col md:flex-row">
+              {/* Left Panel: Search & Select */}
+              <div className="md:w-1/3 bg-slate-50 p-8 border-e border-slate-100 flex flex-col overflow-hidden">
+                <div className="mb-6">
+                  <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
+                    <Search size={20} className="text-blue-600" />
+                    <span>البحث عن معلم</span>
+                  </h3>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="ابحث بالاسم أو المادة.."
+                      className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 focus:border-blue-500 outline-none transition-all pr-12 font-bold shadow-sm"
+                      value={reportTeacherSearch}
+                      onChange={e => setReportTeacherSearch(e.target.value)}
+                    />
+                    <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  {teachers.filter(t => t.teacherName.includes(reportTeacherSearch) || t.subjectCode.includes(reportTeacherSearch)).map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => { setReportTeacherId(t.id); setReportSelectedFields(['teacherName', 'subjectCode', 'className', 'gender', 'total', 'percent']); }}
+                      className={`w-full p-4 rounded-2xl flex items-center justify-between transition-all border-2 text-right ${reportTeacherId === t.id
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100'
+                        : 'bg-white border-transparent hover:border-blue-200 text-slate-700 shadow-sm'}`}
+                    >
+                      <div className="text-right">
+                        <div className="font-black text-sm">{t.teacherName || 'معلم جديد'}</div>
+                        <div className={`text-[10px] font-bold truncate ${reportTeacherId === t.id ? 'text-blue-100' : 'text-slate-400'}`}>
+                          {t.subjectCode || 'بدون مادة'} - {t.className || 'بدون صف'}
+                        </div>
+                      </div>
+                      {reportTeacherId === t.id && <Check size={18} />}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                {teachers.filter(t => t.teacherName.includes(reportTeacherSearch) || t.subjectCode.includes(reportTeacherSearch)).map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => { setReportTeacherId(t.id); setReportSelectedFields(['teacherName', 'subjectCode', 'className', 'gender', 'total', 'percent']); }}
-                    className={`w-full p-4 rounded-2xl flex items-center justify-between transition-all border-2 text-right ${reportTeacherId === t.id
-                      ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100'
-                      : 'bg-white border-transparent hover:border-blue-200 text-slate-700 shadow-sm'}`}
-                  >
-                    <div className="text-right">
-                      <div className="font-black text-sm">{t.teacherName || 'معلم جديد'}</div>
-                      <div className={`text-[10px] font-bold truncate ${reportTeacherId === t.id ? 'text-blue-100' : 'text-slate-400'}`}>
-                        {t.subjectCode || 'بدون مادة'} - {t.className || 'بدون صف'}
+              {/* Right Panel: Data Entry & Export */}
+              <div className="md:w-2/3 p-8 flex flex-col bg-white overflow-hidden">
+                {reportTeacherId ? (
+                  <>
+                    <div className="flex items-center justify-between mb-6">
+                      <button
+                        onClick={() => setShowTeacherReport(false)}
+                        className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400"
+                      >
+                        <X size={24} />
+                      </button>
+                      <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                        <FileText className="text-blue-600" />
+                        <span>تقرير متابعة معلم</span>
+                      </h2>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setShowWhatsAppSelect(true)}
+                          className="p-2.5 bg-green-50 text-green-600 rounded-xl border border-green-200 hover:bg-green-100 transition-all font-bold flex items-center gap-2 text-sm shadow-sm"
+                        >
+                          <MessageCircle size={18} />
+                          <span className="hidden sm:inline">واتساب</span>
+                        </button>
                       </div>
                     </div>
-                    {reportTeacherId === t.id && <Check size={18} />}
-                  </button>
-                ))}
-              </div>
-            </div>
 
-            {/* Right Panel: Data Entry & Export */}
-            <div className="md:w-2/3 p-8 flex flex-col bg-white overflow-hidden">
-              {reportTeacherId ? (
-                <>
-                  <div className="flex items-center justify-between mb-6">
-                    <button
-                      onClick={() => setShowTeacherReport(false)}
-                      className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400"
-                    >
-                      <X size={24} />
-                    </button>
-                    <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
-                      <FileText className="text-blue-600" />
-                      <span>تقرير متابعة معلم</span>
-                    </h2>
-                    <div className="flex items-center gap-2">
+                    {/* Field Selection Grid */}
+                    <div className="mb-4 p-3 border-2 border-blue-50 rounded-2xl bg-slate-50/50">
+                      <label className="text-xs font-black text-slate-500 mb-2 block text-center">اختر المجالات المعروضة في التقرير</label>
+                      <div className="flex flex-wrap gap-2 justify-center max-h-32 overflow-y-auto p-1 custom-scrollbar">
+                        {fieldsConfig.map(f => (
+                          <button
+                            key={f.key}
+                            onClick={() => setReportSelectedFields(prev => prev.includes(f.key) ? prev.filter(k => k !== f.key) : [...prev, f.key])}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all flex items-center gap-1.5 shadow-sm border ${reportSelectedFields.includes(f.key)
+                              ? `${f.color} text-white border-transparent scale-105`
+                              : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'}`}
+                          >
+                            <span>{f.emoji}</span>
+                            <span>{f.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Data Entry Form */}
+                    <div className="space-y-2 flex-1 overflow-y-auto px-1 mb-4 custom-scrollbar">
+                      {reportSelectedFields.map(fieldKey => {
+                        const field = fieldsConfig.find(f => f.key === fieldKey);
+                        const teacher = teachers.find(t => t.id === reportTeacherId);
+                        if (!field || !teacher) return null;
+
+                        if (fieldKey === 'total') {
+                          return (
+                            <div key={fieldKey} className="flex items-center gap-4 bg-slate-100 p-3 rounded-xl border border-slate-200 text-right font-sans" dir="rtl">
+                              <span className="font-black text-slate-600 w-1/3 font-arabic">{field.emoji} {field.label}</span>
+                              <span className="font-black text-blue-600 text-lg">{calculateTotal(teacher)} / {calculateMaxTotal(teacher)}</span>
+                            </div>
+                          );
+                        }
+                        if (fieldKey === 'percent') {
+                          const score = calculateTotal(teacher);
+                          const mTotal = calculateMaxTotal(teacher);
+                          const percent = mTotal > 0 ? ((score / mTotal) * 100).toFixed(1) : '0';
+                          return (
+                            <div key={fieldKey} className="flex items-center gap-4 bg-slate-100 p-3 rounded-xl border border-slate-200 text-right font-sans" dir="rtl">
+                              <span className="font-black text-slate-600 w-1/3 font-arabic">{field.emoji} {field.label}</span>
+                              <span className="font-black text-blue-600 text-lg">{percent}%</span>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div key={fieldKey} className="flex items-center gap-4 bg-white p-2 rounded-xl border hover:border-blue-400 transition-colors shadow-sm text-right" dir="rtl">
+                            <label className="font-bold text-slate-700 w-1/3 flex items-center gap-2">
+                              <span className="p-1.5 bg-slate-50 rounded-lg text-sm">{field.emoji}</span>
+                              <span className="text-sm">{field.label}</span>
+                            </label>
+                            <div className="flex-1">
+                              {fieldKey === 'subjectCode' ? (
+                                <MultiSelectDropDown
+                                  label="المواد"
+                                  options={subjects}
+                                  selected={teacher.subjectCode ? teacher.subjectCode.split(', ') : []}
+                                  onChange={(vals) => updateTeacher(teacher.id, { subjectCode: vals.join(', ') })}
+                                  emoji="📚"
+                                />
+                              ) : fieldKey === 'className' ? (
+                                <MultiSelectDropDown
+                                  label="الصفوف"
+                                  options={grades}
+                                  selected={teacher.className ? teacher.className.split(', ') : []}
+                                  onChange={(vals) => updateTeacher(teacher.id, { className: vals.join(', ') })}
+                                  emoji="🎓"
+                                />
+                              ) : fieldKey === 'gender' ? (
+                                <select className="w-full p-2 bg-slate-50 rounded-lg font-bold text-center outline-none focus:ring-2 ring-blue-100" value={teacher.gender || 'ذكر'} onChange={e => updateTeacher(teacher.id, { gender: e.target.value })}>
+                                  <option value="ذكر">ذكر</option>
+                                  <option value="أنثى">أنثى</option>
+                                </select>
+                              ) : fieldKey === 'teacherName' ? (
+                                <input
+                                  type="text"
+                                  className="w-full p-2 bg-slate-50 rounded-lg font-bold text-center outline-none focus:ring-2 ring-blue-100"
+                                  value={teacher.teacherName}
+                                  onChange={e => updateTeacher(teacher.id, { teacherName: e.target.value })}
+                                />
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    disabled={(teacher.unaccreditedMetrics || []).includes(fieldKey)}
+                                    className={`flex-1 p-2 bg-slate-50 rounded-lg font-bold text-center outline-none focus:ring-2 ring-blue-100 font-sans ${(teacher.unaccreditedMetrics || []).includes(fieldKey) ? 'opacity-30' : ''}`}
+                                    value={(teacher as any)[fieldKey]}
+                                    onChange={e => {
+                                      const metric = metricsConfig.find(m => m.key === fieldKey);
+                                      const max = metric ? metric.max : 100;
+                                      const val = Math.min(max, Math.max(0, parseInt(e.target.value) || 0));
+                                      updateTeacher(teacher.id, { [fieldKey]: val });
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => toggleAccreditation(teacher.id, fieldKey)}
+                                    className={`p-2 rounded-lg transition-all flex items-center gap-1 ${(teacher.unaccreditedMetrics || []).includes(fieldKey) ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'}`}
+                                    title={(teacher.unaccreditedMetrics || []).includes(fieldKey) ? 'اعتماد' : 'استبعاد'}
+                                  >
+                                    <Star size={16} className={(teacher.unaccreditedMetrics || []).includes(fieldKey) ? 'fill-red-500' : 'fill-green-500'} />
+                                    {(teacher.unaccreditedMetrics || []).includes(fieldKey) && <X size={12} />}
+                                  </button>
+                                  {metricsConfig.find(m => m.key === fieldKey) && (
+                                    <span className={`text-[10px] font-black font-sans ${(teacher.unaccreditedMetrics || []).includes(fieldKey) ? 'text-red-500' : 'text-slate-400'} whitespace-nowrap`}>
+                                      / {metricsConfig.find(m => m.key === fieldKey)?.max}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex gap-4 mt-auto pt-6 border-t border-slate-100">
                       <button
-                        onClick={() => setShowWhatsAppSelect(true)}
-                        className="p-2.5 bg-green-50 text-green-600 rounded-xl border border-green-200 hover:bg-green-100 transition-all font-bold flex items-center gap-2 text-sm shadow-sm"
+                        onClick={() => setShowTeacherReport(false)}
+                        className="flex-1 bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2 text-lg text-right"
                       >
-                        <MessageCircle size={18} />
-                        <span className="hidden sm:inline">واتساب</span>
+                        <CheckCircle size={22} />
+                        حفظ وإنهاء
+                      </button>
+                      <button
+                        onClick={() => {
+                          setReportTeacherId('');
+                          setReportTeacherSearch('');
+                          setReportSelectedFields([]);
+                          setShowTeacherReport(false);
+                        }}
+                        className="px-8 bg-slate-50 text-slate-500 font-bold py-4 rounded-2xl border border-slate-200 hover:bg-white transition-all text-lg"
+                      >
+                        إلغاء
                       </button>
                     </div>
-                  </div>
-
-                  {/* Field Selection Grid */}
-                  <div className="mb-4 p-3 border-2 border-blue-50 rounded-2xl bg-slate-50/50">
-                    <label className="text-xs font-black text-slate-500 mb-2 block text-center">اختر المجالات المعروضة في التقرير</label>
-                    <div className="flex flex-wrap gap-2 justify-center max-h-32 overflow-y-auto p-1 custom-scrollbar">
-                      {fieldsConfig.map(f => (
-                        <button
-                          key={f.key}
-                          onClick={() => setReportSelectedFields(prev => prev.includes(f.key) ? prev.filter(k => k !== f.key) : [...prev, f.key])}
-                          className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all flex items-center gap-1.5 shadow-sm border ${reportSelectedFields.includes(f.key)
-                            ? `${f.color} text-white border-transparent scale-105`
-                            : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'}`}
-                        >
-                          <span>{f.emoji}</span>
-                          <span>{f.label}</span>
-                        </button>
-                      ))}
+                  </>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-4">
+                    <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center">
+                      <UserCircle size={48} className="text-slate-200" />
                     </div>
+                    <p className="font-bold text-lg text-center">يرجى اختيار معلم من القائمة الجانبية لإدارة تقريره</p>
+                    <button onClick={() => setShowTeacherReport(false)} className="text-blue-600 font-black hover:underline">إغلاق النافذة</button>
                   </div>
-
-                  {/* Data Entry Form */}
-                  <div className="space-y-2 flex-1 overflow-y-auto px-1 mb-4 custom-scrollbar">
-                    {reportSelectedFields.map(fieldKey => {
-                      const field = fieldsConfig.find(f => f.key === fieldKey);
-                      const teacher = teachers.find(t => t.id === reportTeacherId);
-                      if (!field || !teacher) return null;
-
-                      if (fieldKey === 'total') {
-                        return (
-                          <div key={fieldKey} className="flex items-center gap-4 bg-slate-100 p-3 rounded-xl border border-slate-200 text-right font-sans" dir="rtl">
-                            <span className="font-black text-slate-600 w-1/3 font-arabic">{field.emoji} {field.label}</span>
-                            <span className="font-black text-blue-600 text-lg">{calculateTotal(teacher)} / {calculateMaxTotal(teacher)}</span>
-                          </div>
-                        );
-                      }
-                      if (fieldKey === 'percent') {
-                        const score = calculateTotal(teacher);
-                        const mTotal = calculateMaxTotal(teacher);
-                        const percent = mTotal > 0 ? ((score / mTotal) * 100).toFixed(1) : '0';
-                        return (
-                          <div key={fieldKey} className="flex items-center gap-4 bg-slate-100 p-3 rounded-xl border border-slate-200 text-right font-sans" dir="rtl">
-                            <span className="font-black text-slate-600 w-1/3 font-arabic">{field.emoji} {field.label}</span>
-                            <span className="font-black text-blue-600 text-lg">{percent}%</span>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div key={fieldKey} className="flex items-center gap-4 bg-white p-2 rounded-xl border hover:border-blue-400 transition-colors shadow-sm text-right" dir="rtl">
-                          <label className="font-bold text-slate-700 w-1/3 flex items-center gap-2">
-                            <span className="p-1.5 bg-slate-50 rounded-lg text-sm">{field.emoji}</span>
-                            <span className="text-sm">{field.label}</span>
-                          </label>
-                          <div className="flex-1">
-                            {fieldKey === 'subjectCode' ? (
-                              <MultiSelectDropDown
-                                label="المواد"
-                                options={subjects}
-                                selected={teacher.subjectCode ? teacher.subjectCode.split(', ') : []}
-                                onChange={(vals) => updateTeacher(teacher.id, 'subjectCode', vals.join(', '))}
-                                emoji="📚"
-                              />
-                            ) : fieldKey === 'className' ? (
-                              <MultiSelectDropDown
-                                label="الصفوف"
-                                options={grades}
-                                selected={teacher.className ? teacher.className.split(', ') : []}
-                                onChange={(vals) => updateTeacher(teacher.id, 'className', vals.join(', '))}
-                                emoji="🎓"
-                              />
-                            ) : fieldKey === 'gender' ? (
-                              <select className="w-full p-2 bg-slate-50 rounded-lg font-bold text-center outline-none focus:ring-2 ring-blue-100" value={teacher.gender || 'ذكر'} onChange={e => updateTeacher(teacher.id, 'gender', e.target.value)}>
-                                <option value="ذكر">ذكر</option>
-                                <option value="أنثى">أنثى</option>
-                              </select>
-                            ) : fieldKey === 'teacherName' ? (
-                              <input
-                                type="text"
-                                className="w-full p-2 bg-slate-50 rounded-lg font-bold text-center outline-none focus:ring-2 ring-blue-100"
-                                value={teacher.teacherName}
-                                onChange={e => updateTeacher(teacher.id, 'teacherName', e.target.value)}
-                              />
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  disabled={(teacher.unaccreditedMetrics || []).includes(fieldKey)}
-                                  className={`flex-1 p-2 bg-slate-50 rounded-lg font-bold text-center outline-none focus:ring-2 ring-blue-100 font-sans ${(teacher.unaccreditedMetrics || []).includes(fieldKey) ? 'opacity-30' : ''}`}
-                                  value={(teacher as any)[fieldKey]}
-                                  onChange={e => {
-                                    const metric = metricsConfig.find(m => m.key === fieldKey);
-                                    const max = metric ? metric.max : 100;
-                                    const val = Math.min(max, Math.max(0, parseInt(e.target.value) || 0));
-                                    updateTeacher(teacher.id, fieldKey, val);
-                                  }}
-                                />
-                                <button
-                                  onClick={() => toggleAccreditation(teacher.id, fieldKey)}
-                                  className={`p-2 rounded-lg transition-all flex items-center gap-1 ${(teacher.unaccreditedMetrics || []).includes(fieldKey) ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'}`}
-                                  title={(teacher.unaccreditedMetrics || []).includes(fieldKey) ? 'اعتماد' : 'استبعاد'}
-                                >
-                                  <Star size={16} className={(teacher.unaccreditedMetrics || []).includes(fieldKey) ? 'fill-red-500' : 'fill-green-500'} />
-                                  {(teacher.unaccreditedMetrics || []).includes(fieldKey) && <X size={12} />}
-                                </button>
-                                {metricsConfig.find(m => m.key === fieldKey) && (
-                                  <span className={`text-[10px] font-black font-sans ${(teacher.unaccreditedMetrics || []).includes(fieldKey) ? 'text-red-500' : 'text-slate-400'} whitespace-nowrap`}>
-                                    / {metricsConfig.find(m => m.key === fieldKey)?.max}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="flex gap-4 mt-auto pt-6 border-t border-slate-100">
-                    <button
-                      onClick={() => setShowTeacherReport(false)}
-                      className="flex-1 bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2 text-lg text-right"
-                    >
-                      <CheckCircle size={22} />
-                      حفظ وإنهاء
-                    </button>
-                    <button
-                      onClick={() => {
-                        setReportTeacherId('');
-                        setReportTeacherSearch('');
-                        setReportSelectedFields([]);
-                        setShowTeacherReport(false);
-                      }}
-                      className="px-8 bg-slate-50 text-slate-500 font-bold py-4 rounded-2xl border border-slate-200 hover:bg-white transition-all text-lg"
-                    >
-                      إلغاء
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-4">
-                  <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center">
-                    <UserCircle size={48} className="text-slate-200" />
-                  </div>
-                  <p className="font-bold text-lg text-center">يرجى اختيار معلم من القائمة الجانبية لإدارة تقريره</p>
-                  <button onClick={() => setShowTeacherReport(false)} className="text-blue-600 font-black hover:underline">إغلاق النافذة</button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )
+        )
       }
       {/* WhatsApp Selection Modal */}
       {
@@ -1100,22 +1150,36 @@ export const ViolationsPage: React.FC = () => {
   const [tempNames, setTempNames] = useState<string[]>([]);
   const [nameInput, setNameInput] = useState('');
   const [showFilter, setShowFilter] = useState(false);
+  const [activeSearchId, setActiveSearchId] = useState<string | null>(null);
 
   const studentList = data.studentReports || [];
 
   // Map teacher names to their profiles for quick lookup and auto-fill
   const teacherProfiles = useMemo(() => {
     const profiles: Record<string, { subject: string, class: string }> = {};
-    // Reverse iterate to get the most recent data if duplicates exist
-    [...data.dailyReports].reverse().forEach(r => {
+
+    // 1. Get from timetable (base list)
+    (data.timetable || []).forEach(t => {
+      if (t.teacherName) {
+        const name = t.teacherName.trim();
+        profiles[name] = { subject: t.subject || '', class: '' };
+      }
+    });
+
+    // 2. Supplement from dailyReports (natural order: newest at end will win)
+    (data.dailyReports || []).forEach(r => {
       r.teachersData.forEach(t => {
-        if (t.teacherName && !profiles[t.teacherName]) {
-          profiles[t.teacherName] = { subject: t.subjectCode, class: t.className };
+        if (t.teacherName) {
+          const name = t.teacherName.trim();
+          profiles[name] = {
+            subject: t.subjectCode || profiles[name]?.subject || '',
+            class: t.className || profiles[name]?.class || ''
+          };
         }
       });
     });
     return profiles;
-  }, [data.dailyReports]);
+  }, [data.dailyReports, data.timetable]);
 
   const teacherList = useMemo(() => Object.keys(teacherProfiles), [teacherProfiles]);
 
@@ -1158,26 +1222,31 @@ export const ViolationsPage: React.FC = () => {
     if (activeMode === 'students') {
       const student = studentList.find(s => s.name === suggestionName);
       if (student) {
+        const prevCount = (data.violations || []).filter(v => v.type === 'students' && v.studentName === student.name).length;
         const updated = data.violations.map(v => v.id === rowId ? {
           ...v,
           studentName: student.name,
           grade: student.grade,
-          section: student.section
+          section: student.section,
+          prevViolations: prevCount
         } : v);
         updateData({ violations: updated });
       }
     } else {
       const profile = teacherProfiles[suggestionName];
       if (profile) {
+        const prevCount = (data.violations || []).filter(v => v.type === 'teachers' && v.teacherName === suggestionName).length;
         const updated = data.violations.map(v => v.id === rowId ? {
           ...v,
           teacherName: suggestionName,
           subject: profile.subject,
-          class: profile.class
+          class: profile.class,
+          prevViolations: prevCount
         } : v);
         updateData({ violations: updated });
       }
     }
+    setActiveSearchId(null);
   };
 
   const deleteViolation = (id: string) => {
@@ -1263,6 +1332,24 @@ export const ViolationsPage: React.FC = () => {
 
   const handleWhatsApp = () => {
     const url = `https://wa.me/?text=${encodeURIComponent(generateRichReport())}`;
+    window.open(url, '_blank');
+  };
+
+  const handleWhatsAppIndividual = (row: any) => {
+    let msg = `*📋 إشعار تعهد ومخالفة (${activeMode === 'students' ? 'طلاب' : 'معلمون'})*\n\n`;
+    msg += `👤 *الاسم:* ${activeMode === 'students' ? row.studentName : row.teacherName}\n`;
+    msg += `📍 *الصف:* ${row.grade || row.class || '---'} ${activeMode === 'students' ? `/ ${row.section || '---'}` : ''}\n`;
+    if (activeMode === 'teachers') msg += `📚 *المادة:* ${row.subject || '---'}\n`;
+    msg += `🔢 *عدد المخالفات:* ${row.prevViolations || 0}\n`;
+    msg += `📅 *التاريخ:* ${row.date} (${row.day || '---'})\n`;
+    msg += `⚠️ *بيان المخالفة:* _${row.violation || '---'}_\n`;
+    msg += `🛡️ *الإجراء المتخذ:* _${row.procedure || '---'}_\n`;
+    msg += `✍️ *التوقيع:* _${row.signature || '---'}_\n\n`;
+
+    const profile = data.profile;
+    if (profile.schoolName) msg += `🏫 *${profile.schoolName}*`;
+
+    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
   };
 
@@ -1387,7 +1474,8 @@ export const ViolationsPage: React.FC = () => {
                   <th className="p-4 border-e border-slate-300 w-40">التاريخ</th>
                   <th className="p-4 border-e border-slate-300">الإجراء</th>
                   <th className="p-4 border-e border-slate-300 w-64">التوقيع</th>
-                  <th className="p-4"></th>
+                  <th className="p-4 border-e border-slate-300 w-16 text-green-600 bg-green-50/50"><button onClick={handleWhatsApp} title="إرسال الكل للواتساب"><MessageCircle size={18} className="mx-auto" /></button></th>
+                  <th className="p-4 w-12"></th>
                 </tr>
               ) : (
                 <tr>
@@ -1400,7 +1488,8 @@ export const ViolationsPage: React.FC = () => {
                   <th className="p-4 border-e border-slate-300">بيان المخالفة</th>
                   <th className="p-4 border-e border-slate-300">الإجراء المتخذ</th>
                   <th className="p-4 border-e border-slate-300 w-64">التوقيع</th>
-                  <th className="p-4"></th>
+                  <th className="p-4 border-e border-slate-300 w-16 text-green-600 bg-green-50/50"><button onClick={handleWhatsApp} title="إرسال الكل للواتساب"><MessageCircle size={18} className="mx-auto" /></button></th>
+                  <th className="p-4 w-12"></th>
                 </tr>
               )}
             </thead>
@@ -1418,18 +1507,22 @@ export const ViolationsPage: React.FC = () => {
                       <input
                         className="w-full text-right bg-transparent outline-none focus:ring-1 ring-blue-200 rounded p-1"
                         value={activeMode === 'students' ? v.studentName : v.teacherName}
+                        onFocus={() => setActiveSearchId(v.id)}
+                        onBlur={() => setTimeout(() => setActiveSearchId(null), 200)}
                         onChange={(e) => updateViolation(v.id, activeMode === 'students' ? 'studentName' : 'teacherName', e.target.value)}
                         placeholder="اكتب الاسم..."
                       />
-                      {((activeMode === 'students' ? v.studentName : v.teacherName).length > 2) && (
-                        <div className="absolute top-full left-0 right-0 z-[100] bg-white border shadow-xl rounded-lg max-h-32 overflow-y-auto hidden group-focus-within:block">
+                      {activeSearchId === v.id && (activeMode === 'students' ? v.studentName : v.teacherName).trim() !== '' && (
+                        <div className="absolute top-full left-0 right-0 z-[100] bg-white border-2 shadow-2xl rounded-xl max-h-48 overflow-y-auto block mt-1 border-blue-100">
                           {(activeMode === 'students' ? studentList.map(s => s.name) : teacherList)
                             .filter(n => n.includes(activeMode === 'students' ? v.studentName : v.teacherName))
+                            .filter(n => n !== (activeMode === 'students' ? v.studentName : v.teacherName))
+                            .slice(0, 8)
                             .map(suggestion => (
                               <button
                                 key={suggestion}
                                 onMouseDown={() => handleSelectSuggestion(v.id, suggestion)}
-                                className="w-full text-right p-2 text-[10px] hover:bg-blue-50 border-b last:border-none"
+                                className="w-full text-right p-3 text-[11px] hover:bg-blue-50 border-b last:border-none font-black text-slate-700 hover:text-blue-700 transition-colors"
                               >
                                 {suggestion}
                               </button>
@@ -1524,8 +1617,14 @@ export const ViolationsPage: React.FC = () => {
                       </div>
                     </td>
 
+                    <td className="p-2 border-e border-slate-100">
+                      <button onClick={() => handleWhatsAppIndividual(v)} className="text-green-500 hover:text-green-700 transition-colors p-2 hover:bg-green-50 rounded-lg" title="إرسال واتس">
+                        <MessageCircle size={18} />
+                      </button>
+                    </td>
+
                     <td className="p-2">
-                      <button onClick={() => deleteViolation(v.id)} className="text-red-300 hover:text-red-600 transition-colors">
+                      <button onClick={() => deleteViolation(v.id)} className="text-red-300 hover:text-red-600 transition-colors p-2 hover:bg-red-50 rounded-lg">
                         <Trash2 size={16} />
                       </button>
                     </td>
@@ -1541,7 +1640,7 @@ export const ViolationsPage: React.FC = () => {
 };
 
 // Memoized Row for performance optimization
-const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShowNotesModal, toggleStar, isHighlighted, onRowClick }: {
+const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShowNotesModal, toggleStar, isHighlighted, onRowClick, setWaSelector }: {
   s: StudentReport;
   optionsAr: any;
   optionsEn: any;
@@ -1551,6 +1650,7 @@ const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShow
   toggleStar: (id: string, type: any) => void;
   isHighlighted: boolean;
   onRowClick: (id: any) => void;
+  setWaSelector: (val: any) => void;
 }) => {
   return (
     <tr onClick={() => onRowClick(s.id)} className={`transition-colors h-10 group cursor-pointer ${isHighlighted ? 'bg-cyan-50' : 'hover:bg-blue-50/20'}`}>
@@ -1623,6 +1723,21 @@ const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShow
           {optionsAr.level.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.level[optionsAr.level.indexOf(o)]}</option>)}
         </select>
       </td>
+      <td className="p-1 border-e border-slate-100 bg-[#E2F0D9]/10">
+        <input className={`text-[8px] w-full text-center outline-none bg-transparent ${s.absenceSummary?.includes('بدون') ? 'text-red-500 font-bold' : ''}`} value={s.absenceSummary || ''} onChange={(e) => updateStudent(s.id, 'absenceSummary', e.target.value)} placeholder="..." />
+      </td>
+      <td className="p-1 border-e border-slate-100 bg-[#E2F0D9]/10">
+        <input className="text-[8px] w-full text-center outline-none bg-transparent" value={s.latenessSummary || ''} onChange={(e) => updateStudent(s.id, 'latenessSummary', e.target.value)} placeholder="..." />
+      </td>
+      <td className="p-1 border-e border-slate-100 bg-[#E2F0D9]/10">
+        <input className="text-[8px] w-full text-center outline-none bg-transparent" value={s.exitSummary || ''} onChange={(e) => updateStudent(s.id, 'exitSummary', e.target.value)} placeholder="..." />
+      </td>
+      <td className="p-1 border-e border-slate-100 bg-[#E2F0D9]/10">
+        <input className={`text-[8px] w-full text-center outline-none bg-transparent ${s.violationSummary ? 'text-red-600 font-black' : ''}`} value={s.violationSummary || ''} onChange={(e) => updateStudent(s.id, 'violationSummary', e.target.value)} placeholder="..." />
+      </td>
+      <td className="p-1 border-e border-slate-100 bg-[#E2F0D9]/10">
+        <input className="text-[8px] w-full text-center outline-none bg-transparent" value={s.damageSummary || ''} onChange={(e) => updateStudent(s.id, 'damageSummary', e.target.value)} placeholder="..." />
+      </td>
       <td className="p-1 border-e border-slate-100">
         <select className={`text-[9px] font-bold w-full appearance-none text-center outline-none bg-transparent ${s.behaviorLevel.includes('ضعيف') ? 'text-red-600' : ''}`} value={s.behaviorLevel} onChange={(e) => updateStudent(s.id, 'behaviorLevel', e.target.value)}>
           {optionsAr.behavior.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.behavior[optionsAr.behavior.indexOf(o)]}</option>)}
@@ -1656,10 +1771,21 @@ const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShow
           {optionsAr.cooperation.map((o: any) => <option key={o} value={o}>{lang === 'ar' ? o : optionsEn.cooperation[optionsAr.cooperation.indexOf(o)]}</option>)}
         </select>
       </td>
-      <td className="p-1">
-        <button onClick={() => setShowNotesModal({ id: s.id, text: s.notes })} className="p-1.5 bg-slate-100 hover:bg-blue-100 rounded-lg transition-all">
-          {s.notes ? <CheckCircle size={14} className="text-green-500" /> : <Settings2 size={14} className="text-slate-400" />}
+      <td className="p-1 text-center border-e border-slate-100">
+        <button onClick={(e) => { e.stopPropagation(); setShowNotesModal({ id: s.id, text: s.notes }); }} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all">
+          <FileText size={14} />
         </button>
+      </td>
+      <td className="p-1 border-e border-slate-100">
+        <div className="flex items-center justify-center">
+          <button
+            onClick={(e) => { e.stopPropagation(); setWaSelector({ type: 'single', student: s }); }}
+            className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-all"
+            title={lang === 'ar' ? 'إرسال واتساب' : 'Send WhatsApp'}
+          >
+            <MessageCircle size={14} />
+          </button>
+        </div>
       </td>
     </tr>
   );
@@ -1704,6 +1830,11 @@ export const StudentsReportsPage: React.FC = () => {
     { key: 'guardian', label: 'ولي الأمر (الاسم، الهاتف)' },
     { key: 'academic', label: 'المستوى العلمي (قراءة، كتابة، مشاركة)' },
     { key: 'behavior', label: 'المستوى السلوكي' },
+    { key: 'abs', label: 'الغياب اليومي' },
+    { key: 'late', label: 'التأخر' },
+    { key: 'exit', label: 'خروج طالب' },
+    { key: 'viol', label: 'المخالفات الطلابية' },
+    { key: 'damage', label: 'الإتلاف المدرسي' },
     { key: 'main_notes', label: 'الملاحظات الأساسية' },
     { key: 'guardian_followup', label: 'ولي الأمر المتابع (تعليم، متابعة، تعاون)' },
     { key: 'other_notes', label: 'ملاحظات أخرى' },
@@ -1757,7 +1888,12 @@ export const StudentsReportsPage: React.FC = () => {
     behaviorLevel: "المستوى السلوكي",
     guardianEducation: "تعليم ولي الأمر",
     guardianFollowUp: "متابعة ولي الأمر",
-    guardianCooperation: "تعاون ولي الأمر"
+    guardianCooperation: "تعاون ولي الأمر",
+    absenceSummary: "الغياب اليومي",
+    latenessSummary: "التأخر",
+    exitSummary: "خروج طالب",
+    violationSummary: "المخالفات الطلابية",
+    damageSummary: "الإتلاف المدرسي"
   } : {
     gender: "Gender",
     grade: "Grade",
@@ -1769,7 +1905,12 @@ export const StudentsReportsPage: React.FC = () => {
     behaviorLevel: "Behavior Level",
     guardianEducation: "Guardian Education",
     guardianFollowUp: "Guardian Follow-up",
-    guardianCooperation: "Guardian Cooperation"
+    guardianCooperation: "Guardian Cooperation",
+    absenceSummary: "Absence",
+    latenessSummary: "Lateness",
+    exitSummary: "Exit",
+    violationSummary: "Violations",
+    damageSummary: "Damage"
   };
 
   const detailFieldConfigs = [
@@ -1932,8 +2073,31 @@ export const StudentsReportsPage: React.FC = () => {
         s.mainNotes.some(n => selectedSpecifics.includes(n))
       );
     }
-    return result;
-  }, [studentData, filterMode, filterValue, selectedSpecifics, selectedStudentNames]);
+
+    // Auto-sync metrics from special reports
+    return result.map(s => {
+      const absences = (data.absenceLogs || []).filter(l => l.studentId === s.id);
+      const lateness = (data.latenessLogs || []).filter(l => l.studentId === s.id);
+      const exits = (data.exitLogs || []).filter(l => l.studentId === s.id);
+      const violations = (data.studentViolationLogs || []).filter(l => l.studentId === s.id);
+      const damages = (data.damageLogs || []).filter(l => l.studentId === s.id);
+
+      const calculatedAbsence = absences.length > 0 ? `بعذر: ${absences.filter(a => a.reason.includes('بعذر')).length}، بدون: ${absences.filter(a => !a.reason.includes('بعذر')).length}` : '';
+      const calculatedLateness = lateness.length > 0 ? `${lateness.length}` : '';
+      const calculatedExit = exits.length > 0 ? `${exits.length}` : '';
+      const calculatedViolation = violations.length > 0 ? violations.map(v => [...(v.behaviorViolations || []), ...(v.dutiesViolations || []), ...(v.achievementViolations || [])].join('، ')).filter(v => v).join(' | ') : '';
+      const calculatedDamage = damages.length > 0 ? damages.map(d => d.description).join(' | ') : '';
+
+      return {
+        ...s,
+        absenceSummary: s.absenceSummary || calculatedAbsence,
+        latenessSummary: s.latenessSummary || calculatedLateness,
+        exitSummary: s.exitSummary || calculatedExit,
+        violationSummary: s.violationSummary || calculatedViolation,
+        damageSummary: s.damageSummary || calculatedDamage,
+      };
+    });
+  }, [studentData, filterMode, filterValue, selectedSpecifics, selectedStudentNames, data.absenceLogs, data.latenessLogs, data.exitLogs, data.studentViolationLogs, data.damageLogs]);
 
   const suggestions = useMemo(() => {
     if (!studentInput.trim()) return [];
@@ -1991,52 +2155,67 @@ export const StudentsReportsPage: React.FC = () => {
     text += `----------------------------------\n\n`;
 
     studentsList.forEach((s, i) => {
-      text += `*🔹 الطالب (${i + 1}):*\n`;
+      text += `*👤 الطالب (${i + 1}):*\n`;
       const isAll = fields.includes('all');
 
-      if (isAll || fields.includes('name')) text += `👤 *الاسم:* ${s.name}\n`;
-      if (isAll || fields.includes('grade')) text += `📍 *الصف:* ${s.grade}\n`;
-      if (isAll || fields.includes('section')) text += `🏁 *الشعبة:* ${s.section}\n`;
-      if (isAll || fields.includes('gender')) text += `🚻 *النوع:* ${s.gender}\n`;
+      if (isAll || fields.includes('name')) text += `  ▫️ *الاسم:* ${s.name}\n`;
+      if (isAll || fields.includes('grade')) text += `  ▫️ *الصف:* ${s.grade}\n`;
+      if (isAll || fields.includes('section')) text += `  ▫️ *الشعبة:* ${s.section}\n`;
+      if (isAll || fields.includes('gender')) text += `  ▫️ *النوع:* ${s.gender}\n`;
       if (isAll || fields.includes('address_work')) {
-        text += `🏠 *السكن:* ${s.address || '---'}\n`;
-        text += `💼 *العمل:* ${s.workOutside}\n`;
+        text += `  🏠 *السكن:* ${s.address || '---'}\n`;
+        text += `  💼 *العمل:* ${s.workOutside}\n`;
       }
       if (isAll || fields.includes('health')) {
-        text += `🏥 *الحالة الصحية:* ${formatWAValue(s.healthStatus)}${s.healthDetails ? ` (${s.healthDetails})` : ''}\n`;
+        text += `  🏥 *الحالة الصحية:* ${formatWAValue(s.healthStatus)}${s.healthDetails ? ` (${s.healthDetails})` : ''}\n`;
       }
       if (isAll || fields.includes('guardian')) {
-        text += `👨‍👩‍👧 *ولي الأمر:* ${s.guardianName || '---'}\n`;
-        text += `📞 *الهواتف:* ${s.guardianPhones.join(' - ')}\n`;
+        text += `  👨‍👩‍👧 *ولي الأمر:* ${s.guardianName || '---'}\n`;
+        text += `  📞 *الهواتف:* ${s.guardianPhones.join(' - ')}\n`;
       }
       if (isAll || fields.includes('academic')) {
-        text += `📚 *المستوى العلمي:*\n`;
-        text += `   📖 قراءة: ${formatWAValue(s.academicReading)}\n`;
-        text += `   ✍️ الكتابة: ${formatWAValue(s.academicWriting)}\n`;
-        text += `   🙋 المشاركة: ${formatWAValue(s.academicParticipation)}\n`;
+        text += `  📚 *المستوى العلمي:*\n`;
+        text += `     📖 القراءة: ${formatWAValue(s.academicReading)}\n`;
+        text += `     ✍️ الكتابة: ${formatWAValue(s.academicWriting)}\n`;
+        text += `     🙋 المشاركة: ${formatWAValue(s.academicParticipation)}\n`;
       }
       if (isAll || fields.includes('behavior')) {
-        text += `🎭 *المستوى السلوكي:* ${formatWAValue(s.behaviorLevel)}\n`;
+        text += `  🎭 *المستوى السلوكي:* ${formatWAValue(s.behaviorLevel)}\n`;
+      }
+      if (isAll || fields.includes('abs')) {
+        text += `  🕒 *الغياب اليومي:* ${s.absenceSummary ? formatWAValue(s.absenceSummary) : '---'}\n`;
+      }
+      if (isAll || fields.includes('late')) {
+        text += `  ⏱️ *التأخر:* ${s.latenessSummary ? formatWAValue(s.latenessSummary) : '---'}\n`;
+      }
+      if (isAll || fields.includes('exit')) {
+        text += `  🚪 *خروج أثناء الدراسة:* ${s.exitSummary ? formatWAValue(s.exitSummary) : '---'}\n`;
+      }
+      if (isAll || fields.includes('viol')) {
+        text += `  ⚠️ *المخالفات الطلابية:* ${s.violationSummary ? formatWAValue(s.violationSummary) : '---'}\n`;
+      }
+      if (isAll || fields.includes('damage')) {
+        text += `  🔨 *الإتلاف المدرسي:* ${s.damageSummary ? formatWAValue(s.damageSummary) : '---'}\n`;
       }
       if (isAll || fields.includes('main_notes')) {
         if (s.mainNotes.length > 0) {
-          text += `⚠️ *الملاحظات الأساسية:*\n`;
-          s.mainNotes.forEach(n => text += `   🔴 ${n}\n`);
+          text += `  🚨 *الملاحظات الأساسية:*\n`;
+          s.mainNotes.forEach(n => text += `     🔴 ${n}\n`);
         } else {
-          text += `⚠️ *الملاحظات الأساسية:* ---\n`;
+          text += `  🚨 *الملاحظات الأساسية:* ---\n`;
         }
       }
       if (isAll || fields.includes('guardian_followup')) {
-        text += `🤝 *متابعة ولي الأمر:*\n`;
-        text += `   🎓 التعليم: ${s.guardianEducation}\n`;
-        text += `   📈 المتابعة: ${formatWAValue(s.guardianFollowUp)}\n`;
-        text += `   🤝 التعاون: ${formatWAValue(s.guardianCooperation)}\n`;
+        text += `  🤝 *متابعة ولي الأمر:*\n`;
+        text += `     🎓 التعليم: ${s.guardianEducation}\n`;
+        text += `     📈 المتابعة: ${formatWAValue(s.guardianFollowUp)}\n`;
+        text += `     🤝 التعاون: ${formatWAValue(s.guardianCooperation)}\n`;
       }
       if (isAll || fields.includes('other_notes')) {
-        if (s.notes) text += `📝 *ملاحظات أخرى:* ${s.notes}\n`;
-        if (s.otherNotesText) text += `🔖 *ملاحظات برمجية:* ${s.otherNotesText}\n`;
+        if (s.notes) text += `  📝 *ملاحظات أخرى:* ${s.notes}\n`;
+        if (s.otherNotesText) text += `  🔖 *ملاحظات برمجية:* ${s.otherNotesText}\n`;
       }
-      text += `----------------------------------\n`;
+      text += `\n`;
     });
 
     const profile = data.profile;
@@ -2262,10 +2441,16 @@ export const StudentsReportsPage: React.FC = () => {
                     <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black">{lang === 'ar' ? 'الحالة الصحية' : 'Health Status'}</th>
                     <th rowSpan={2} className="px-2 border-e border-slate-300 w-32 text-xs font-black">{lang === 'ar' ? 'ولي الأمر (الاسم/الهواتف)' : 'Guardian (Name/Phones)'}</th>
                     <th colSpan={3} className="px-1 border-e border-slate-300 bg-[#FFF2CC] text-xs font-black">{lang === 'ar' ? 'المستوى العلمي' : 'Academic Level'}</th>
+                    <th colSpan={5} className="px-1 border-e border-slate-300 bg-[#E2F0D9] text-xs font-black">{lang === 'ar' ? 'سجل المتابعة الخاصة' : 'Special Logs'}</th>
                     <th rowSpan={2} className="px-2 border-e border-slate-300 w-24 text-xs font-black">{lang === 'ar' ? 'المستوى السلوكي' : 'Behavior Level'}</th>
                     <th rowSpan={2} className="px-2 border-e border-slate-300 w-44 text-xs font-black">{lang === 'ar' ? 'الملاحظات الأساسية' : 'Main Notes'}</th>
                     <th colSpan={3} className="px-1 border-e border-slate-300 bg-[#DDEBF7] text-xs font-black">{lang === 'ar' ? 'ولي الأمر المتابع' : 'Guardian Follow-up'}</th>
-                    <th rowSpan={2} className="px-2 w-10 text-xs font-black">{lang === 'ar' ? 'ملاحظات أخرى' : 'Other Notes'}</th>
+                    <th rowSpan={2} className="px-2 border-e border-slate-300 w-10 text-xs font-black">{lang === 'ar' ? 'ملاحظات أخرى' : 'Other Notes'}</th>
+                    <th rowSpan={2} className="px-2 border-slate-300 w-16 text-xs font-black">
+                      <button onClick={sendWhatsApp} className="flex items-center gap-1 bg-green-600 text-white px-2 py-1 rounded-lg text-[9px] hover:bg-green-700 mx-auto">
+                        <MessageCircle size={10} /> {lang === 'ar' ? 'إرسال واتس' : 'Send WA'}
+                      </button>
+                    </th>
                   </>
                 )}
 
@@ -2279,6 +2464,11 @@ export const StudentsReportsPage: React.FC = () => {
                   <th className="border-e border-slate-300 bg-[#FFF2CC]/50">{lang === 'ar' ? 'قراءة' : 'Read'}</th>
                   <th className="border-e border-slate-300 bg-[#FFF2CC]/50">{lang === 'ar' ? 'كتابة' : 'Write'}</th>
                   <th className="border-e border-slate-300 bg-[#FFF2CC]/50">{lang === 'ar' ? 'مشاركة' : 'Part'}</th>
+                  <th className="border-e border-slate-300 bg-[#E2F0D9]/50 text-[8px]">{lang === 'ar' ? 'الغياب' : 'Absence'}</th>
+                  <th className="border-e border-slate-300 bg-[#E2F0D9]/50 text-[8px]">{lang === 'ar' ? 'التأخر' : 'Lateness'}</th>
+                  <th className="border-e border-slate-300 bg-[#E2F0D9]/50 text-[8px]">{lang === 'ar' ? 'الخروج' : 'Exit'}</th>
+                  <th className="border-e border-slate-300 bg-[#E2F0D9]/50 text-[8px]">{lang === 'ar' ? 'المخالفات' : 'Violations'}</th>
+                  <th className="border-e border-slate-300 bg-[#E2F0D9]/50 text-[8px]">{lang === 'ar' ? 'الإتلاف' : 'Damage'}</th>
                   <th className="border-e border-slate-300 bg-[#DDEBF7]/50">{lang === 'ar' ? 'تعليم' : 'Edu'}</th>
                   <th className="border-e border-slate-300 bg-[#DDEBF7]/50">{lang === 'ar' ? 'متابعة' : 'Follow'}</th>
                   <th className="border-e border-slate-300 bg-[#DDEBF7]/50">{lang === 'ar' ? 'تعاون' : 'Coop'}</th>
@@ -2307,6 +2497,7 @@ export const StudentsReportsPage: React.FC = () => {
                     toggleStar={toggleStar}
                     isHighlighted={highlightedRow === s.id}
                     onRowClick={setHighlightedRow}
+                    setWaSelector={setWaSelector}
                   />
                 ))
               )}

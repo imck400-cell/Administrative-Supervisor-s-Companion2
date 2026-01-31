@@ -258,7 +258,7 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
   });
 
   const [damageForm, setDamageForm] = useState<Partial<DamageLog>>({
-    date: today, semester: 'الفصلين', description: '', statusTags: [], action: 'تنبيه', pledge: '', notes: '', prevDamageCount: 0
+    date: today, semester: 'الفصلين', description: '', participants: '', followUpStatus: 'قيد المتابعة', statusTags: [], action: 'تنبيه', pledge: '', notes: '', prevDamageCount: 0
   });
 
   const [visitForm, setVisitForm] = useState<Partial<ParentVisitLog>>({
@@ -1352,7 +1352,7 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
   };
 
   const renderLatenessModule = () => {
-    const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
+    const suggestions = (searchQuery.trim() && searchQuery !== latenessForm.studentName) ? students.filter(s => s.name.includes(searchQuery)) : [];
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
     const filtered = (data.latenessLogs || []).filter(l => {
       if (appliedNames.length > 0 && !appliedNames.includes(l.studentName)) return false;
@@ -1535,7 +1535,7 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
   };
 
   const renderViolationModule = () => {
-    const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
+    const suggestions = (searchQuery.trim() && searchQuery !== violationForm.studentName) ? students.filter(s => s.name.includes(searchQuery)) : [];
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
     const filtered = (data.studentViolationLogs || []).filter(l => {
       if (appliedNames.length > 0 && !appliedNames.includes(l.studentName)) return false;
@@ -1723,7 +1723,7 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
   };
 
   const renderExitModule = () => {
-    const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
+    const suggestions = (searchQuery.trim() && searchQuery !== exitForm.studentName) ? students.filter(s => s.name.includes(searchQuery)) : [];
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
     const filtered = (data.exitLogs || []).filter(l => {
       if (appliedNames.length > 0 && !appliedNames.includes(l.studentName)) return false;
@@ -1840,7 +1840,7 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
   };
 
   const renderDamageModule = () => {
-    const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
+    const suggestions = (searchQuery.trim() && searchQuery !== damageForm.studentName) ? students.filter(s => s.name.includes(searchQuery)) : [];
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
     const filtered = (data.damageLogs || []).filter(l => {
       if (appliedNames.length > 0 && !appliedNames.includes(l.studentName)) return false;
@@ -1868,7 +1868,7 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
       if (!damageForm.studentId) return alert('يرجى اختيار طالب أولاً');
       const newLog: DamageLog = { ...damageForm as DamageLog, id: Date.now().toString(), day: getDayName(damageForm.date || today) };
       updateData({ damageLogs: [newLog, ...(data.damageLogs || [])] });
-      setDamageForm({ ...damageForm, studentName: '', studentId: '', notes: '', description: '', action: 'تنبيه' });
+      setDamageForm({ ...damageForm, studentName: '', studentId: '', notes: '', description: '', participants: '', followUpStatus: 'قيد المتابعة', action: 'تنبيه' });
       setSearchQuery('');
       alert('تم حفظ بيانات الإتلاف');
     };
@@ -1876,7 +1876,7 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
     const cols = [
       { label: 'اسم الطالب', key: 'studentName' }, { label: 'الصف', key: 'grade' }, { label: 'الشعبة', key: 'section' },
       { label: 'عدد الإتلافات', key: 'prevDamageCount' }, { label: 'التاريخ', key: 'date' }, { label: 'بيان الإتلاف', key: 'description' },
-      { label: 'نوع الإجراء', key: 'action' }, { label: 'ملاحظات أخرى', key: 'notes' }
+      { label: 'المشاركين', key: 'participants' }, { label: 'الإجراء', key: 'action' }, { label: 'حالة المتابعة', key: 'followUpStatus' }, { label: 'ملاحظات أخرى', key: 'notes' }
     ];
 
     return (
@@ -1939,7 +1939,20 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">بيان الإتلاف</label><input className="w-full p-4 border-2 rounded-2xl outline-none font-black text-xs md:text-sm bg-slate-50 focus:border-red-400" value={damageForm.description} onChange={e => setDamageForm({ ...damageForm, description: e.target.value })} placeholder="ماذا تم إتلافه؟" /></div>
+              <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">المشاركين معه في الإتلاف</label><input className="w-full p-4 border-2 rounded-2xl outline-none font-black text-xs md:text-sm bg-slate-50 focus:border-red-400" value={damageForm.participants} onChange={e => setDamageForm({ ...damageForm, participants: e.target.value })} placeholder="أسماء المشاركين إن وجدوا..." /></div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 mr-2">الإجراء المتخذ</label><input className="w-full p-4 border-2 rounded-2xl outline-none font-black text-xs md:text-sm bg-slate-50 focus:border-red-400" value={damageForm.action} onChange={e => setDamageForm({ ...damageForm, action: e.target.value })} placeholder="تنبيه" /></div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 mr-2">حالة المتابعة</label>
+                <select className="w-full p-4 border-2 rounded-2xl outline-none font-black text-xs md:text-sm bg-slate-50 focus:border-red-400" value={damageForm.followUpStatus} onChange={e => setDamageForm({ ...damageForm, followUpStatus: e.target.value })}>
+                  <option value="قيد المتابعة">قيد المتابعة</option>
+                  <option value="تم الإصلاح">تم الإصلاح</option>
+                  <option value="تم شراء البديل">تم شراء البديل</option>
+                  <option value="لم يتم الإصلاح">لم يتم الإصلاح</option>
+                  <option value="لم يتم شراء البديل">لم يتم شراء البديل</option>
+                </select>
+              </div>
             </div>
             <button onClick={saveLog} className="w-full bg-[#0f172a] text-white p-5 md:p-6 rounded-3xl font-black text-lg md:text-xl hover:bg-black shadow-xl flex items-center justify-center gap-4 active:scale-95 transition-all mt-4"><Save size={24} /> حفظ بيانات الإتلاف</button>
           </div>
@@ -1948,7 +1961,24 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
             <FilterSection suggestions={nameSugg} values={filterValues} setValues={setFilterValues} tempNames={tempNames} setTempNames={setTempNames} appliedNames={appliedNames} setAppliedNames={setAppliedNames} nameInput={nameInput} setNameInput={setNameInput} onExportExcel={() => exportExcelFiltered('إتلاف_المدرسة', filtered, cols)} onExportTxt={() => exportTxtFiltered('إتلاف_المدرسة', filtered, cols)} onExportWA={() => shareWhatsAppRich('سجل إتلاف المدرسة المفلتر', filtered, cols)} />
             <div className="overflow-x-auto rounded-[1.5rem] border shadow-inner">
               <table className="w-full text-center text-[10px] md:text-sm border-collapse min-w-[1000px]"><thead className="bg-[#FFD966] text-slate-800 font-black"><tr>{cols.map(c => <th key={c.key} className="p-3 md:p-5 border-e border-red-200">{c.label}</th>)}</tr></thead>
-                <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد بيانات إتلاف.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-red-50/30 transition-colors h-10 md:h-12"><td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td><td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.grade}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.section}</td><td className="p-3 md:p-5 border-e border-slate-50 text-red-600 text-lg">{l.prevDamageCount + 1}</td><td className="p-3 md:p-5 border-e border-slate-400 text-[10px]">{l.date}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.description}</td><td className="p-3 md:p-5 border-e border-slate-50">{l.action}</td><td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td></tr>)}</tbody></table>
+                <tbody className="divide-y divide-slate-100 bg-white font-bold">{filtered.length === 0 ? <tr><td colSpan={cols.length} className="p-20 text-slate-300 italic text-base md:text-lg font-bold">لا توجد بيانات إتلاف.</td></tr> : filtered.map(l => <tr key={l.id} className="hover:bg-red-50/30 transition-colors h-10 md:h-12">
+                  <td className="p-3 md:p-5 border-e border-slate-50 font-black">{l.studentName}</td>
+                  <td className="p-3 md:p-5 border-e border-slate-50 font-bold">{l.grade}</td>
+                  <td className="p-3 md:p-5 border-e border-slate-50">{l.section}</td>
+                  <td className="p-3 md:p-5 border-e border-slate-50 text-red-600 text-lg">{l.prevDamageCount + 1}</td>
+                  <td className="p-3 md:p-5 border-e border-slate-400 text-[10px]">{l.date}</td>
+                  <td className="p-3 md:p-5 border-e border-slate-50 text-[11px]">{l.description}</td>
+                  <td className="p-3 md:p-5 border-e border-slate-50 text-[10px] text-slate-500 italic">{l.participants || '---'}</td>
+                  <td className="p-3 md:p-5 border-e border-slate-50 text-red-700">{l.action}</td>
+                  <td className="p-3 md:p-5 border-e border-slate-50">
+                    <span className={`px-2 py-1 rounded-lg text-[9px] font-black ${l.followUpStatus?.includes('تم') ? 'bg-green-100 text-green-700' :
+                        l.followUpStatus?.includes('قيد') ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
+                      }`}>
+                      {l.followUpStatus || 'قيد المتابعة'}
+                    </span>
+                  </td>
+                  <td className="p-3 md:p-5 text-slate-400 text-[10px]">{l.notes}</td>
+                </tr>)}</tbody></table>
             </div>
           </div>
         )}
@@ -1957,7 +1987,7 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
   };
 
   const renderParentVisitModule = () => {
-    const suggestions = searchQuery.trim() ? students.filter(s => s.name.includes(searchQuery)) : [];
+    const suggestions = (searchQuery.trim() && searchQuery !== visitForm.studentName) ? students.filter(s => s.name.includes(searchQuery)) : [];
     const nameSugg = nameInput.trim() ? students.filter(s => s.name.includes(nameInput) && !tempNames.includes(s.name)) : [];
     const filtered = (data.parentVisitLogs || []).filter(l => {
       if (appliedNames.length > 0 && !appliedNames.includes(l.studentName)) return false;
