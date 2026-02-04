@@ -30,16 +30,16 @@ const defaultMaxGrades = {
 };
 
 const defaultData: AppData = {
-  profile: { 
-    ministry: '', 
-    district: '', 
-    schoolName: '', 
-    branch: '', 
-    year: '2024-2025', 
-    semester: '', 
-    branchManager: '', 
-    generalManager: '', 
-    customFields: [] 
+  profile: {
+    ministry: '',
+    district: '',
+    schoolName: '',
+    branch: '',
+    year: '2024-2025',
+    semester: '',
+    branchManager: '',
+    generalManager: '',
+    customFields: []
   },
   substitutions: [],
   timetable: [],
@@ -50,8 +50,11 @@ const defaultData: AppData = {
   maxGrades: defaultMaxGrades,
   studentReports: [],
   absenceLogs: [],
-  latenessLogs: [],
+  studentLatenessLogs: [],
   studentViolationLogs: [],
+  exitLogs: [],
+  damageLogs: [],
+  parentVisitLogs: [],
   examLogs: [],
   genericSpecialReports: [],
   customViolationElements: {

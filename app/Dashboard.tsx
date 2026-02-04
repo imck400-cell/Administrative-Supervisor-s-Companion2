@@ -172,7 +172,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[]
     const results: Record<string, any[]> = {
       students: (data.studentReports || []).map(s => {
         const hasAbsence = (data.absenceLogs || []).some(l => l.studentId === s.id);
-        const hasLateness = (data.latenessLogs || []).some(l => l.studentId === s.id);
+        const hasLateness = (data.studentLatenessLogs || []).some(l => l.studentId === s.id);
         const hasExit = (data.exitLogs || []).some(l => l.studentId === s.id);
         const hasViolation = (data.studentViolationLogs || []).some(l => l.studentId === s.id);
         const hasDamage = (data.damageLogs || []).some(l => l.studentId === s.id);
@@ -193,7 +193,7 @@ const Dashboard: React.FC<{ setView?: (v: string) => void, recentActions?: any[]
       substitutions: (data.substitutions || []).map(s => ({ ...s, displayName: s.absentTeacher, type: 'substitution' })),
       special_reports: [
         ...(data.absenceLogs || []).map(l => ({ ...l, displayName: l.studentName, cat: 'students_sr', sub: 'الغياب اليومي', icon: <UserX size={12} /> })),
-        ...(data.latenessLogs || []).map(l => ({ ...l, displayName: l.studentName, cat: 'students_sr', sub: 'التأخر', icon: <Clock size={12} /> })),
+        ...(data.studentLatenessLogs || []).map(l => ({ ...l, displayName: l.studentName, cat: 'students_sr', sub: 'التأخر', icon: <Clock size={12} /> })),
         ...(data.exitLogs || []).map(l => ({ ...l, displayName: l.studentName, cat: 'students_sr', sub: 'خروج طالب أثناء الدراسة', icon: <UserPlusIcon size={12} /> })),
         ...(data.damageLogs || []).map(l => ({ ...l, displayName: l.studentName, cat: 'students_sr', sub: 'سجل الإتلاف المدرسي', icon: <Hammer size={12} /> })),
         ...(data.studentViolationLogs || []).map(l => ({ ...l, displayName: l.studentName, cat: 'students_sr', sub: 'المخالفات الطلابية', icon: <ShieldAlert size={12} /> })),

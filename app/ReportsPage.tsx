@@ -26,6 +26,11 @@ export const DailyReportsPage: React.FC = () => {
   const [activeTeacherFilter, setActiveTeacherFilter] = useState<string>('');
   const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
 
+  // Import Teachers Modal State
+  const [showImportModal, setShowImportModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFileType, setSelectedFileType] = useState<'excel' | 'xml' | 'pdf' | 'txt' | null>(null);
+
   // Teacher Report Modal State
   const [showTeacherReport, setShowTeacherReport] = useState(false);
   const [reportTeacherId, setReportTeacherId] = useState<string>('');
@@ -46,7 +51,7 @@ export const DailyReportsPage: React.FC = () => {
   const currentReport = reports.find(r => r.id === activeReportId);
 
   // Subjects Ordering
-  const subjectOrder = ["القرآن الكريم", "التربية الإسلامية", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "العلوم", "الكيمياء", "الفيزياء", "الأحياء", "الاجتماعيات", "الحاسوب", "المكتبة", "الفنية", "المختص الاجتماعي", "الأنشطة", "غيرها"];
+  const subjectOrder = ["مربية", "القرآن الكريم", "التربية الإسلامية", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "العلوم", "الكيمياء", "الفيزياء", "الأحياء", "الاجتماعيات", "الحاسوب", "المكتبة", "الفنية", "المختص الاجتماعي", "الأنشطة", "غيرها"];
 
   const teachers = useMemo(() => {
     let list = currentReport ? [...currentReport.teachersData] : [];
@@ -101,7 +106,7 @@ export const DailyReportsPage: React.FC = () => {
     { key: 'violations_score', label: 'المخالفات', max: 0 }, // Added for Report selectability
   ];
 
-  const subjects = ["القرآن الكريم", "التربية الإسلامية", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "العلوم", "الكيمياء", "الفيزياء", "الأحياء", "الاجتماعيات", "الحاسوب", "المكتبة", "الفنية", "المختص الاجتماعي", "الأنشطة", "غيرها"];
+  const subjects = ["مربية", "القرآن الكريم", "التربية الإسلامية", "اللغة العربية", "اللغة الإنجليزية", "الرياضيات", "العلوم", "الكيمياء", "الفيزياء", "الأحياء", "الاجتماعيات", "الحاسوب", "المكتبة", "الفنية", "المختص الاجتماعي", "الأنشطة", "غيرها"];
   const grades = ["تمهيدي", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
   const violationTypes = ["تأخر عن طابور", "تأخر عن حصة", "خروج من الحصة", "الإفراط في العقاب", "رفض القرارات الإدارية", "عدم تسليم ما كلف به"];
 
@@ -419,7 +424,20 @@ export const DailyReportsPage: React.FC = () => {
             val = mTotal > 0 ? ((calculateTotal(teacher) / mTotal) * 100).toFixed(1) + '%' : '0%';
           }
 
-          if (val !== undefined && val !== null && val !== '') {
+          // Special handling for violations with detailed notes
+          if (f.key === 'violations_score') {
+            if (val !== undefined && val !== null && val !== '') {
+              msg += `⚠️ *${f.label}:* ${val}\n`;
+              // Add detailed violation notes if available
+              if (teacher.violations_notes && teacher.violations_notes.length > 0) {
+                msg += `━━━━━━━━━━━━━━━━\n`;
+                teacher.violations_notes.forEach((note, noteIdx) => {
+                  msg += `  ${noteIdx + 1}. 🚫 ${note}\n`;
+                });
+                msg += `━━━━━━━━━━━━━━━━\n`;
+              }
+            }
+          } else if (val !== undefined && val !== null && val !== '') {
             const isUnaccredited = (teacher.unaccreditedMetrics || []).includes(f.key);
             msg += `${f.emoji} *${f.label}:* ${isUnaccredited ? '_غير معتمد_' : val}\n`;
           }
@@ -441,6 +459,162 @@ export const DailyReportsPage: React.FC = () => {
     setShowWhatsAppSelect(false);
   };
 
+  // Import Teachers Handler
+  const handleImportTeachers = async (fileType: 'excel' | 'xml' | 'pdf' | 'txt') => {
+    setSelectedFileType(fileType);
+    if (fileInputRef.current) {
+      // Set accept attribute based on file type
+      switch (fileType) {
+        case 'excel':
+          fileInputRef.current.accept = '.xlsx,.xls,.csv';
+          break;
+        case 'xml':
+          fileInputRef.current.accept = '.xml';
+          break;
+        case 'pdf':
+          fileInputRef.current.accept = '.pdf';
+          break;
+        case 'txt':
+          fileInputRef.current.accept = '.txt';
+          break;
+      }
+      fileInputRef.current.click();
+    }
+  };
+
+  const processImportedFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeReportId) return;
+
+    try {
+      let teacherNames: string[] = [];
+
+      if (selectedFileType === 'excel') {
+        // Process Excel/CSV file
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
+
+        // Extract names from first column (skip header if exists)
+        teacherNames = jsonData
+          .flat()
+          .filter((cell: any) => typeof cell === 'string' && cell.trim().length > 0)
+          .map((name: string) => name.trim());
+      } else if (selectedFileType === 'xml') {
+        // Process XML file
+        const text = await file.text();
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(text, 'text/xml');
+
+        // Try to find teacher names in various XML structures
+        const possibleTags = ['teacher', 'name', 'teacherName', 'معلم', 'اسم', 'اسم_المعلم'];
+        for (const tag of possibleTags) {
+          const elements = xmlDoc.getElementsByTagName(tag);
+          if (elements.length > 0) {
+            for (let i = 0; i < elements.length; i++) {
+              const text = elements[i].textContent?.trim();
+              if (text) teacherNames.push(text);
+            }
+            break;
+          }
+        }
+
+        // If no specific tags found, try to extract all text content
+        if (teacherNames.length === 0) {
+          const allText = xmlDoc.documentElement.textContent || '';
+          teacherNames = allText.split(/[\n\r,;]+/).filter(s => s.trim().length > 0).map(s => s.trim());
+        }
+      } else if (selectedFileType === 'pdf') {
+        // For PDF, we'll try to extract text (basic approach)
+        // Note: Full PDF parsing requires additional libraries
+        alert('لاستيراد ملفات PDF، يرجى تحويلها إلى Excel أو TXT أولاً');
+        setShowImportModal(false);
+        return;
+      } else if (selectedFileType === 'txt') {
+        // Process TXT file
+        const text = await file.text();
+        teacherNames = text
+          .split(/[\n\r,;]+/)
+          .map(line => line.trim())
+          .filter(line => line.length > 0 && !line.match(/^\d+$/)); // Filter out empty lines and pure numbers
+      }
+
+      // Remove duplicates and filter valid names
+      teacherNames = [...new Set(teacherNames)].filter(name =>
+        name.length > 1 &&
+        !name.match(/^\d+$/) &&
+        !name.toLowerCase().includes('name') &&
+        !name.includes('اسم المعلم') &&
+        !name.includes('الاسم')
+      );
+
+      if (teacherNames.length === 0) {
+        alert('لم يتم العثور على أسماء معلمين في الملف');
+        setShowImportModal(false);
+        return;
+      }
+
+      // Create new teachers from imported names
+      const existingNames = new Set(teachers.map(t => t.teacherName.trim()));
+      const newTeachers: TeacherFollowUp[] = teacherNames
+        .filter(name => !existingNames.has(name))
+        .map((name, idx) => ({
+          id: `${Date.now()}-${idx}`,
+          teacherName: name,
+          subjectCode: teacherProfiles[name]?.subject || '',
+          className: teacherProfiles[name]?.class || '',
+          attendance: 0,
+          appearance: 0,
+          preparation: 0,
+          supervision_queue: 0,
+          supervision_rest: 0,
+          supervision_end: 0,
+          correction_books: 0,
+          correction_notebooks: 0,
+          correction_followup: 0,
+          teaching_aids: 0,
+          extra_activities: 0,
+          radio: 0,
+          creativity: 0,
+          zero_period: 0,
+          violations_score: 0,
+          violations_notes: [],
+          order: teachers.length + idx + 1,
+          gender: 'ذكر'
+        }));
+
+      if (newTeachers.length === 0) {
+        alert('جميع الأسماء موجودة بالفعل في الجدول');
+        setShowImportModal(false);
+        return;
+      }
+
+      // Update the report with new teachers
+      const updatedReports = reports.map(r => {
+        if (r.id === activeReportId) {
+          return {
+            ...r,
+            teachersData: [...r.teachersData, ...newTeachers]
+          };
+        }
+        return r;
+      });
+
+      updateData({ dailyReports: updatedReports });
+      alert(`تم استيراد ${newTeachers.length} معلم بنجاح`);
+      setShowImportModal(false);
+    } catch (error) {
+      console.error('Error importing file:', error);
+      alert('حدث خطأ أثناء استيراد الملف');
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
 
   return (
     <div className="space-y-4 font-arabic">
@@ -449,6 +623,7 @@ export const DailyReportsPage: React.FC = () => {
           <button onClick={handleCreateReport} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-blue-700 transition-all text-xs sm:text-sm"><FilePlus size={16} /> إضافة جدول جديد</button>
           <button onClick={() => setShowArchive(true)} className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-xl font-bold hover:bg-slate-200 transition-all text-xs sm:text-sm"><FolderOpen size={16} /> فتح تقرير</button>
           <button onClick={addNewTeacher} className="flex items-center gap-2 bg-purple-50 text-purple-700 px-4 py-2 rounded-xl font-bold border border-purple-200 hover:bg-purple-100 transition-all text-xs sm:text-sm"><UserCircle size={16} /> إضافة معلم</button>
+          <button onClick={() => setShowImportModal(true)} className="flex items-center gap-2 bg-orange-50 text-orange-700 px-4 py-2 rounded-xl font-bold border border-orange-200 hover:bg-orange-100 transition-all text-xs sm:text-sm"><Upload size={16} /> استيراد أسماء المعلمين</button>
           <button onClick={() => { setShowTeacherReport(true); setReportTeacherSearch(''); setReportTeacherId(''); setReportSelectedFields([]); }} className="flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-xl font-bold border border-green-200 hover:bg-green-100 transition-all text-xs sm:text-sm"><FileText size={16} /> تقرير معلم</button>
         </div>
 
@@ -1134,6 +1309,86 @@ export const DailyReportsPage: React.FC = () => {
           </div>
         )
       }
+      {/* Import Teachers Modal */}
+      {
+        showImportModal && (
+          <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
+              <h3 className="text-xl font-black text-center mb-2 flex items-center justify-center gap-2">
+                <Upload size={24} className="text-orange-600" />
+                استيراد أسماء المعلمين
+              </h3>
+              <p className="text-center text-slate-500 text-sm mb-6">اختر نوع الملف الذي تريد استيراده</p>
+
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <button
+                  onClick={() => handleImportTeachers('excel')}
+                  className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-green-200 bg-green-50 hover:bg-green-100 hover:border-green-400 transition-all group"
+                >
+                  <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <FileSpreadsheet size={24} className="text-white" />
+                  </div>
+                  <span className="font-bold text-green-700">Excel / CSV</span>
+                  <span className="text-[10px] text-slate-400">.xlsx, .xls, .csv</span>
+                </button>
+
+                <button
+                  onClick={() => handleImportTeachers('xml')}
+                  className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition-all group"
+                >
+                  <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <FileText size={24} className="text-white" />
+                  </div>
+                  <span className="font-bold text-blue-700">XML</span>
+                  <span className="text-[10px] text-slate-400">.xml</span>
+                </button>
+
+                <button
+                  onClick={() => handleImportTeachers('pdf')}
+                  className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-400 transition-all group"
+                >
+                  <div className="w-12 h-12 bg-red-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <FileText size={24} className="text-white" />
+                  </div>
+                  <span className="font-bold text-red-700">PDF</span>
+                  <span className="text-[10px] text-slate-400">.pdf</span>
+                </button>
+
+                <button
+                  onClick={() => handleImportTeachers('txt')}
+                  className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-400 transition-all group"
+                >
+                  <div className="w-12 h-12 bg-slate-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <FileText size={24} className="text-white" />
+                  </div>
+                  <span className="font-bold text-slate-700">TXT</span>
+                  <span className="text-[10px] text-slate-400">.txt</span>
+                </button>
+              </div>
+
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-4">
+                <p className="text-xs text-orange-700 text-center">
+                  <strong>ملاحظة:</strong> يجب أن يحتوي الملف على أسماء المعلمين فقط، كل اسم في سطر منفصل أو في عمود واحد
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="w-full p-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        )
+      }
+      {/* Hidden File Input for Import */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        onChange={processImportedFile}
+      />
     </div >
   );
 };
@@ -1844,6 +2099,15 @@ export const StudentsReportsPage: React.FC = () => {
   const [showListModal, setShowListModal] = useState<'blacklist' | 'excellence' | null>(null);
   const [listSearch, setListSearch] = useState('');
   const [tempListSelected, setTempListSelected] = useState<string[]>([]);
+
+  useEffect(() => {
+    const highlightName = localStorage.getItem('highlight_student_name');
+    if (highlightName) {
+      setFilterMode('student');
+      setSelectedStudentNames([highlightName]);
+      localStorage.removeItem('highlight_student_name');
+    }
+  }, []);
 
   const studentData = data.studentReports || [];
 
