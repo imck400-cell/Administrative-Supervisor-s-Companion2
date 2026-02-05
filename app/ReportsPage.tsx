@@ -1980,7 +1980,7 @@ export const ViolationsPage: React.FC = () => {
 };
 
 // Memoized Row for performance optimization
-const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShowNotesModal, toggleStar, isHighlighted, onRowClick, setWaSelector }: {
+const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShowNotesModal, toggleStar, isHighlighted, onRowClick, setWaSelector, isSelected, onSelect, onDelete, index, showBulkActions }: {
   s: StudentReport;
   optionsAr: any;
   optionsEn: any;
@@ -1991,10 +1991,30 @@ const StudentRow = memo(({ s, optionsAr, optionsEn, lang, updateStudent, setShow
   isHighlighted: boolean;
   onRowClick: (id: any) => void;
   setWaSelector: (val: any) => void;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+  index: number;
+  showBulkActions: boolean;
 }) => {
   return (
     <tr onClick={() => onRowClick(s.id)} className={`transition-colors h-10 group cursor-pointer ${isHighlighted ? 'bg-cyan-50' : 'hover:bg-blue-50/20'}`}>
-      <td className={`p-1 border-e border-slate-100 sticky right-0 z-10 transition-colors shadow-[2px_0_5px_rgba(0,0,0,0.05)] ${isHighlighted ? 'bg-cyan-50' : 'bg-white group-hover:bg-blue-50'}`}>
+      <td className={`p-1 border-e border-slate-100 sticky right-0 z-10 transition-colors ${isHighlighted ? 'bg-cyan-50' : 'bg-white group-hover:bg-blue-50'} w-20`}>
+        <div className="flex items-center justify-center gap-2">
+          <button onClick={(e) => { e.stopPropagation(); onDelete(s.id); }} className="p-1 text-slate-300 hover:text-red-500 transition-colors" title={lang === 'ar' ? 'حذف الطالب' : 'Delete Student'}>
+            <Trash2 size={12} />
+          </button>
+          <span className="text-[10px] font-black text-slate-400 w-4 text-center">{index + 1}</span>
+          <input
+            type="checkbox"
+            className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            checked={isSelected}
+            onChange={(e) => { e.stopPropagation(); onSelect(s.id); }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      </td>
+      <td className={`p-1 border-e border-slate-100 sticky right-[80px] z-10 transition-colors shadow-[2px_0_5px_rgba(0,0,0,0.05)] ${isHighlighted ? 'bg-cyan-50' : 'bg-white group-hover:bg-blue-50'}`}>
         <div className="flex items-center gap-1 h-full">
           <button onClick={() => toggleStar(s.id, 'isExcellent')} title={lang === 'ar' ? 'إضافة للتميز' : 'Add to Excellence'}>
             <Star className={`w-3.5 h-3.5 ${s.isExcellent ? 'fill-green-500 text-green-500' : 'text-slate-300'}`} />
@@ -2159,6 +2179,11 @@ export const StudentsReportsPage: React.FC = () => {
   const [showImportConfirmModal, setShowImportConfirmModal] = useState(false);
   const [pendingImportData, setPendingImportData] = useState<StudentReport[]>([]);
 
+  // Advanced Deletion States
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [showDeleteStudentsModal, setShowDeleteStudentsModal] = useState(false);
+  const [deletionFilters, setDeletionFilters] = useState({ grades: [] as string[], sections: [] as string[], deleteDuplicates: false });
+
   const waFieldOptions = [
     { key: 'all', label: 'جميع البيانات' },
     { key: 'name', label: 'اسم الطالب' },
@@ -2310,31 +2335,60 @@ export const StudentsReportsPage: React.FC = () => {
     updateData({ studentReports: [...studentData, newStudent] });
   };
 
-  const handleDeleteDuplicates = () => {
-    if (!confirm(lang === 'ar' ? 'سيتم حذف جميع السجلات المكررة (الاسم، الصف، الشعبة) والإبقاء على الأقدم فقط. هل أنت متأكد؟' : 'All duplicate records (Name, Grade, Section) will be deleted, keeping only the oldest. Are you sure?')) return;
+  const deleteStudent = (id: string) => {
+    if (!confirm(lang === 'ar' ? 'هل أنت متأكد من حذف هذا الطالب؟' : 'Are you sure you want to delete this student?')) return;
+    updateData({ studentReports: studentData.filter(s => s.id !== id) });
+    // Reset selection if deleted
+    setSelectedStudentIds(prev => prev.filter(sid => sid !== id));
+  };
 
-    const seen = new Map<string, StudentReport>();
-    const toKeep: StudentReport[] = [];
+  const bulkDeleteStudents = () => {
+    if (selectedStudentIds.length === 0) return;
+    if (!confirm(lang === 'ar' ? 'هل أنت متأكد من حذف الأسماء المحددة؟' : 'Are you sure you want to delete the selected names?')) return;
+    updateData({ studentReports: studentData.filter(s => !selectedStudentIds.includes(s.id)) });
+    setSelectedStudentIds([]);
+  };
 
-    const sortedData = [...studentData].sort((a, b) =>
-      new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
-    );
+  const handleAdvancedDelete = () => {
+    const { grades, sections, deleteDuplicates } = deletionFilters;
+    if (grades.length === 0 && sections.length === 0 && !deleteDuplicates) return;
 
-    sortedData.forEach(s => {
-      const key = `${s.name.trim()}-${s.grade}-${s.section}`;
-      if (!seen.has(key)) {
-        seen.set(key, s);
-        toKeep.push(s);
-      }
-    });
+    let updatedData = [...studentData];
 
-    if (toKeep.length === studentData.length) {
-      alert(lang === 'ar' ? 'لا يوجد تكرار لحذفه' : 'No duplicates found to delete');
-      return;
+    if (deleteDuplicates) {
+      const seen = new Map<string, StudentReport>();
+      const toKeep: StudentReport[] = [];
+      const sortedData = [...updatedData].sort((a, b) =>
+        new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+      );
+      sortedData.forEach(s => {
+        const key = `${s.name.trim()}-${s.grade}-${s.section}`;
+        if (!seen.has(key)) {
+          seen.set(key, s);
+          toKeep.push(s);
+        }
+      });
+      updatedData = toKeep;
     }
 
-    updateData({ studentReports: toKeep });
-    alert(lang === 'ar' ? `تم حذف ${studentData.length - toKeep.length} سجل مكرر` : `Deleted ${studentData.length - toKeep.length} duplicate records`);
+    if (grades.length > 0 || sections.length > 0) {
+      updatedData = updatedData.filter(s => {
+        const gradeMatch = grades.length === 0 || grades.includes(s.grade);
+        const sectionMatch = sections.length === 0 || sections.includes(s.section);
+        // Requirement: Only delete if it matches ALL specified criteria
+        const shouldDelete = gradeMatch && sectionMatch;
+        return !shouldDelete;
+      });
+    }
+
+    updateData({ studentReports: updatedData });
+    setShowDeleteStudentsModal(false);
+    setDeletionFilters({ grades: [], sections: [], deleteDuplicates: false });
+    alert(lang === 'ar' ? 'تم الحذف بنجاح' : 'Deleted successfully');
+  };
+
+  const handleDeleteDuplicates = () => {
+    setShowDeleteStudentsModal(true);
   };
 
   const bulkAutoFill = () => {
@@ -2681,9 +2735,9 @@ export const StudentsReportsPage: React.FC = () => {
 
           <button
             onClick={handleDeleteDuplicates}
-            className="flex items-center gap-2 bg-red-50 text-red-700 px-4 py-2.5 rounded-xl font-bold text-sm border border-red-200 hover:bg-red-100 transition-all"
+            className="flex items-center gap-2 bg-red-50 text-red-700 px-4 py-2.5 rounded-xl font-bold text-sm border border-red-200 hover:bg-red-100 transition-all font-black"
           >
-            <Trash2 size={16} /> {lang === 'ar' ? 'حذف التكرار' : 'Delete Duplicates'}
+            <Trash2 size={16} /> {lang === 'ar' ? 'حذف الطلاب' : 'Delete Students'}
           </button>
 
           <button onClick={bulkAutoFill} className="flex items-center gap-2 bg-purple-50 text-purple-700 px-4 py-2.5 rounded-xl font-bold text-sm border border-purple-200 hover:bg-purple-100 transition-all">
@@ -2778,8 +2832,33 @@ export const StudentsReportsPage: React.FC = () => {
         <div className="overflow-x-auto scroll-smooth max-h-[75vh]">
           <table className={`w-full text-center border-collapse table-auto ${isOnlyMetricView ? 'min-w-[700px]' : 'min-w-[1600px]'}`}>
             <thead className="bg-[#FFD966] text-slate-800 sticky top-0 z-20">
-              <tr className="border-b border-slate-300 h-12">
-                <th rowSpan={2} className="px-3 border-e border-slate-300 w-[160px] text-xs font-black sticky right-0 bg-[#FFD966] z-30">{lang === 'ar' ? 'اسم الطالب' : 'Student Name'}</th>
+              <tr className="border-b border-slate-300 h-12 text-center">
+                <th rowSpan={2} className="px-2 border-e border-slate-300 w-20 sticky right-0 bg-[#FFD966] z-30 whitespace-nowrap">
+                  <div className="flex flex-col items-center gap-1">
+                    {selectedStudentIds.length > 0 && (
+                      <button
+                        onClick={bulkDeleteStudents}
+                        className="p-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-sm animate-in fade-in zoom-in duration-200"
+                        title={lang === 'ar' ? 'حذف المحددة' : 'Delete Selected'}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                    <div className="flex items-center gap-2 justify-center">
+                      <span className="text-[10px] font-black">{lang === 'ar' ? 'م' : 'No.'}</span>
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded"
+                        checked={filteredData.length > 0 && selectedStudentIds.length === filteredData.length}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedStudentIds(filteredData.map(s => s.id));
+                          else setSelectedStudentIds([]);
+                        }}
+                      />
+                    </div>
+                  </div>
+                </th>
+                <th rowSpan={2} className="px-3 border-e border-slate-300 w-[160px] text-xs font-black sticky right-[80px] bg-[#FFD966] z-30">{lang === 'ar' ? 'اسم الطالب' : 'Student Name'}</th>
                 <th rowSpan={2} className="px-1 border-e border-slate-300 w-20 text-xs font-black">{lang === 'ar' ? 'الصف' : 'Grade'}</th>
                 <th rowSpan={2} className="px-1 border-e border-slate-300 w-16 text-xs font-black">{lang === 'ar' ? 'الشعبة' : 'Section'}</th>
 
@@ -2827,7 +2906,7 @@ export const StudentsReportsPage: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={isOnlyMetricView ? 3 + activeMetricFilter.length : 15} className="py-10 text-slate-400 italic text-sm">
+                  <td colSpan={isOnlyMetricView ? 4 + activeMetricFilter.length : 24} className="py-10 text-slate-400 italic text-sm">
                     {(filterMode === 'student' || filterMode === 'blacklist' || filterMode === 'excellence') && selectedStudentNames.length === 0
                       ? (lang === 'ar' ? 'يرجى اختيار أسماء الطلاب من القائمة للعرض' : 'Please select student names to display')
                       : (lang === 'ar' ? 'لا توجد بيانات تطابق هذا البحث' : 'No data matching this search')}
@@ -2847,6 +2926,11 @@ export const StudentsReportsPage: React.FC = () => {
                     isHighlighted={highlightedRow === s.id}
                     onRowClick={setHighlightedRow}
                     setWaSelector={setWaSelector}
+                    isSelected={selectedStudentIds.includes(s.id)}
+                    onSelect={(id) => setSelectedStudentIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+                    onDelete={deleteStudent}
+                    index={idx}
+                    showBulkActions={selectedStudentIds.length > 0}
                   />
                 ))
               )}
@@ -2978,6 +3062,97 @@ export const StudentsReportsPage: React.FC = () => {
       )}
 
       {/* Requirement: Detail Modal Implementation & Optimization */}
+      {showDeleteStudentsModal && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 font-arabic">
+          <div className="bg-white rounded-3xl p-8 w-full max-w-2xl shadow-2xl space-y-6 animate-in fade-in zoom-in duration-200 text-right overflow-y-auto max-h-[90vh]">
+            <div className="flex justify-between items-center border-b pb-4">
+              <h3 className="text-xl font-black text-red-600 flex items-center gap-2">
+                <Trash2 size={24} /> {lang === 'ar' ? 'خيارات حذف الطلاب' : 'Delete Students Options'}
+              </h3>
+              <button onClick={() => setShowDeleteStudentsModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X /></button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Delete Duplicates Choice */}
+              <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl cursor-pointer hover:bg-slate-100 transition-all border-2 border-transparent has-[:checked]:border-red-200 has-[:checked]:bg-red-50/30">
+                <input
+                  type="checkbox"
+                  className="w-5 h-5 rounded text-red-600"
+                  checked={deletionFilters.deleteDuplicates}
+                  onChange={e => setDeletionFilters({ ...deletionFilters, deleteDuplicates: e.target.checked })}
+                />
+                <div className="flex-1">
+                  <div className="font-black text-sm">{lang === 'ar' ? 'أ / حذف التكرار' : 'A / Delete Duplicates'}</div>
+                  <div className="text-[10px] text-slate-500 font-bold mt-1">
+                    {lang === 'ar' ? 'يتم حذف جميع السجلات المكررة (الاسم، الصف، الشعبة) والإبقاء على الأقدم فقط' : 'Deletes all duplicate records (Name, Grade, Section), keeping only the oldest version.'}
+                  </div>
+                </div>
+              </label>
+
+              {/* Delete by Grade */}
+              <div className="p-4 bg-slate-50 rounded-2xl space-y-3">
+                <div className="font-black text-sm text-slate-600">{lang === 'ar' ? 'ب / حذف صف كامل' : 'B / Delete Full Grade'}</div>
+                <div className="flex flex-wrap gap-1">
+                  {optionsAr.grades.map(g => (
+                    <button
+                      key={g}
+                      onClick={() => setDeletionFilters({
+                        ...deletionFilters,
+                        grades: deletionFilters.grades.includes(g) ? deletionFilters.grades.filter(x => x !== g) : [...deletionFilters.grades, g]
+                      })}
+                      className={`px-3 py-1.5 rounded-xl text-[10px] font-black border-2 transition-all ${deletionFilters.grades.includes(g) ? 'bg-red-600 text-white border-red-700' : 'bg-white text-slate-500 border-slate-100 hover:border-red-200'}`}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Delete by Section */}
+              <div className="p-4 bg-slate-50 rounded-2xl space-y-3">
+                <div className="font-black text-sm text-slate-600">{lang === 'ar' ? 'ج / حذف شعبة كاملة' : 'C / Delete Full Section'}</div>
+                <div className="flex flex-wrap gap-1">
+                  {optionsAr.sections.map(s => (
+                    <button
+                      key={s}
+                      onClick={() => setDeletionFilters({
+                        ...deletionFilters,
+                        sections: deletionFilters.sections.includes(s) ? deletionFilters.sections.filter(x => x !== s) : [...deletionFilters.sections, s]
+                      })}
+                      className={`px-4 py-1.5 rounded-xl text-[10px] font-black border-2 transition-all ${deletionFilters.sections.includes(s) ? 'bg-red-600 text-white border-red-700' : 'bg-white text-slate-500 border-slate-100 hover:border-red-200'}`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 flex items-start gap-3">
+                <AlertCircle className="text-amber-600 shrink-0 w-5 h-5" />
+                <p className="text-[10px] font-bold text-amber-800 leading-relaxed">
+                  {lang === 'ar'
+                    ? 'في حال تحديد صف وشعبة معاً، سيتم حذف الطلاب المنتمين لهذا الصف بالشعبة المحددة فقط. يمكن اختيار أكثر من خيار في كل قسم.'
+                    : 'If both a grade and a section are selected, only students in that specific combination will be deleted. Multiple choices are allowed.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t">
+              <button
+                onClick={handleAdvancedDelete}
+                disabled={!deletionFilters.deleteDuplicates && deletionFilters.grades.length === 0 && deletionFilters.sections.length === 0}
+                className="flex-1 bg-red-600 text-white p-4 rounded-2xl font-black text-sm hover:bg-red-700 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+              >
+                {lang === 'ar' ? 'تنفيذ الحذف' : 'Confirm Deletion'}
+              </button>
+              <button onClick={() => setShowDeleteStudentsModal(false)} className="px-6 bg-slate-100 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-200 transition-all">
+                {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showIndividualReportModal && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 font-arabic">
           <div className="bg-white rounded-[2.5rem] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border-4 border-emerald-50 animate-in zoom-in-95 duration-300 text-right">
