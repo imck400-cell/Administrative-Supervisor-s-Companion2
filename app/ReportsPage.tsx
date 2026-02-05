@@ -2426,7 +2426,7 @@ export const StudentsReportsPage: React.FC = () => {
     // Auto-sync metrics from special reports
     return result.map(s => {
       const absences = (data.absenceLogs || []).filter(l => l.studentId === s.id);
-      const lateness = (data.latenessLogs || []).filter(l => l.studentId === s.id);
+      const lateness = (data.studentLatenessLogs || []).filter(l => l.studentId === s.id);
       const exits = (data.exitLogs || []).filter(l => l.studentId === s.id);
       const violations = (data.studentViolationLogs || []).filter(l => l.studentId === s.id);
       const damages = (data.damageLogs || []).filter(l => l.studentId === s.id);
@@ -2446,7 +2446,7 @@ export const StudentsReportsPage: React.FC = () => {
         damageSummary: s.damageSummary || calculatedDamage,
       };
     });
-  }, [studentData, filterMode, filterValue, selectedSpecifics, selectedStudentNames, data.absenceLogs, data.latenessLogs, data.exitLogs, data.studentViolationLogs, data.damageLogs]);
+  }, [studentData, filterMode, filterValue, selectedSpecifics, selectedStudentNames, data.absenceLogs, data.studentLatenessLogs, data.exitLogs, data.studentViolationLogs, data.damageLogs]);
 
   const suggestions = useMemo(() => {
     if (!studentInput.trim()) return [];
