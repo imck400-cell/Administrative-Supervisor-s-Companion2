@@ -37,6 +37,7 @@ export const DailyReportsPage: React.FC = () => {
   const [reportTeacherSearch, setReportTeacherSearch] = useState('');
   const [reportSelectedFields, setReportSelectedFields] = useState<string[]>([]);
   const [showWhatsAppSelect, setShowWhatsAppSelect] = useState(false);
+  const [selectedTeacherIds, setSelectedTeacherIds] = useState<string[]>([]);
 
 
   const reports = data.dailyReports || [];
@@ -122,6 +123,12 @@ export const DailyReportsPage: React.FC = () => {
   };
 
   const handleCreateReport = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const exists = reports.some(r => r.dateStr === today);
+    if (exists) {
+      if (!confirm(lang === 'ar' ? 'الجدول لهذا اليوم موجود بالفعل، فهل أنت متأكد من تكرار الجدول لهذا اليوم؟' : 'The schedule for today already exists, are you sure you want to duplicate it?')) return;
+    }
+
     const lastReport = reports[reports.length - 1];
     const newTeachers = lastReport ? lastReport.teachersData.map(t => ({
       ...t,
@@ -133,7 +140,7 @@ export const DailyReportsPage: React.FC = () => {
     const newReport: DailyReportContainer = {
       id: Date.now().toString(),
       dayName: new Intl.DateTimeFormat('ar-EG', { weekday: 'long' }).format(new Date()),
-      dateStr: new Date().toISOString().split('T')[0],
+      dateStr: today,
       teachersData: newTeachers as TeacherFollowUp[]
     };
     updateData({ dailyReports: [...reports, newReport] });
@@ -166,6 +173,38 @@ export const DailyReportsPage: React.FC = () => {
       return r;
     });
     updateData({ dailyReports: updatedReports });
+  };
+
+  const deleteTeacher = (teacherId: string) => {
+    if (!activeReportId) return;
+    if (!confirm(lang === 'ar' ? 'هل أنت متأكد من حذف هذا المعلم؟' : 'Are you sure you want to delete this teacher?')) return;
+    const updatedReports = reports.map(r => {
+      if (r.id === activeReportId) {
+        return {
+          ...r,
+          teachersData: r.teachersData.filter(t => t.id !== teacherId)
+        };
+      }
+      return r;
+    });
+    updateData({ dailyReports: updatedReports });
+    setSelectedTeacherIds(prev => prev.filter(id => id !== teacherId));
+  };
+
+  const deleteSelectedTeachers = () => {
+    if (!activeReportId || selectedTeacherIds.length === 0) return;
+    if (!confirm(lang === 'ar' ? `هل أنت متأكد من حذف ${selectedTeacherIds.length} معلم؟` : `Are you sure you want to delete ${selectedTeacherIds.length} teachers?`)) return;
+    const updatedReports = reports.map(r => {
+      if (r.id === activeReportId) {
+        return {
+          ...r,
+          teachersData: r.teachersData.filter(t => !selectedTeacherIds.includes(t.id))
+        };
+      }
+      return r;
+    });
+    updateData({ dailyReports: updatedReports });
+    setSelectedTeacherIds([]);
   };
 
   // Map teacher names to their profiles for quick lookup and auto-fill
@@ -624,7 +663,7 @@ export const DailyReportsPage: React.FC = () => {
           <button onClick={() => setShowArchive(true)} className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-xl font-bold hover:bg-slate-200 transition-all text-xs sm:text-sm"><FolderOpen size={16} /> فتح تقرير</button>
           <button onClick={addNewTeacher} className="flex items-center gap-2 bg-purple-50 text-purple-700 px-4 py-2 rounded-xl font-bold border border-purple-200 hover:bg-purple-100 transition-all text-xs sm:text-sm"><UserCircle size={16} /> إضافة معلم</button>
           <button onClick={() => setShowImportModal(true)} className="flex items-center gap-2 bg-orange-50 text-orange-700 px-4 py-2 rounded-xl font-bold border border-orange-200 hover:bg-orange-100 transition-all text-xs sm:text-sm"><Upload size={16} /> استيراد أسماء المعلمين</button>
-          <button onClick={() => { setShowTeacherReport(true); setReportTeacherSearch(''); setReportTeacherId(''); setReportSelectedFields([]); }} className="flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-xl font-bold border border-green-200 hover:bg-green-100 transition-all text-xs sm:text-sm"><FileText size={16} /> تقرير معلم</button>
+          <button onClick={() => setShowTeacherReport(true)} className="flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-xl font-bold border border-green-200 hover:bg-green-100 transition-all text-xs sm:text-sm"><FileText size={16} /> تقرير معلم</button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -653,8 +692,32 @@ export const DailyReportsPage: React.FC = () => {
           <table className={`w-full text-center border-collapse ${filterMode === 'metric' ? '' : 'min-w-[1400px]'}`}>
             <thead>
               <tr className="border-b border-slate-300">
-                <th rowSpan={2} className="p-2 border-e border-slate-300 w-10 sticky right-0 bg-[#FFD966] z-20 font-sans">م</th>
-                <th rowSpan={2} className="p-2 border-e border-slate-300 w-44 sticky right-10 bg-[#FFD966] z-20">اسم المعلم</th>
+                <th rowSpan={2} className="p-2 border-e border-slate-300 w-12 sticky right-0 bg-[#FFD966] z-20">
+                  <div className="flex flex-col items-center gap-1">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      checked={teachers.length > 0 && selectedTeacherIds.length === teachers.length}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedTeacherIds(teachers.map(t => t.id));
+                        else setSelectedTeacherIds([]);
+                      }}
+                    />
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-sans">م</span>
+                      {selectedTeacherIds.length > 0 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteSelectedTeachers(); }}
+                          className="p-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors animate-in zoom-in"
+                          title="حذف المحددين"
+                        >
+                          <Trash2 size={10} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </th>
+                <th rowSpan={2} className="p-2 border-e border-slate-300 w-44 sticky right-12 bg-[#FFD966] z-20">اسم المعلم</th>
                 {!filterMode.includes('metric') && (
                   <>
                     <th rowSpan={2} className="p-2 border-e border-slate-300 w-20 sticky top-0 bg-[#FFD966] z-10">النوع</th>
@@ -770,11 +833,33 @@ export const DailyReportsPage: React.FC = () => {
                 return (
                   <tr
                     key={t.id}
-                    className={`border-b transition-colors h-10 ${highlightedRowId === t.id ? 'bg-orange-100' : 'hover:bg-slate-50'}`}
+                    className={`border-b transition-colors h-10 ${highlightedRowId === t.id ? 'bg-orange-100' : (selectedTeacherIds.includes(t.id) ? 'bg-blue-50' : 'hover:bg-slate-50')}`}
                     onClick={() => setHighlightedRowId(t.id)}
                   >
-                    <td className="p-1 border-e sticky right-0 bg-white group-hover:bg-slate-50 font-bold text-xs font-sans">{idx + 1}</td>
-                    <td className="p-1 border-e sticky right-10 bg-white group-hover:bg-slate-50">
+                    <td className="p-1 border-e sticky right-0 bg-inherit group-hover:bg-slate-50">
+                      <div className="flex items-center gap-1 justify-center">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          checked={selectedTeacherIds.includes(t.id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            if (e.target.checked) setSelectedTeacherIds(prev => [...prev, t.id]);
+                            else setSelectedTeacherIds(prev => prev.filter(id => id !== t.id));
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <span className="font-bold text-xs font-sans">{idx + 1}</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteTeacher(t.id); }}
+                          className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                          title="حذف الاسم"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="p-1 border-e sticky right-12 bg-inherit group-hover:bg-slate-50">
                       <input
                         list="teacher-names-list"
                         className="w-full text-right font-bold outline-none bg-transparent text-xs"
@@ -868,7 +953,7 @@ export const DailyReportsPage: React.FC = () => {
                           type="number"
                           className="w-full text-center text-red-600 font-bold outline-none bg-transparent text-xs font-sans"
                           value={t.violations_score}
-                          onChange={e => updateTeacher(t.id, 'violations_score', parseInt(e.target.value) || 0)}
+                          onChange={e => updateTeacher(t.id, { violations_score: parseInt(e.target.value) || 0 })}
                           onClick={(e) => e.stopPropagation()}
                           onFocus={(e) => e.target.select()}
                         />
@@ -979,7 +1064,7 @@ export const DailyReportsPage: React.FC = () => {
                 <div className="max-h-40 overflow-y-auto border p-2 rounded-xl bg-slate-50">
                   {teachers.map(t => (
                     <div key={t.id} className="flex items-center gap-2 mb-1">
-                      <input type="number" className="w-12 p-1 text-center rounded border" value={t.order || 0} onChange={(e) => updateTeacher(t.id, 'order', parseInt(e.target.value))} />
+                      <input type="number" className="w-12 p-1 text-center rounded border" value={t.order || 0} onChange={(e) => updateTeacher(t.id, { order: parseInt(e.target.value) })} />
                       <span className="text-xs font-bold">{t.teacherName}</span>
                     </div>
                   ))}
