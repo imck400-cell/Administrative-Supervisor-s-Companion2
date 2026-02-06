@@ -10,7 +10,7 @@ import {
   FileSearch, Archive, CheckSquare, PencilLine, Zap,
   Sparkles, Database, FileUp, FileDown, MessageCircle,
   Activity, Fingerprint, History, RefreshCw, Upload, LayoutList,
-  Hammer, UserPlus, Edit, ArrowUpDown, PhoneCall, Mail, ChevronUp, ChevronDown
+  Hammer, UserPlus, Edit, ArrowUpDown, PhoneCall, Mail
 } from 'lucide-react';
 import { AbsenceLog, LatenessLog, StudentViolationLog, StudentReport, ExitLog, DamageLog, ParentVisitLog, ExamLog } from '../types';
 import * as XLSX from 'xlsx';
@@ -168,69 +168,11 @@ interface SpecialReportsPageProps {
   onNavigate?: (viewId: string) => void;
 }
 
-const getDayName = (dateStr: string) => {
-  if (!dateStr) return '';
-  try {
-    return new Intl.DateTimeFormat('ar-EG', { weekday: 'long' }).format(new Date(dateStr));
-  } catch { return ''; }
-};
-
-// Helper Component for Collapsible Actions
-const CollapsibleActions = ({
-  title,
-  icon: Icon,
-  dateValue,
-  onDateChange,
-  children
-}: {
-  title: string,
-  icon: any,
-  dateValue: string,
-  onDateChange: (e: any) => void,
-  children: React.ReactNode
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <div className="mb-6 border-b pb-4">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        {/* Toggle Button - Takes specific style requested by user */}
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className={`w-full md:w-auto px-6 py-3 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-sm transition-all ${isOpen ? 'bg-slate-100 text-slate-500' : 'bg-blue-600 text-white animate-pulse'}`}
-          title={isOpen ? "إخفاء القائمة" : "إظهار إجراءات السجل"}
-        >
-          {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-          {isOpen ? "إخفاء القائمة" : "انقر هنا لفتح القائمة"}
-        </button>
-
-        <div className="flex flex-col items-center md:items-end w-full md:w-auto">
-          <h2 className="text-xl md:text-2xl font-black text-slate-800 flex items-center gap-3">
-            {title} <Icon className="text-blue-600" size={24} />
-          </h2>
-          <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
-            <Calendar size={14} className="text-slate-400" />
-            <input type="date" className="text-[10px] md:text-xs font-black bg-transparent outline-none" value={dateValue} onChange={onDateChange} />
-            <span className="text-[10px] font-bold text-slate-400">{getDayName(dateValue || new Date().toISOString().split('T')[0])}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className={`mt-4 grid overflow-hidden transition-all duration-500 ease-in-out ${isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-        <div className="min-h-0 flex flex-wrap gap-2 justify-center md:justify-start bg-slate-50 p-4 rounded-3xl border border-slate-100 shadow-inner">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, onSubTabOpen, onNavigate }) => {
   // END OF CHANGE
   const { lang, data, updateData } = useGlobal();
   const [activeTab, setActiveTab] = useState<MainTab>('supervisor');
   const [activeSubTab, setActiveSubTab] = useState<SubTab | null>(null);
-  const [isNavHidden, setIsNavHidden] = useState(false);
 
   useEffect(() => {
     if (initialSubTab) {
@@ -332,6 +274,12 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
     date: today, semester: 'الفصلين', type: 'visit', status: 'نادر الزيارة', customStatusItems: [], visitorName: '', reason: '', recommendations: '', actions: '', followUpStatus: [], notes: '', prevVisitCount: 0
   });
 
+  const getDayName = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      return new Intl.DateTimeFormat('ar-EG', { weekday: 'long' }).format(new Date(dateStr));
+    } catch { return ''; }
+  };
 
   const structure = {
     supervisor: { title: 'المشرف الإداري', icon: <Briefcase />, items: ['الخطة الفصلية', 'الخلاصة الشهرية', 'المهام اليومية', 'المهام المضافة', 'المهام المرحلة', 'أهم المشكلات اليومية', 'التوصيات العامة', 'احتياجات الدور', 'سجل متابعة الدفاتر والتصحيح', 'الجرد العام للعهد', 'ملاحظات عامة'] },
@@ -934,29 +882,35 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
           isOpen={showFrequentNames}
           onClose={() => setShowFrequentNames(false)}
         />
-
-        <CollapsibleActions
-          title="تقرير الغياب اليومي"
-          icon={Clock}
-          dateValue={absenceForm.date}
-          onDateChange={e => setAbsenceForm({ ...absenceForm, date: e.target.value })}
-        >
-          <button onClick={() => { setShowTable(!showTable); setShowPresenceTracker(false); }} className={`px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm transition-all flex items-center gap-2 ${!showTable && !showPresenceTracker ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-blue-600 border hover:bg-blue-50'}`}>
-            <Plus size={18} /> رصد غياب جديد
-          </button>
-          <button onClick={() => { setShowTable(true); setShowPresenceTracker(false); }} className={`px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm transition-all flex items-center gap-2 ${showTable && !showPresenceTracker ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-blue-600 border hover:bg-blue-50'}`}>
-            <LayoutList size={18} /> جدول السجلات
-          </button>
-          <button onClick={() => { setShowPresenceTracker(true); setShowTable(false); }} className={`px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm transition-all flex items-center gap-2 ${showPresenceTracker ? 'bg-green-600 text-white shadow-md' : 'bg-white text-green-600 border hover:bg-green-50'}`}>
-            <Filter size={18} /> تحضير الطلاب (فلتر)
-          </button>
-          {!showTable && !showPresenceTracker && (
-            <button onClick={() => setShowFrequentNames(true)} className="bg-white border text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-50 transition-all flex items-center gap-2">
-              <RefreshCw size={18} /> الأسماء المتكررة
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
+          <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
+            <button onClick={() => { setShowTable(!showTable); setShowPresenceTracker(false); }} className={`px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm transition-all flex items-center gap-2 ${!showTable && !showPresenceTracker ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}>
+              <Plus size={18} /> رصد غياب جديد
             </button>
-          )}
-          <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-2xl transition-all border border-red-100 flex items-center gap-2 font-bold"><X size={18} /> إغلاق</button>
-        </CollapsibleActions>
+            <button onClick={() => { setShowTable(true); setShowPresenceTracker(false); }} className={`px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm transition-all flex items-center gap-2 ${showTable && !showPresenceTracker ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}>
+              <LayoutList size={18} /> جدول السجلات
+            </button>
+            <button onClick={() => { setShowPresenceTracker(true); setShowTable(false); }} className={`px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm transition-all flex items-center gap-2 ${showPresenceTracker ? 'bg-green-600 text-white shadow-md' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>
+              <Filter size={18} /> تحضير الطلاب (فلتر)
+            </button>
+            {!showTable && !showPresenceTracker && (
+              <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                <RefreshCw size={18} /> الأسماء المتكررة
+              </button>
+            )}
+            <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={18} /></button>
+          </div>
+          <div className="flex flex-col items-center md:items-end w-full md:w-auto">
+            <h2 className="text-xl md:text-2xl font-black text-slate-800 flex items-center gap-3">
+              تقرير الغياب اليومي <Clock className="text-blue-600" size={24} />
+            </h2>
+            <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
+              <Calendar size={14} className="text-slate-400" />
+              <input type="date" className="text-[10px] md:text-xs font-black bg-transparent outline-none" value={absenceForm.date} onChange={e => setAbsenceForm({ ...absenceForm, date: e.target.value })} />
+              <span className="text-[10px] font-bold text-slate-400">{getDayName(absenceForm.date || today)}</span>
+            </div>
+          </div>
+        </div>
 
         {showPresenceTracker ? (
           <div className="space-y-6 animate-in slide-in-from-top-4 duration-300">
@@ -1280,7 +1234,7 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
                     </button>
 
                     {/* Popover List for each status */}
-                    <div className="hidden group-hover:block absolute top-full left-0 z-[110] mt-2 w-72 bg-white border-2 rounded-2xl shadow-2xl p-4 animate-in slide-in-from-top-2">
+                    <div className="hidden group-hover:block fixed inset-x-8 top-[20%] z-[500] w-auto max-h-[60vh] overflow-y-auto bg-white border-4 border-slate-800 rounded-3xl shadow-[0_0_100px_rgba(0,0,0,0.5)] p-4 animate-in zoom-in-95 duration-200 md:absolute md:inset-auto md:top-full md:left-0 md:z-[110] md:mt-2 md:w-72 md:border-2 md:shadow-2xl md:rounded-2xl">
                       <div className="flex justify-between items-center mb-2 border-b pb-1">
                         <h4 className="text-[10px] font-black text-blue-600">قائمة: {opt.label}</h4>
                         <button
@@ -1538,23 +1492,30 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
           isOpen={showFrequentNames}
           onClose={() => setShowFrequentNames(false)}
         />
-        <CollapsibleActions
-          title="تقرير التأخر اليومي"
-          icon={Clock}
-          dateValue={latenessForm.date}
-          onDateChange={e => setLatenessForm({ ...latenessForm, date: e.target.value })}
-        >
-          <button onClick={() => setShowTable(!showTable)} className="bg-white border text-blue-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-blue-50 transition-all flex items-center gap-2 shadow-sm">
-            {showTable ? <Plus size={18} /> : <History size={18} />}
-            {showTable ? 'رصد جديد' : 'جدول السجلات'}
-          </button>
-          {!showTable && (
-            <button onClick={() => setShowFrequentNames(true)} className="bg-white border text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-50 transition-all flex items-center gap-2">
-              <RefreshCw size={18} /> الأسماء المتكررة
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
+          <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
+            <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-blue-100 transition-all flex items-center gap-2 shadow-sm">
+              {showTable ? <Plus size={18} /> : <History size={18} />}
+              {showTable ? 'رصد جديد' : 'جدول السجلات'}
             </button>
-          )}
-          <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-2xl transition-all border border-red-100 flex items-center gap-2 font-bold"><X size={18} /> إغلاق</button>
-        </CollapsibleActions>
+            {!showTable && (
+              <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                <RefreshCw size={18} /> الأسماء المتكررة
+              </button>
+            )}
+            <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={18} /></button>
+          </div>
+          <div className="flex flex-col items-center md:items-end w-full md:w-auto">
+            <h2 className="text-xl md:text-2xl font-black text-slate-800 flex items-center gap-3">
+              تقرير التأخر اليومي <Clock className="text-orange-500" size={24} />
+            </h2>
+            <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
+              <Calendar size={14} className="text-slate-400" />
+              <input type="date" className="text-[10px] md:text-xs font-black bg-transparent outline-none" value={latenessForm.date} onChange={e => setLatenessForm({ ...latenessForm, date: e.target.value })} />
+              <span className="text-[10px] font-bold text-slate-400">{getDayName(latenessForm.date || today)}</span>
+            </div>
+          </div>
+        </div>
 
         {!showTable ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
@@ -1716,23 +1677,28 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
           isOpen={showFrequentNames}
           onClose={() => setShowFrequentNames(false)}
         />
-        <CollapsibleActions
-          title="سجل المخالفات الطلابية"
-          icon={AlertCircle}
-          dateValue={violationForm.date}
-          onDateChange={e => setViolationForm({ ...violationForm, date: e.target.value })}
-        >
-          <button onClick={() => setShowTable(!showTable)} className="bg-white border text-blue-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-blue-50 transition-all flex items-center gap-2">
-            {showTable ? <Plus size={18} /> : <ShieldAlert size={18} />}
-            {showTable ? 'رصد جديد' : 'جدول المخالفات'}
-          </button>
-          {!showTable && (
-            <button onClick={() => setShowFrequentNames(true)} className="bg-white border text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-50 transition-all flex items-center gap-2">
-              <RefreshCw size={18} /> الأسماء المتكررة
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
+          <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
+            <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-blue-100 transition-all flex items-center gap-2">
+              {showTable ? <Plus size={18} /> : <ShieldAlert size={18} />}
+              {showTable ? 'رصد جديد' : 'جدول المخالفات'}
             </button>
-          )}
-          <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-2xl transition-all border border-red-100 flex items-center gap-2 font-bold"><X size={18} /> إغلاق</button>
-        </CollapsibleActions>
+            {!showTable && (
+              <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                <RefreshCw size={18} /> الأسماء المتكررة
+              </button>
+            )}
+            <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={18} /></button>
+          </div>
+          <div className="flex flex-col items-center md:items-end w-full md:w-auto">
+            <h2 className="text-xl md:text-2xl font-black text-red-600 flex items-center gap-3">سجل المخالفات الطلابية <AlertCircle size={24} /></h2>
+            <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
+              <Calendar size={14} className="text-slate-400" />
+              <input type="date" className="text-[10px] md:text-xs font-black bg-transparent outline-none" value={violationForm.date} onChange={e => setViolationForm({ ...violationForm, date: e.target.value })} />
+              <span className="text-[10px] font-bold text-slate-400">{getDayName(violationForm.date || today)}</span>
+            </div>
+          </div>
+        </div>
 
         {!showTable ? (
           <div className="space-y-6 md:space-y-8">
@@ -1906,23 +1872,28 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
           isOpen={showFrequentNames}
           onClose={() => setShowFrequentNames(false)}
         />
-        <CollapsibleActions
-          title="خروج طالب أثناء الدراسة"
-          icon={UserPlus}
-          dateValue={exitForm.date}
-          onDateChange={e => setExitForm({ ...exitForm, date: e.target.value })}
-        >
-          <button onClick={() => setShowTable(!showTable)} className="bg-white border text-blue-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-blue-50 transition-all flex items-center gap-2 shadow-sm">
-            {showTable ? <Plus size={18} /> : <LayoutList size={18} />}
-            {showTable ? 'رصد خروج جديد' : 'جدول الخروج'}
-          </button>
-          {!showTable && (
-            <button onClick={() => setShowFrequentNames(true)} className="bg-white border text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-50 transition-all flex items-center gap-2">
-              <RefreshCw size={18} /> الأسماء المتكررة
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
+          <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
+            <button onClick={() => setShowTable(!showTable)} className="bg-blue-50 text-blue-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-blue-100 transition-all flex items-center gap-2 shadow-sm">
+              {showTable ? <Plus size={18} /> : <LayoutList size={18} />}
+              {showTable ? 'رصد خروج جديد' : 'جدول الخروج'}
             </button>
-          )}
-          <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-2xl transition-all border border-red-100 flex items-center gap-2 font-bold"><X size={18} /> إغلاق</button>
-        </CollapsibleActions>
+            {!showTable && (
+              <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                <RefreshCw size={18} /> الأسماء المتكررة
+              </button>
+            )}
+            <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={18} /></button>
+          </div>
+          <div className="flex flex-col items-center md:items-end w-full md:w-auto">
+            <h2 className="text-xl md:text-2xl font-black text-blue-600 flex items-center gap-3">خروج طالب أثناء الدراسة <UserPlus size={24} /></h2>
+            <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
+              <Calendar size={14} className="text-slate-400" />
+              <input type="date" className="text-[10px] md:text-xs font-black bg-transparent outline-none" value={exitForm.date} onChange={e => setExitForm({ ...exitForm, date: e.target.value })} />
+              <span className="text-[10px] font-bold text-slate-400">{getDayName(exitForm.date || today)}</span>
+            </div>
+          </div>
+        </div>
 
         {!showTable ? (
           <div className="space-y-6">
@@ -2018,23 +1989,28 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
           isOpen={showFrequentNames}
           onClose={() => setShowFrequentNames(false)}
         />
-        <CollapsibleActions
-          title="سجل الإتلاف المدرسي"
-          icon={Hammer}
-          dateValue={damageForm.date}
-          onDateChange={e => setDamageForm({ ...damageForm, date: e.target.value })}
-        >
-          <button onClick={() => setShowTable(!showTable)} className="bg-white border text-red-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-red-50 transition-all flex items-center gap-2 shadow-sm">
-            {showTable ? <Plus size={18} /> : <LayoutList size={18} />}
-            {showTable ? 'رصد إتلاف جديد' : 'جدول الإتلاف'}
-          </button>
-          {!showTable && (
-            <button onClick={() => setShowFrequentNames(true)} className="bg-white border text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-50 transition-all flex items-center gap-2">
-              <RefreshCw size={18} /> الأسماء المتكررة
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
+          <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
+            <button onClick={() => setShowTable(!showTable)} className="bg-red-50 text-red-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-red-100 transition-all flex items-center gap-2 shadow-sm">
+              {showTable ? <Plus size={18} /> : <LayoutList size={18} />}
+              {showTable ? 'رصد إتلاف جديد' : 'جدول الإتلاف'}
             </button>
-          )}
-          <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-2xl transition-all border border-red-100 flex items-center gap-2 font-bold"><X size={18} /> إغلاق</button>
-        </CollapsibleActions>
+            {!showTable && (
+              <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                <RefreshCw size={18} /> الأسماء المتكررة
+              </button>
+            )}
+            <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={18} /></button>
+          </div>
+          <div className="flex flex-col items-center md:items-end w-full md:w-auto">
+            <h2 className="text-xl md:text-2xl font-black text-red-600 flex items-center gap-3">سجل الإتلاف المدرسي <Hammer size={24} /></h2>
+            <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
+              <Calendar size={14} className="text-slate-400" />
+              <input type="date" className="text-[10px] md:text-xs font-black bg-transparent outline-none" value={damageForm.date} onChange={e => setDamageForm({ ...damageForm, date: e.target.value })} />
+              <span className="text-[10px] font-bold text-slate-400">{getDayName(damageForm.date || today)}</span>
+            </div>
+          </div>
+        </div>
 
         {!showTable ? (
           <div className="space-y-6">
@@ -2164,23 +2140,28 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
           isOpen={showFrequentNames}
           onClose={() => setShowFrequentNames(false)}
         />
-        <CollapsibleActions
-          title="سجل زيارات أولياء الأمور"
-          icon={UserPlus}
-          dateValue={visitForm.date}
-          onDateChange={e => setVisitForm({ ...visitForm, date: e.target.value })}
-        >
-          <button onClick={() => setShowTable(!showTable)} className="bg-white border text-indigo-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-indigo-50 transition-all flex items-center gap-2 shadow-sm">
-            {showTable ? <Plus size={18} /> : <LayoutList size={18} />}
-            {showTable ? 'رصد جديد' : 'جدول السجلات'}
-          </button>
-          {!showTable && (
-            <button onClick={() => setShowFrequentNames(true)} className="bg-white border text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-50 transition-all flex items-center gap-2">
-              <RefreshCw size={18} /> الأسماء المتكررة
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
+          <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
+            <button onClick={() => setShowTable(!showTable)} className="bg-indigo-50 text-indigo-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-indigo-100 transition-all flex items-center gap-2 shadow-sm">
+              {showTable ? <Plus size={18} /> : <LayoutList size={18} />}
+              {showTable ? 'رصد جديد' : 'جدول السجلات'}
             </button>
-          )}
-          <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-2xl transition-all border border-red-100 flex items-center gap-2 font-bold"><X size={18} /> إغلاق</button>
-        </CollapsibleActions>
+            {!showTable && (
+              <button onClick={() => setShowFrequentNames(true)} className="bg-orange-50 text-orange-600 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black text-xs md:text-sm hover:bg-orange-100 transition-all flex items-center gap-2">
+                <RefreshCw size={18} /> الأسماء المتكررة
+              </button>
+            )}
+            <button onClick={() => setActiveSubTab(null)} className="p-2 md:p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all"><X size={18} /></button>
+          </div>
+          <div className="flex flex-col items-center md:items-end w-full md:w-auto">
+            <h2 className="text-xl md:text-2xl font-black text-indigo-600 flex items-center gap-3">سجل زيارات أولياء الأمور <UserPlus size={24} /></h2>
+            <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
+              <Calendar size={14} className="text-slate-400" />
+              <input type="date" className="text-[10px] md:text-xs font-black bg-transparent outline-none" value={visitForm.date} onChange={e => setVisitForm({ ...visitForm, date: e.target.value })} />
+              <span className="text-[10px] font-bold text-slate-400">{getDayName(visitForm.date || today)}</span>
+            </div>
+          </div>
+        </div>
 
         {!showTable ? (
           <div className="space-y-6 md:space-y-10">
@@ -2464,90 +2445,42 @@ const SpecialReportsPage: React.FC<SpecialReportsPageProps> = ({ initialSubTab, 
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 font-arabic pb-20 text-right">
-      <header className="flex flex-wrap items-center justify-between gap-4 bg-white/50 backdrop-blur-md p-6 rounded-[2.5rem] border border-white shadow-sm sticky top-0 z-[50]">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setIsNavHidden(!isNavHidden)}
-            className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-100 transition-all shadow-sm flex items-center gap-2"
-            title={isNavHidden ? 'إظهار القائمة' : 'إخفاء القائمة'}
-          >
-            {isNavHidden ? <LayoutList size={20} /> : <X size={20} />}
-            <span className="text-xs font-black hidden md:block">{isNavHidden ? 'فتح القائمة' : 'تصغير'}</span>
-          </button>
-          <div>
-            <h2 className="text-xl md:text-2xl font-black text-slate-800 flex items-center gap-2">
-              <Sparkles className="text-blue-600 w-5 h-5" />
-              {activeSubTab || 'التقارير الخاصة'}
-            </h2>
-            <p className="text-slate-500 font-bold text-[10px] md:text-xs">
-              {activeSubTab ? `القسم الفرعي لـ ${structure[activeTab].title}` : 'إدارة شاملة للسجلات الإدارية والتربوية'}
-            </p>
-          </div>
-        </div>
-
-        {!isNavHidden && (
-          <div className="flex flex-wrap gap-2">
+      {!activeSubTab ? (
+        <>
+          <header className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-black text-slate-800 flex items-center gap-3">
+                <Sparkles className="text-blue-600 animate-pulse" />
+                التقارير الخاصة والمتقدمة
+              </h2>
+              <p className="text-slate-500 font-bold mt-1 text-sm md:text-base">إدارة شاملة لجميع السجلات الإدارية والتربوية</p>
+            </div>
+          </header>
+          <div className="flex flex-wrap gap-2 md:gap-4 justify-center md:justify-start">
             {Object.entries(structure).map(([key, cat]) => (
-              <button
-                key={key}
-                onClick={() => {
-                  setActiveTab(key as MainTab);
-                  if (activeSubTab) setActiveSubTab(null);
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all ${activeTab === key
-                  ? 'bg-blue-600 text-white shadow-lg scale-105'
-                  : 'bg-white text-slate-600 border border-slate-100 hover:bg-blue-50'
-                  }`}
-              >
-                {React.cloneElement(cat.icon as React.ReactElement<any>, { size: 16 })}
-                <span className="hidden sm:inline">{cat.title}</span>
+              <button key={key} onClick={() => setActiveTab(key as MainTab)} className={`flex items-center gap-2 md:gap-3 px-4 md:px-8 py-3 md:py-5 rounded-[1.5rem] md:rounded-[2rem] font-black text-sm md:text-lg transition-all shadow-sm ${activeTab === key ? 'bg-blue-600 text-white shadow-xl scale-105' : 'bg-white text-slate-600 border border-slate-100 hover:bg-blue-50'}`}>
+                {React.cloneElement(cat.icon as React.ReactElement<any>, { size: 20 })} {cat.title}
               </button>
             ))}
           </div>
-        )}
-      </header>
-
-      {!isNavHidden && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 animate-in slide-in-from-top-4 duration-500">
-          {structure[activeTab].items.map((item, idx) => (
-            <button
-              key={idx}
-              onClick={() => {
-                handleSubTabClick(item);
-                setIsNavHidden(true);
-              }}
-              className={`group flex items-center justify-between p-4 rounded-2xl transition-all text-right shadow-sm border-2 ${activeSubTab === item
-                ? 'bg-blue-600 border-blue-600 text-white'
-                : 'bg-white border-slate-50 hover:border-blue-500 hover:bg-blue-50/50'
-                }`}
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center transition-all ${activeSubTab === item ? 'bg-white text-blue-600' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'
-                  }`}>
-                  <FileText size={16} />
-                </div>
-                <span className={`font-black text-[10px] md:text-xs truncate ${activeSubTab === item ? 'text-white' : 'text-slate-700'
-                  }`}>{item}</span>
-              </div>
-              <ChevronRight className={activeSubTab === item ? 'text-white' : 'text-slate-300 group-hover:text-blue-500'} size={16} />
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className={`transition-all duration-500 ${isNavHidden ? 'mt-0' : 'mt-4'}`}>
-        {activeSubTab ? renderCurrentModule() : (
-          <div className="bg-white p-12 rounded-[3rem] border-2 border-dashed border-slate-100 flex flex-col items-center justify-center gap-6 text-slate-300 min-h-[400px]">
-            <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center animate-bounce">
-              <LayoutList size={48} />
-            </div>
-            <div className="text-center space-y-2">
-              <h3 className="font-black text-xl text-slate-400">اختر تقريراً من القائمة أعلاه</h3>
-              <p className="font-bold text-sm max-w-xs">يرجى تحديد القسم والتقرير المطلوب للبدء في إدارة البيانات</p>
+          <div className="bg-white p-4 md:p-8 rounded-[2rem] md:rounded-[3rem] border shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+              {structure[activeTab].items.map((item, idx) => (
+                <button key={idx} onClick={() => handleSubTabClick(item)} className="group flex items-center justify-between p-4 md:p-6 rounded-[1.2rem] md:rounded-[1.5rem] bg-slate-50 border-2 border-slate-50 hover:border-blue-500 hover:bg-white transition-all text-right shadow-sm hover:shadow-xl">
+                  <div className="flex items-center gap-2 md:gap-3 overflow-hidden">
+                    <div className="w-8 md:w-10 h-8 md:h-10 rounded-xl bg-white flex-shrink-0 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
+                      <FileText size={16} />
+                    </div>
+                    <span className="font-black text-slate-700 group-hover:text-blue-600 transition-colors text-[10px] md:text-xs truncate">{item}</span>
+                  </div>
+                  <ChevronRight className="text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all flex-shrink-0" size={18} />
+                </button>
+              ))}
             </div>
           </div>
-        )}
-      </div>
+        </>
+      ) : renderCurrentModule()}
     </div>
   );
 };
