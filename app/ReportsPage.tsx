@@ -2349,41 +2349,77 @@ export const StudentsReportsPage: React.FC = () => {
     setSelectedStudentIds([]);
   };
 
+  const normalizeArabic = (text: any): string => {
+    if (!text) return '';
+    return String(text)
+      .replace(/[أإآ]/g, 'ا')
+      .replace(/ة/g, 'ه')
+      .replace(/ى/g, 'ي')
+      .trim();
+  };
+
   const handleAdvancedDelete = () => {
     const { grades, sections, deleteDuplicates } = deletionFilters;
     if (grades.length === 0 && sections.length === 0 && !deleteDuplicates) return;
 
-    let updatedData = [...studentData];
+    // Normalizing filters to ensure matching (including Arabic character normalization)
+    const normalizedGrades = grades.map(g => normalizeArabic(g));
+    const normalizedSections = sections.map(s => normalizeArabic(s));
 
+    let studentsToProcess = [...studentData];
+    let deletedCount = 0;
+
+    // 1. Handle Duplicates if selected
     if (deleteDuplicates) {
       const seen = new Map<string, StudentReport>();
       const toKeep: StudentReport[] = [];
-      const sortedData = [...updatedData].sort((a, b) =>
+      const sortedData = [...studentsToProcess].sort((a, b) =>
         new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
       );
       sortedData.forEach(s => {
-        const key = `${s.name.trim()}-${s.grade}-${s.section}`;
+        const key = `${s.name.trim()}-${normalizeArabic(s.grade)}-${normalizeArabic(s.section)}`;
         if (!seen.has(key)) {
           seen.set(key, s);
           toKeep.push(s);
         }
       });
-      updatedData = toKeep;
+      deletedCount += (studentsToProcess.length - toKeep.length);
+      studentsToProcess = toKeep;
     }
 
-    if (grades.length > 0 || sections.length > 0) {
-      updatedData = updatedData.filter(s => {
-        const gradeMatch = grades.length === 0 || grades.includes(s.grade);
-        const sectionMatch = sections.length === 0 || sections.includes(s.section);
-        // Requirement: Only delete if it matches ALL specified criteria
+    // 2. Handle Grades/Sections filtering
+    let finalData = [...studentsToProcess];
+    if (normalizedGrades.length > 0 || normalizedSections.length > 0) {
+      const afterFiltering = studentsToProcess.filter(s => {
+        const sGrade = normalizeArabic(s.grade);
+        const sSection = normalizeArabic(s.section);
+
+        const gradeMatch = normalizedGrades.length === 0 || normalizedGrades.includes(sGrade);
+        const sectionMatch = normalizedSections.length === 0 || normalizedSections.includes(sSection);
+
+        // Combined logic (Intersection) as per requirement: Grade AND Section must match if both are selected
         const shouldDelete = gradeMatch && sectionMatch;
         return !shouldDelete;
       });
+      deletedCount += (studentsToProcess.length - afterFiltering.length);
+      finalData = afterFiltering;
     }
 
-    updateData({ studentReports: updatedData });
+    if (deletedCount === 0) {
+      alert(lang === 'ar' ? 'لم يتم العثور على طلاب مطابقين لحذفهم' : 'No matching students found to delete');
+      return;
+    }
+
+    const confirmMsg = lang === 'ar'
+      ? `سيتم حذف ${deletedCount} طالب بشكل نهائي. هل أنت متأكد؟`
+      : `Are you sure you want to delete ${deletedCount} students permanently?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    updateData({ studentReports: finalData });
     setShowDeleteStudentsModal(false);
     setDeletionFilters({ grades: [], sections: [], deleteDuplicates: false });
+    setSelectedStudentIds([]); // Clear selection to be safe
     alert(lang === 'ar' ? 'تم الحذف بنجاح' : 'Deleted successfully');
   };
 
@@ -2437,9 +2473,9 @@ export const StudentsReportsPage: React.FC = () => {
       // Check for duplicates
       const duplicates = (imported as any[]).filter(imp =>
         studentData.some(existing =>
-          existing.name.trim() === imp.name.trim() &&
-          existing.grade === imp.grade &&
-          existing.section === imp.section
+          normalizeArabic(existing.name) === normalizeArabic(imp.name) &&
+          normalizeArabic(existing.grade) === normalizeArabic(imp.grade) &&
+          normalizeArabic(existing.section) === normalizeArabic(imp.section)
         )
       );
 
@@ -2464,16 +2500,17 @@ export const StudentsReportsPage: React.FC = () => {
       if (selectedStudentNames.length === 0) return [];
       result = result.filter(s => selectedStudentNames.some(name => s.name.toLowerCase().includes(name.toLowerCase())));
     } else if (filterMode === 'grade' && filterValue) {
-      result = result.filter(s => s.grade === filterValue);
+      result = result.filter(s => normalizeArabic(s.grade) === normalizeArabic(filterValue));
     } else if (filterMode === 'section' && filterValue) {
-      result = result.filter(s => s.section === filterValue);
+      result = result.filter(s => normalizeArabic(s.section) === normalizeArabic(filterValue));
     } else if (filterMode === 'specific' && selectedSpecifics.length > 0) {
+      const normalizedSpecifics = selectedSpecifics.map(sx => normalizeArabic(sx));
       result = result.filter(s =>
-        selectedSpecifics.includes(s.healthStatus) ||
-        selectedSpecifics.includes(s.behaviorLevel) ||
-        selectedSpecifics.includes(s.grade) ||
-        selectedSpecifics.includes(s.section) ||
-        s.mainNotes.some(n => selectedSpecifics.includes(n))
+        normalizedSpecifics.includes(normalizeArabic(s.healthStatus)) ||
+        normalizedSpecifics.includes(normalizeArabic(s.behaviorLevel)) ||
+        normalizedSpecifics.includes(normalizeArabic(s.grade)) ||
+        normalizedSpecifics.includes(normalizeArabic(s.section)) ||
+        s.mainNotes.some(n => normalizedSpecifics.includes(normalizeArabic(n)))
       );
     }
 
